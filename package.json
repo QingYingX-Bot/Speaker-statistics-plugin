@@ -1,0 +1,23 @@
+{
+  "name": "speaker-statistics-plugin",
+  "version": "3.0.0",
+  "description": "群聊水群统计插件 for Yunzai-Bot",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "express": "^5.1.0",
+    "handlebars": "^4.7.8",
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.32.6"
+  },
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "yunzai-bot",
+    "plugin",
+    "statistics",
+    "postgresql"
+  ]
+}

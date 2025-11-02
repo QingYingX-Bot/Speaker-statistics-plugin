@@ -1,0 +1,684 @@
+import fs from 'fs';
+import path from 'path';
+import { getDatabaseService } from './database/DatabaseService.js';
+import { globalConfig } from './ConfigManager.js';
+import { PathResolver } from './utils/PathResolver.js';
+import { TimeUtils } from './utils/TimeUtils.js';
+
+/**
+ * 成就服务类
+ * 负责成就的定义、检查、解锁和管理（使用数据库存储）
+ */
+class AchievementService {
+    constructor(dataService) {
+        this.dataService = dataService;
+        this.dbService = getDatabaseService();
+        this.configDir = PathResolver.getConfigDir();
+        this.achievementsDir = path.join(this.configDir, 'achievements');
+
+        // 缓存相关
+        this.achievementCache = new Map();
+        this.cacheTimestamp = 0;
+        this.cacheTTL = 5 * 60 * 1000; // 5分钟缓存
+
+        // 从JSON文件加载成就定义（延迟加载）
+        this.achievementDefinitions = null;
+        this.categories = null;
+        this.rarities = null;
+        this.definitionsLoaded = false;
+    }
+
+    /**
+     * 获取成就定义（带缓存）
+     */
+    getAchievementDefinitions() {
+        // 检查缓存是否有效
+        if (this.definitionsLoaded && this.achievementDefinitions &&
+            (Date.now() - this.cacheTimestamp) < this.cacheTTL) {
+            return this.achievementDefinitions;
+        }
+
+        // 重新加载定义
+        this.achievementDefinitions = this.loadAchievementsFromFile();
+        this.categories = this.loadCategoriesFromFile();
+        this.rarities = this.loadRaritiesFromFile();
+        this.definitionsLoaded = true;
+        this.cacheTimestamp = Date.now();
+
+        return this.achievementDefinitions;
+    }
+
+    /**
+     * 从JSON文件加载成就定义
+     */
+    loadAchievementsFromFile() {
+        const achievements = {};
+
+        try {
+            // 第一步：加载系统默认成就（config/achievements.json）
+            const configPath = path.join(this.configDir, 'achievements.json');
+            if (fs.existsSync(configPath)) {
+                const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                Object.assign(achievements, configData.achievements || {});
+                globalConfig.debug('已加载系统默认成就配置');
+            } else {
+                globalConfig.error('未找到系统默认成就配置文件');
+            }
+
+            // 第二步：加载用户自定义成就（config/achievements/ 目录），覆盖默认成就
+            if (fs.existsSync(this.achievementsDir)) {
+                const files = fs.readdirSync(this.achievementsDir).filter(file => {
+                    // 跳过 README.md 和 group 目录
+                    return file.endsWith('.json');
+                });
+
+                for (const file of files) {
+                    const filePath = path.join(this.achievementsDir, file);
+                    try {
+                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        Object.assign(achievements, fileData);
+                        globalConfig.debug(`已加载用户自定义成就文件: ${file}`);
+                    } catch (fileError) {
+                        globalConfig.error(`加载用户成就文件失败: ${file}`, fileError);
+                    }
+                    }
+                }
+
+            globalConfig.debug(`共加载 ${Object.keys(achievements).length} 个成就`);
+                    return achievements;
+        } catch (error) {
+            globalConfig.error('加载成就配置文件失败:', error);
+            return {};
+        }
+    }
+
+    /**
+     * 从JSON文件加载分类定义
+     */
+    loadCategoriesFromFile() {
+        const configPath = path.join(this.configDir, 'achievements.json');
+
+        try {
+            if (fs.existsSync(configPath)) {
+                const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                return configData.categories || {};
+            }
+        } catch (error) {
+            globalConfig.error('加载成就分类配置失败:', error);
+        }
+
+        return {};
+    }
+
+    /**
+     * 从JSON文件加载稀有度定义
+     */
+    loadRaritiesFromFile() {
+        const configPath = path.join(this.configDir, 'achievements.json');
+
+        try {
+            if (fs.existsSync(configPath)) {
+                const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                return configData.rarities || {};
+            }
+        } catch (error) {
+            globalConfig.error('加载成就稀有度配置失败:', error);
+        }
+
+        return {};
+    }
+
+    /**
+     * 重新加载成就配置
+     */
+    reloadAchievements() {
+        this.achievementDefinitions = this.loadAchievementsFromFile();
+        this.categories = this.loadCategoriesFromFile();
+        this.rarities = this.loadRaritiesFromFile();
+        this.definitionsLoaded = false;
+        this.cacheTimestamp = 0;
+        globalConfig.debug('成就配置已重新加载');
+    }
+
+    /**
+     * 获取所有成就定义（包括群专属）
+     * @param {string} groupId 群号
+     * @returns {Object} 成就定义对象
+     */
+    getAllAchievementDefinitions(groupId) {
+        const globalDefinitions = this.getAchievementDefinitions();
+        
+        // 加载群专属成就
+        const groupAchievementsDir = path.join(this.achievementsDir, 'group', groupId);
+        const groupDefinitions = {};
+        
+        try {
+            if (fs.existsSync(groupAchievementsDir)) {
+                const files = fs.readdirSync(groupAchievementsDir).filter(file => file.endsWith('.json'));
+                for (const file of files) {
+                    const filePath = path.join(groupAchievementsDir, file);
+                    try {
+                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        Object.assign(groupDefinitions, fileData);
+                    } catch (fileError) {
+                        globalConfig.error(`加载群专属成就文件失败: ${file}`, fileError);
+                    }
+                }
+            }
+        } catch (error) {
+            globalConfig.error(`加载群专属成就失败 (${groupId}):`, error);
+        }
+
+        // 合并全局和群专属成就
+        return {
+            ...globalDefinitions,
+            ...groupDefinitions
+        };
+    }
+
+    /**
+     * 获取用户成就数据（从数据库）
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     * @returns {Object} 用户成就数据
+     */
+    async getUserAchievements(groupId, userId) {
+        try {
+            const allAchievements = await this.dbService.getAllUserAchievements(groupId, userId);
+            const achievements = {};
+            let unlockedCount = 0;
+
+            for (const achievement of allAchievements) {
+                achievements[achievement.achievement_id] = {
+                    unlocked: achievement.unlocked === true,
+                    unlocked_at: achievement.unlocked_at,
+                    progress: achievement.progress || 0
+                };
+                if (achievement.unlocked === true) {
+                    unlockedCount++;
+                }
+            }
+
+            // 获取显示成就
+            let displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
+            
+            // 如果没有手动设置的显示成就，自动选择史诗级及以上成就（按稀有度降序）
+            if (!displayAchievement) {
+                const rarityOrder = {
+                    'mythic': 6,
+                    'legendary': 5,
+                    'festival': 5,  // festival 和 legendary 同级
+                    'epic': 4,
+                    'rare': 3,
+                    'uncommon': 2,
+                    'common': 1
+                };
+                
+                // 获取所有成就定义
+                const allDefinitions = this.getAllAchievementDefinitions(groupId);
+                
+                const epicOrHigher = allAchievements
+                    .filter(a => {
+                        if (a.unlocked !== true) return false;
+                        const definition = allDefinitions[a.achievement_id];
+                        if (!definition) return false;
+                        const rarity = definition.rarity || 'common';
+                        return rarityOrder[rarity] >= rarityOrder['epic'];
+                    })
+                    .sort((a, b) => {
+                        const defA = allDefinitions[a.achievement_id];
+                        const defB = allDefinitions[b.achievement_id];
+                        const aRarity = rarityOrder[defA?.rarity || 'common'] || 0;
+                        const bRarity = rarityOrder[defB?.rarity || 'common'] || 0;
+                        if (bRarity !== aRarity) {
+                            return bRarity - aRarity;
+                        }
+                        // 稀有度相同按解锁时间排序
+                        return new Date(b.unlocked_at) - new Date(a.unlocked_at);
+                    });
+                
+                if (epicOrHigher.length > 0) {
+                    const topAchievement = epicOrHigher[0];
+                    const definition = allDefinitions[topAchievement.achievement_id];
+                    displayAchievement = {
+                        achievement_id: topAchievement.achievement_id,
+                        achievement_name: definition?.name || topAchievement.achievement_id,
+                        rarity: definition?.rarity || 'common'
+                    };
+                }
+            }
+
+            return {
+                achievements,
+                unlockedCount,
+                displayAchievement: displayAchievement ? {
+                    id: displayAchievement.achievement_id,
+                    name: displayAchievement.achievement_name,
+                    rarity: displayAchievement.rarity
+                } : null
+            };
+        } catch (error) {
+            globalConfig.error('获取用户成就数据失败:', error);
+            return {
+                achievements: {},
+                unlockedCount: 0,
+                displayAchievement: null
+            };
+        }
+    }
+
+    /**
+     * 保存用户成就数据（到数据库）
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @param {Object} achievementData 成就数据
+     */
+    async saveUserAchievement(groupId, userId, achievementId, achievementData) {
+        try {
+            await this.dbService.saveUserAchievement(groupId, userId, achievementId, {
+                unlocked: achievementData.unlocked || false,
+                unlocked_at: achievementData.unlocked_at || null,
+                progress: achievementData.progress || 0
+            });
+        } catch (error) {
+            globalConfig.error('保存用户成就数据失败:', error);
+        }
+    }
+
+    /**
+     * 检查并更新用户成就
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     * @param {Object} userData 用户数据
+     * @returns {Array} 新解锁的成就列表
+     */
+    async checkAndUpdateAchievements(groupId, userId, userData) {
+        const achievementData = await this.getUserAchievements(groupId, userId);
+        // 合并全量成就定义（全局 + 群专属）
+        const allDefinitions = this.getAllAchievementDefinitions(groupId);
+        
+        const newAchievements = [];
+        let progressChanged = false;
+
+        // 检查每个成就（包含群专属）
+        for (const [achievementId, definition] of Object.entries(allDefinitions)) {
+            // 如果已经解锁，跳过
+            if (achievementData.achievements[achievementId]?.unlocked) {
+                continue;
+            }
+
+            // 检查成就条件
+            const { matched, progressed } = this.checkAchievementCondition(
+                definition,
+                userData,
+                achievementData.achievements,
+                achievementId,
+                groupId,
+                userId
+            );
+            
+            if (progressed) progressChanged = true;
+            
+            if (matched) {
+                // 只在真正解锁时记录（不输出日志，由调用方统一输出）
+                // 解锁成就（使用 UTC+8 时区）
+                const unlockedAt = TimeUtils.formatDateTimeForDB();
+                
+                await this.saveUserAchievement(groupId, userId, achievementId, {
+                    unlocked: true,
+                    unlocked_at: unlockedAt,
+                    progress: definition.condition?.value || 1
+                });
+
+                newAchievements.push({
+                    ...definition,
+                    id: achievementId,
+                    unlockedAt
+                });
+            } else if (progressed) {
+                // 进度更新但未解锁
+                const currentProgress = achievementData.achievements[achievementId]?.progress || 0;
+                await this.saveUserAchievement(groupId, userId, achievementId, {
+                    unlocked: false,
+                    unlocked_at: null,
+                    progress: currentProgress
+                });
+            }
+        }
+
+        // 移除检查完成的日志，由调用方统一输出
+
+        return newAchievements;
+    }
+
+    /**
+     * 检查成就条件
+     * @param {Object} definition 成就定义
+     * @param {Object} userData 用户数据
+     * @param {Object} achievementData 用户成就数据
+     * @param {string} achievementId 成就ID
+     * @param {string} groupId 群号（用于文本检查）
+     * @param {string} userId 用户ID（用于文本检查）
+     * @returns {Object} { matched: boolean, progressed: boolean }
+     */
+    checkAchievementCondition(definition, userData, achievementData = {}, achievementId = '', groupId = '', userId = '') {
+        const { condition } = definition;
+
+        if (!condition || !condition.type) {
+            return { matched: false, progressed: false };
+        }
+
+        switch (condition.type) {
+            case 'first_message':
+                return { matched: (userData.total || 0) >= 1 };
+
+            case 'total_count':
+                return { matched: (userData.total || 0) >= (condition.value || 0) };
+
+            case 'daily_count':
+                return { matched: this.getTodayMessageCount(userData) >= (condition.value || 0) };
+
+            case 'weekly_count':
+                return { matched: this.getThisWeekMessageCount(userData) >= (condition.value || 0) };
+
+            case 'monthly_count':
+                return { matched: this.getThisMonthMessageCount(userData) >= (condition.value || 0) };
+
+            case 'daily_words':
+                return { matched: this.getTodayWordCount(userData) >= (condition.value || 0) };
+
+            case 'weekly_words':
+                return { matched: this.getThisWeekWordCount(userData) >= (condition.value || 0) };
+
+            case 'monthly_words':
+                return { matched: this.getThisMonthWordCount(userData) >= (condition.value || 0) };
+
+            case 'daily_streak':
+                return { matched: this.calculateDailyStreak(userData) >= (condition.value || 0) };
+
+            case 'max_continuous_days':
+                return { matched: this.calculateMaxContinuousDays(userData) >= (condition.value || 0) };
+
+            case 'total_words':
+                return { matched: (userData.total_number_of_words || 0) >= (condition.value || 0) };
+
+            case 'active_days':
+                return { matched: (userData.active_days || 0) >= (condition.value || 0) };
+
+            case 'text_contains':
+                return this.checkTextContains(condition, userData, achievementData, achievementId, groupId, userId);
+
+            case 'text_contains_times':
+                return this.checkTextContainsTimes(condition, userData, achievementData, achievementId, groupId, userId);
+
+            case 'night_time':
+                return { matched: this.isNightTime() };
+
+            case 'morning_time':
+                return { matched: this.isMorningTime() };
+
+            case 'time_window':
+                return this.checkTimeWindow(condition);
+
+            default:
+                return { matched: false, progressed: false };
+        }
+    }
+
+    /**
+     * 获取最新消息文本（从数据服务或消息记录器）
+     */
+    getRecentMessageText(userData, groupId, userId) {
+        // 尝试从消息记录器获取
+        if (this.dataService && this.dataService.messageRecorder) {
+            return this.dataService.messageRecorder.getRecentMessageText(groupId, userId);
+        }
+        return '';
+    }
+
+    /**
+     * 检查文本包含条件
+     */
+    checkTextContains(condition, userData, achievementData, achievementId, groupId, userId) {
+        try {
+            const text = this.getRecentMessageText(userData, groupId, userId) || '';
+            const value = condition.value;
+            
+            if (text.length === 0 || value == null) {
+                return { matched: false };
+            }
+
+            // 支持字符串、字符串数组、或 { pattern, flags } 的正则对象
+            if (Array.isArray(value)) {
+                return {
+                    matched: value.some(v => v != null && text.includes(String(v)))
+                };
+            }
+
+            if (typeof value === 'object' && value.pattern) {
+                const pattern = String(value.pattern);
+                const flags = value.flags ? String(value.flags) : 'i';
+                const reg = new RegExp(pattern, flags);
+                return {
+                    matched: reg.test(text)
+                };
+            }
+
+            return {
+                matched: text.includes(String(value))
+            };
+        } catch (err) {
+            globalConfig.error('text_contains 条件判断失败:', err);
+            return { matched: false };
+        }
+    }
+
+    /**
+     * 检查文本包含次数条件
+     */
+    checkTextContainsTimes(condition, userData, achievementData, achievementId, groupId, userId) {
+        try {
+            const text = this.getRecentMessageText(userData, groupId, userId) || '';
+            const value = condition.value;
+            const times = Number(condition.times) || 1;
+            
+            if (text.length === 0 || value == null) {
+                return { matched: false };
+            }
+
+            let hit = false;
+            if (Array.isArray(value)) {
+                hit = value.some(v => v != null && text.includes(String(v)));
+            } else if (typeof value === 'object' && value.pattern) {
+                const pattern = String(value.pattern);
+                const flags = value.flags ? String(value.flags) : 'i';
+                const reg = new RegExp(pattern, flags);
+                hit = reg.test(text);
+            } else {
+                hit = text.includes(String(value));
+            }
+
+            let progressed = false;
+            if (hit && achievementId) {
+                const current = Number(achievementData[achievementId]?.progress || 0);
+                const next = current + 1;
+                
+                // 更新进度
+                if (!achievementData[achievementId]) {
+                    achievementData[achievementId] = {};
+                }
+                achievementData[achievementId].progress = next;
+                progressed = true;
+
+                globalConfig.debug(`[成就] 进度: id=${achievementId} ${next}/${times}`);
+
+                if (next >= times) {
+                    return {
+                        matched: true,
+                        progressed
+                    };
+                }
+            }
+
+            return {
+                matched: false,
+                progressed
+            };
+        } catch (err) {
+            globalConfig.error('text_contains_times 条件判断失败:', err);
+            return { matched: false };
+        }
+    }
+
+    /**
+     * 检查时间窗口条件
+     */
+    checkTimeWindow(condition) {
+        try {
+            const { start, end, timezone } = condition;
+            if (!start || !end) return { matched: false };
+
+            const now = TimeUtils.getUTC8Date();
+            const nowMs = now.getTime();
+
+            const parse = (s) => {
+                if (typeof s !== 'string') return NaN;
+                if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+                    return new Date(s).getTime();
+                }
+                // 简化解析逻辑
+                return Date.parse(s);
+            };
+
+            const startMs = parse(start);
+            const endMs = parse(end);
+
+            if (!isFinite(startMs) || !isFinite(endMs)) {
+                return { matched: false };
+            }
+
+            // 如果 end < start，认为跨年
+            let finalEndMs = endMs;
+            if (endMs < startMs) {
+                const endDate = new Date(endMs);
+                endDate.setFullYear(endDate.getFullYear() + 1);
+                finalEndMs = endDate.getTime();
+            }
+
+            return { matched: nowMs >= startMs && nowMs <= finalEndMs };
+        } catch (err) {
+            globalConfig.error('time_window 条件判断失败:', err);
+            return { matched: false };
+        }
+    }
+
+    /**
+     * 计算连续发言天数（从今天往前的连续天数，遇到中断即停止）
+     */
+    calculateDailyStreak(userData) {
+        if (!userData.daily_stats) return 0;
+        // 使用 TimeUtils 的通用方法，计算从今天往前的连续天数（不计算最大值）
+        return TimeUtils.calculateContinuousDays(userData.daily_stats, false);
+    }
+
+    /**
+     * 获取今日消息数
+     */
+    getTodayMessageCount(userData) {
+        const today = TimeUtils.formatDate(TimeUtils.getUTC8Date());
+        return userData.daily_stats?.[today]?.count || 0;
+    }
+
+    /**
+     * 获取今日字数
+     */
+    getTodayWordCount(userData) {
+        const today = TimeUtils.formatDate(TimeUtils.getUTC8Date());
+        return userData.daily_stats?.[today]?.words || 0;
+    }
+
+    /**
+     * 判断是否是夜间（UTC+8）
+     */
+    isNightTime() {
+        const now = TimeUtils.getUTC8Date();
+        const hour = now.getHours();
+        return hour >= 22 || hour < 6;
+    }
+
+    /**
+     * 判断是否是早晨（UTC+8）
+     */
+    isMorningTime() {
+        const now = TimeUtils.getUTC8Date();
+        const hour = now.getHours();
+        return hour >= 6 && hour < 9;
+    }
+
+    /**
+     * 获取本周消息数
+     */
+    getThisWeekMessageCount(userData) {
+        const now = TimeUtils.getUTC8Date();
+        const weekKey = TimeUtils.getWeekNumber(now);
+        return userData.weekly_stats?.[weekKey]?.count || 0;
+    }
+
+    /**
+     * 获取本月消息数
+     */
+    getThisMonthMessageCount(userData) {
+        const now = TimeUtils.getUTC8Date();
+        const monthKey = TimeUtils.getMonthString(now);
+        return userData.monthly_stats?.[monthKey]?.count || 0;
+    }
+
+    /**
+     * 获取本周字数
+     */
+    getThisWeekWordCount(userData) {
+        const now = TimeUtils.getUTC8Date();
+        const weekKey = TimeUtils.getWeekNumber(now);
+        return userData.weekly_stats?.[weekKey]?.words || 0;
+    }
+
+    /**
+     * 获取本月字数
+     */
+    getThisMonthWordCount(userData) {
+        const now = TimeUtils.getUTC8Date();
+        const monthKey = TimeUtils.getMonthString(now);
+        return userData.monthly_stats?.[monthKey]?.words || 0;
+    }
+
+    /**
+     * 计算最长连续天数
+     */
+    calculateMaxContinuousDays(userData) {
+        if (!userData.daily_stats) return 0;
+        // 使用 TimeUtils 的通用方法，计算最长连续天数
+        return TimeUtils.calculateContinuousDays(userData.daily_stats, true);
+    }
+
+    /**
+     * 设置用户显示成就
+     */
+    async setDisplayAchievement(groupId, userId, achievementId, achievementName, rarity) {
+        try {
+            await this.dbService.setDisplayAchievement(groupId, userId, {
+                id: achievementId,
+                name: achievementName,
+                rarity: rarity
+            });
+            return true;
+        } catch (error) {
+            globalConfig.error('设置显示成就失败:', error);
+            return false;
+        }
+    }
+}
+
+export { AchievementService };
+export default AchievementService;
+

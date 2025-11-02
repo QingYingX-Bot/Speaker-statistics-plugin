@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				background: #D8DBE2;
+				min-height: 100vh;
+				padding: 20px;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+				line-height: 1.6;
+			}
+
+			.container {
+				width: 100%;
+				max-width: 1200px;
+				margin: 0 auto;
+				background: #A9BCD0;
+				border-radius: 20px;
+				box-shadow: 0 20px 40px rgba(27, 27, 30, 0.15);
+				overflow: hidden;
+			}
+
+			.header {
+				background: #58A4B0;
+				color: #FEF9FF;
+				padding: 40px 30px;
+				text-align: center;
+			}
+
+
+			.title {
+				font-size: 48px;
+				font-weight: 1000;
+				line-height: 1.2;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				overflow: hidden;
+				margin-bottom: 20px;
+				max-width: 100%;
+			}
+
+			.group-id {
+				font-size: 24px;
+				opacity: 0.9;
+				font-weight: 500;
+			}
+
+			.stats-grid {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				gap: 30px;
+				padding: 40px;
+				width: 100%;
+			}
+
+			.stat-card {
+				background: #D8DBE2;
+				border-radius: 16px;
+				padding: 30px;
+				text-align: center;
+				border: 1px solid #58A4B0;
+				width: 100%;
+				min-width: 0;
+			}
+
+			.stat-value {
+				font-size: 48px;
+				font-weight: 1000;
+				color: #373F51;
+				margin-bottom: 10px;
+			}
+
+			.stat-label {
+				font-size: 18px;
+				color: #373F51;
+				font-weight: 600;
+			}
+
+			.top-users-section {
+				padding: 0 40px 40px;
+			}
+
+			.section-title {
+				font-size: 32px;
+				font-weight: 1000;
+				color: #373F51;
+				margin-bottom: 30px;
+				text-align: center;
+			}
+
+
+			.top-users-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 20px;
+				width: 100%;
+			}
+
+			.user-card {
+				background: #D8DBE2;
+				border-radius: 16px;
+				padding: 25px;
+				text-align: center;
+				border: 1px solid #58A4B0;
+				width: 100%;
+				min-width: 0;
+			}
+
+			.rank-badge {
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 1000;
+				font-size: 16px;
+				color: #FEF9FF;
+				border: 2px solid #A9BCD0;
+				margin: 0 auto 10px;
+			}
+
+			.rank-1 {
+				background: #736CED;
+			}
+
+			.rank-2 {
+				background: #9F9FED;
+			}
+
+			.rank-3 {
+				background: #D4C1EC;
+			}
+
+			.user-avatar {
+				width: 80px;
+				height: 80px;
+				border-radius: 50%;
+				margin: 0 auto 15px;
+				border: 3px solid #58A4B0;
+			}
+
+			.user-name {
+				font-size: 18px;
+				font-weight: 700;
+				color: #373F51;
+				margin-bottom: 10px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				max-width: 100%;
+				word-wrap: break-word;
+			}
+
+			.user-count {
+				font-size: 24px;
+				font-weight: 1000;
+				color: #373F51;
+			}
+
+			.footer {
+				background: #A9BCD0;
+				padding: 20px;
+				text-align: center;
+				color: #373F51;
+				font-size: 14px;
+				border-top: 1px solid #58A4B0;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<div class="title">{{TITLE}}</div>
+				<div class="group-id">{{GROUP_ID}}</div>
+			</div>
+
+			<div class="stats-grid">
+				<div class="stat-card">
+					<div class="stat-value">{{USER_COUNT}}</div>
+					<div class="stat-label">统计用户总数</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-value">{{TOTAL_MESSAGES}}</div>
+					<div class="stat-label">消息总量</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-value">{{TODAY_ACTIVE}}</div>
+					<div class="stat-label">今日活跃人数</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-value">{{MONTH_ACTIVE}}</div>
+					<div class="stat-label">本月活跃人数</div>
+				</div>
+			</div>
+
+			<div class="top-users-section">
+				<div class="section-title">发言前三用户</div>
+				<div class="top-users-grid">
+					{{TOP_USERS}}
+				</div>
+			</div>
+
+			<div class="footer">
+				生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}
+			</div>
+		</div>
+	</body>
+</html>
