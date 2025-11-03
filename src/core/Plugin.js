@@ -148,7 +148,7 @@ class Plugin extends plugin {
             this.messageRecorder.recordMessage(e).catch(error => {
                 // 静默处理错误，不影响消息传递（不输出到控制台）
                 // 只在调试模式下输出错误
-                if (globalConfig.getConfig('debug.enabled')) {
+                if (globalConfig.getConfig('global.debugLog')) {
                     globalConfig.debug('[消息记录] 记录消息异常:', error.message || error);
                 }
             });

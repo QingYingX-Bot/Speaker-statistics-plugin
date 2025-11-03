@@ -149,7 +149,7 @@ class MessageRecorder {
                     await this.dataService.dbService.saveGroupInfo(groupId, groupName);
                 } catch (error) {
                     // 静默处理，不影响消息记录
-                    if (globalConfig.getConfig('debug.enabled')) {
+                    if (globalConfig.getConfig('global.debugLog')) {
                         globalConfig.debug(`保存群信息失败: group_id=${groupId}`, error);
                     }
                 }
