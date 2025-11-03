@@ -2,6 +2,8 @@ import { DataService } from '../core/DataService.js';
 import { AchievementService } from '../core/AchievementService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { ImageGenerator } from '../render/ImageGenerator.js';
+import { segment } from 'oicq';
 
 /**
  * 成就命令处理类
@@ -10,6 +12,7 @@ class AchievementCommands {
     constructor(dataService = null) {
         this.dataService = dataService || new DataService();
         this.achievementService = new AchievementService(dataService);
+        this.imageGenerator = new ImageGenerator(dataService);
     }
 
     /**
@@ -17,10 +20,6 @@ class AchievementCommands {
      */
     static getRules() {
         return [
-            {
-                reg: '^#水群成就$',
-                fnc: 'showUserAchievements'
-            },
             {
                 reg: '^#水群成就列表$',
                 fnc: 'showUserBadges'
@@ -33,9 +32,9 @@ class AchievementCommands {
     }
 
     /**
-     * 显示用户成就
+     * 显示用户徽章列表（所有可获取的成就：默认+自定义+群专属）
      */
-    async showUserAchievements(e) {
+    async showUserBadges(e) {
         const validation = CommonUtils.validateGroupMessage(e);
         if (!validation.valid) {
             return e.reply(validation.message);
@@ -45,42 +44,60 @@ class AchievementCommands {
             const groupId = String(e.group_id);
             const userId = String(e.sender.user_id);
 
+            // 获取所有成就定义（默认+自定义+群专属）
+            const allDefinitions = this.achievementService.getAllAchievementDefinitions(groupId);
+            
+            // 获取用户的成就解锁状态
             const achievementData = await this.achievementService.getUserAchievements(groupId, userId);
 
-            let text = `🏆 成就列表\n\n`;
-            text += `已解锁: ${achievementData.unlockedCount} 个\n\n`;
+            // 生成成就列表图片
+            try {
+                const imagePath = await this.imageGenerator.generateAchievementListImage(
+                    allDefinitions,
+                    achievementData.achievements,
+                    groupId,
+                    userId
+                );
+                return e.reply(segment.image(`file:///${imagePath.replace(/\\/g, '/')}`));
+            } catch (error) {
+                globalConfig.error('生成成就列表图片失败:', error);
+                // 回退到文本模式
+                let text = `🏆 成就列表\n\n`;
+                text += `已解锁: ${achievementData.unlockedCount} / ${Object.keys(allDefinitions).length} 个\n\n`;
+                
+                // 按稀有度排序显示
+                const rarityOrder = {
+                    common: 1,
+                    uncommon: 2,
+                    rare: 3,
+                    epic: 4,
+                    legendary: 5,
+                    mythic: 6,
+                    festival: 7
+                };
 
-            if (achievementData.displayAchievement) {
-                text += `当前显示: ${achievementData.displayAchievement.name} (${achievementData.displayAchievement.rarity})\n\n`;
-            }
+                const sortedAchievements = Object.entries(allDefinitions)
+                    .sort(([idA, defA], [idB, defB]) => {
+                        const rarityA = rarityOrder[defA.rarity] || 0;
+                        const rarityB = rarityOrder[defB.rarity] || 0;
+                        if (rarityB !== rarityA) {
+                            return rarityB - rarityA;
+                        }
+                        return defA.name.localeCompare(defB.name, 'zh-CN');
+                    });
 
-            // 显示部分成就
-            const unlocked = Object.entries(achievementData.achievements)
-                .filter(([_, data]) => data.unlocked)
-                .slice(0, 10);
-
-            if (unlocked.length > 0) {
-                text += `已解锁成就:\n`;
-                for (const [id, data] of unlocked) {
-                    const definition = this.achievementService.getAchievementDefinitions()[id];
-                    if (definition) {
-                        text += `  • ${definition.name}\n`;
-                    }
+                for (const [id, definition] of sortedAchievements) {
+                    const isUnlocked = achievementData.achievements[id]?.unlocked || false;
+                    const status = isUnlocked ? '✅' : '❌';
+                    text += `${status} ${definition.name} (${definition.rarity})\n`;
                 }
-            }
 
-            return e.reply(text);
+                return e.reply(text);
+            }
         } catch (error) {
-            globalConfig.error('显示用户成就失败:', error);
+            globalConfig.error('显示成就列表失败:', error);
             return e.reply('查询失败，请稍后重试');
         }
-    }
-
-    /**
-     * 显示用户徽章列表
-     */
-    async showUserBadges(e) {
-        return await this.showUserAchievements(e);
     }
 
     /**

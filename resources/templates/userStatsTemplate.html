@@ -211,42 +211,10 @@
 				<div class="title-section">
 					<div class="title">{{TITLE}}</div>
 				</div>
-				<div class="user-profile">
-					<img class="avatar" src="http://q.qlogo.cn/headimg_dl?dst_uin={{USER_ID}}&spec=640&img_type=jpg" />
-					<div class="user-info">
-						<div class="nickname">{{NICKNAME}}</div>
-						<div class="info-container">
-							<div class="info-item">
-								<div class="info-icon clock-icon"></div>
-								<span class="info-label">最后发言时间：</span>
-								<span class="info-value">{{LAST_SPEAKING_TIME}}</span>
-							</div>
-							<div class="info-item">
-								<div class="info-icon globe-icon"></div>
-								<span class="info-value">{{GLOBAL_INFO}}</span>
-							</div>
-						</div>
-					</div>
-				</div>
+				{{USER_PROFILE}}
 			</div>
 			<div class="stats-grid">
-				<div class="stat-card">
-					<div class="stat-label">发言总数</div>
-					<div class="stat-value">{{COUNT}}</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-label">连续发言天数</div>
-					<div class="stat-value">{{CONTINUOUS_DAYS}}</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-label">总发言天数</div>
-					<div class="stat-value">{{TOTAL_DAYS}}</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-label">平均每日发言</div>
-					<div class="stat-value">{{AVERAGE_DAILY}}</div>
-				</div>
-				{{WORD_COUNT_CARD}}
+				{{STATS_GRID}}
 			</div>
 			<div class="footer">
 				<p>生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}</p>

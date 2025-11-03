@@ -519,6 +519,88 @@ class ImageGenerator {
             await this.releasePage(page);
         }
     }
+
+    /**
+     * 生成成就列表图片
+     * @param {Object} allDefinitions 所有成就定义（默认+自定义+群专属）
+     * @param {Object} userAchievements 用户的成就解锁状态
+     * @param {string} groupId 群ID
+     * @param {string} userId 用户ID
+     * @returns {Promise<string>} 图片路径
+     */
+    async generateAchievementListImage(allDefinitions, userAchievements, groupId, userId) {
+        const page = await this.getAvailablePage();
+
+        try {
+            await page.setViewport({
+                width: 1520,
+                height: 1
+            });
+
+            // 获取群名称
+            let groupName = `群${groupId}`;
+            try {
+                if (this.templateManager.dataService) {
+                    const dbService = this.templateManager.dataService.dbService;
+                    if (dbService && dbService.getGroupInfo) {
+                        const groupInfo = await dbService.getGroupInfo(groupId);
+                        if (groupInfo && groupInfo.group_name) {
+                            groupName = groupInfo.group_name;
+                        }
+                    }
+                }
+                if (groupName === `群${groupId}` && typeof Bot !== 'undefined' && Bot.gl) {
+                    const glGroup = Bot.gl.get(groupId);
+                    if (glGroup && glGroup.name) {
+                        groupName = glGroup.name;
+                    }
+                }
+            } catch (error) {
+                globalConfig.debug('获取群名称失败，使用默认值:', error);
+            }
+
+            // 使用模板管理器生成HTML
+            const html = this.templateManager.renderAchievementListTemplate(
+                allDefinitions,
+                userAchievements,
+                groupId,
+                groupName
+            );
+
+            if (!html) {
+                throw new Error('成就列表模板渲染失败');
+            }
+
+            await page.setContent(html, {
+                waitUntil: 'networkidle0'
+            });
+
+            // 获取实际高度并调整视口
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            await page.setViewport({
+                width: 1520,
+                height: bodyHeight
+            });
+
+            // 保存图片
+            const tempDir = PathResolver.getTempDir();
+            this.ensureDirectoryExists(tempDir);
+            const imagePath = path.join(tempDir, `achievement_list_${groupId}_${userId}_${Date.now()}.png`);
+
+            await page.screenshot({
+                path: imagePath,
+                fullPage: true,
+                optimizeForSpeed: true
+            });
+
+            return imagePath;
+        } catch (error) {
+            globalConfig.error('生成成就列表图片失败:', error);
+            throw error;
+        } finally {
+            await this.releasePage(page);
+        }
+    }
 }
 
 export { ImageGenerator };

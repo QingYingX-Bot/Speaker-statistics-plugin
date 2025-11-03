@@ -4,6 +4,7 @@ import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
 import { TextFormatter } from '../render/TextFormatter.js';
+import { segment } from 'oicq';
 
 /**
  * 用户查询命令处理类
@@ -21,7 +22,7 @@ class UserCommands {
     static getRules() {
         return [
             {
-                reg: '^#水群查询$',
+                reg: '^#水群查询(\\s+@.*)?$',
                 fnc: 'queryUserStats'
             },
             {
@@ -29,6 +30,36 @@ class UserCommands {
                 fnc: 'listUserGroups'
             }
         ];
+    }
+
+    /**
+     * 解析 @ 用户或QQ号
+     * @param {Object} e 消息事件
+     * @returns {Object} { userId: string, nickname: string } 或 null
+     */
+    parseMentionedUser(e) {
+        // 检查消息中是否有 @
+        if (e.message) {
+            for (const item of e.message) {
+                if (item.type === 'at' && item.qq) {
+                    return {
+                        userId: String(item.qq),
+                        nickname: item.text || `用户${item.qq}`
+                    };
+                }
+            }
+        }
+        
+        // 检查文本消息中是否有 @QQ号
+        const match = e.msg?.match(/@(\d+)/);
+        if (match) {
+            return {
+                userId: match[1],
+                nickname: `用户${match[1]}`
+            };
+        }
+        
+        return null;
     }
 
     /**
@@ -41,8 +72,19 @@ class UserCommands {
         }
 
         try {
-            const userId = String(e.sender?.user_id || e.user_id || '');
-            const senderNickname = e.sender?.card || e.sender?.nickname || '未知用户';
+            // 解析 @ 用户
+            let userId, nickname;
+            const mentionedUser = this.parseMentionedUser(e);
+            
+            if (mentionedUser) {
+                // 查询 @ 的用户
+                userId = mentionedUser.userId;
+                nickname = mentionedUser.nickname;
+            } else {
+                // 查询自己
+                userId = String(e.sender?.user_id || e.user_id || '');
+                nickname = e.sender?.card || e.sender?.nickname || '未知用户';
+            }
             
             if (!userId) {
                 return e.reply('无法获取用户信息');
@@ -58,11 +100,11 @@ class UserCommands {
                 (!userStats.total_words || userStats.total_words === 0) && 
                 (!userStats.active_days || userStats.active_days === 0)
             )) {
-                return e.reply(`${senderNickname} 暂无统计数据`);
+                return e.reply(`${nickname} 暂无统计数据`);
             }
             
-            // 使用数据库中的昵称（如果有），否则使用发送者的昵称
-            const nickname = userStats.nickname || senderNickname;
+            // 使用数据库中的昵称（如果有），否则使用解析的昵称
+            nickname = userStats.nickname || nickname;
             
             // 获取基础统计数据
             const totalCount = parseInt(userStats.total_count || 0, 10);
@@ -92,6 +134,43 @@ class UserCommands {
             const allDailyStats = { [todayDate]: todayStats };
             const allMonthlyStats = { [monthKey]: monthStats };
 
+            // 获取全局排名和统计信息
+            let globalRank = null;
+            let totalUsers = 0;
+            let totalMessages = 0;
+            let groupCount = 0;
+            try {
+                // 获取用户全局排名
+                const userRankData = await this.dataService.getUserRankData(userId, null, 'total', {});
+                if (userRankData) {
+                    globalRank = userRankData.rank;
+                }
+                
+                // 获取全局统计
+                const globalStats = await this.dataService.getGlobalStats(1, 1);
+                totalUsers = globalStats.totalUsers || 0;
+                totalMessages = globalStats.totalMessages || 0;
+                
+                // 获取用户所在的群个数
+                const userStatsList = await dbService.all(
+                    'SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1',
+                    userId
+                );
+                if (userStatsList && userStatsList.length > 0) {
+                    groupCount = parseInt(userStatsList[0].group_count || 0, 10);
+                }
+            } catch (error) {
+                globalConfig.debug('获取排名信息失败:', error);
+            }
+
+            // 计算占比
+            const messagePercentage = totalMessages > 0 
+                ? ((totalCount / totalMessages) * 100).toFixed(2) 
+                : '0.00';
+            const userPercentage = totalUsers > 0 
+                ? ((1 / totalUsers) * 100).toFixed(4) 
+                : '0.0000';
+
             // 构建用户数据对象（用于模板）
             const userData = {
                 user_id: userId,
@@ -103,7 +182,15 @@ class UserCommands {
                 continuous_days: maxContinuousDays,
                 last_speaking_time: lastSpeakingTime,
                 daily_stats: allDailyStats,
-                monthly_stats: allMonthlyStats
+                monthly_stats: allMonthlyStats,
+                global_rank: globalRank,
+                message_percentage: messagePercentage,
+                user_percentage: userPercentage,
+                today_count: todayStats.count,
+                today_words: todayStats.words,
+                month_count: monthStats.count,
+                month_words: monthStats.words,
+                group_count: groupCount
             };
 
             // 优先使用图片模式（使用userStatsTemplate.html，图片生成失败时回退到文本模式）

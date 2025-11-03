@@ -268,15 +268,21 @@ class TemplateManager {
         const generateTime = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
         const version = this.version;
 
+        // 生成头部HTML
+        const headerHtml = `
+			<div class="title">${title}</div>
+			<div class="total-count">发言总数：<span>${CommonUtils.formatNumber(totalCount)}</span></div>
+			<div class="group-info">${groupName} (${groupId})</div>
+        `;
+
+        // 生成页脚HTML
+        const footerHtml = `生成时间：${generateTime} | Speaker-statistics-plugin v${version}`;
+
         return template
-            .replace(/\{\{TITLE\}\}/g, title)
-            .replace(/\{\{TOTAL_COUNT\}\}/g, CommonUtils.formatNumber(totalCount))
-            .replace(/\{\{GROUP_NAME\}\}/g, groupName)
-            .replace(/\{\{GROUP_ID\}\}/g, groupId)
+            .replace(/\{\{HEADER\}\}/g, headerHtml)
             .replace(/\{\{RANKING_ITEMS\}\}/g, rankingItems)
             .replace(/\{\{USER_CARD\}\}/g, userCard)
-            .replace(/\{\{GENERATE_TIME\}\}/g, generateTime)
-            .replace(/\{\{VERSION\}\}/g, version);
+            .replace(/\{\{FOOTER\}\}/g, footerHtml);
     }
 
     /**
@@ -394,16 +400,113 @@ class TemplateManager {
         // 计算平均每日发言数
         const averageDaily = activeDays > 0 ? Math.round(totalCount / activeDays) : 0;
         
-        // 生成全局信息（总字数和总发言数）
-        const globalInfo = `累计发言 ${CommonUtils.formatNumber(totalCount)} 条 · 累计字数 ${CommonUtils.formatNumber(totalWords)} 字`;
+        // 获取排名和占比信息
+        const globalRank = userData.global_rank || null;
+        const messagePercentage = userData.message_percentage || '0.00';
+        const todayCount = userData.today_count || 0;
+        const todayWords = userData.today_words || 0;
+        const monthCount = userData.month_count || 0;
+        const monthWords = userData.month_words || 0;
+        const groupCount = userData.group_count || 0;
         
-        // 字数统计卡片HTML
-        const wordCountCard = totalWords > 0 ? `
-                    <div class="stat-card">
-                        <div class="stat-label">累计字数</div>
-                        <div class="stat-value">${CommonUtils.formatNumber(totalWords)}</div>
-                    </div>
-        ` : '';
+        // 生成全局信息（群个数、总字数和总发言数）
+        let globalInfo = `累计发言 ${CommonUtils.formatNumber(totalCount)} 条 · 累计字数 ${CommonUtils.formatNumber(totalWords)} 字`;
+        if (groupCount > 0) {
+            globalInfo = `所在群数 ${groupCount} 个 · ${globalInfo}`;
+        }
+        
+        // 生成用户信息区域HTML
+        const userProfileHtml = `
+				<div class="user-profile">
+					<img class="avatar" src="http://q.qlogo.cn/headimg_dl?dst_uin=${userId}&spec=640&img_type=jpg" />
+					<div class="user-info">
+						<div class="nickname">${this.generateNicknameWithAchievement(displayName, displayAchievement)}</div>
+						<div class="info-container">
+							<div class="info-item">
+								<div class="info-icon clock-icon"></div>
+								<span class="info-label">最后发言时间：</span>
+								<span class="info-value">${lastSpeakingTime}</span>
+							</div>
+							<div class="info-item">
+								<div class="info-icon globe-icon"></div>
+								<span class="info-value">${globalInfo}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+        `;
+
+        // 生成所有统计卡片HTML（统一在JS中生成，移除重复数据，优化排序）
+        const statCards = [];
+        
+        // 优化后的布局：
+        // 1. 今日发言（占两列，突出显示）
+        statCards.push(`
+					<div class="stat-card span-2">
+						<div class="stat-label">今日发言</div>
+						<div class="stat-value">${CommonUtils.formatNumber(todayCount)}</div>
+					</div>
+        `);
+        
+        // 2. 连续发言天数（坚持度）
+        statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">连续发言天数</div>
+						<div class="stat-value">${continuousDays}</div>
+					</div>
+        `);
+        
+        // 3. 总发言天数（总体活跃度）
+        statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">总发言天数</div>
+						<div class="stat-value">${activeDays}</div>
+					</div>
+        `);
+        
+        // 4. 消息占比（如果有，显示贡献度）
+        if (messagePercentage !== '0.00') {
+            statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">消息占比</div>
+						<div class="stat-value">${messagePercentage}%</div>
+					</div>
+            `);
+            
+            // 5. 平均每日发言（与消息占比并排）
+            statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">平均每日发言</div>
+						<div class="stat-value">${averageDaily}</div>
+					</div>
+            `);
+        } else {
+            // 如果没有消息占比，单独显示平均每日发言
+            statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">平均每日发言</div>
+						<div class="stat-value">${averageDaily}</div>
+					</div>
+            `);
+        }
+        
+        // 6. 本月发言（如果与总数不同，显示本月数据）
+        if (monthCount !== totalCount && monthCount > 0) {
+            statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">本月发言</div>
+						<div class="stat-value">${CommonUtils.formatNumber(monthCount)}</div>
+					</div>
+            `);
+        }
+        
+        // 移除的重复卡片：
+        // - 发言总数（与头部"累计发言"重复）
+        // - 全群排名（已从头部移除，不再显示）
+        // - 累计字数（与头部"累计字数"重复）
+        
+        // 合并所有统计卡片
+        const statsGridHtml = statCards.join('\n\t\t\t\t\t');
 
         const timeInfo = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
         const version = this.version;
@@ -412,15 +515,8 @@ class TemplateManager {
         return template
             .replace(/\{\{BACKGROUND_STYLE\}\}/g, backgroundStyle)
             .replace(/\{\{TITLE\}\}/g, title)
-            .replace(/\{\{USER_ID\}\}/g, userId)
-            .replace(/\{\{NICKNAME\}\}/g, this.generateNicknameWithAchievement(displayName, displayAchievement))
-            .replace(/\{\{LAST_SPEAKING_TIME\}\}/g, lastSpeakingTime)
-            .replace(/\{\{GLOBAL_INFO\}\}/g, globalInfo)
-            .replace(/\{\{COUNT\}\}/g, CommonUtils.formatNumber(totalCount))
-            .replace(/\{\{CONTINUOUS_DAYS\}\}/g, continuousDays.toString())
-            .replace(/\{\{TOTAL_DAYS\}\}/g, activeDays.toString())
-            .replace(/\{\{AVERAGE_DAILY\}\}/g, averageDaily.toString())
-            .replace(/\{\{WORD_COUNT_CARD\}\}/g, wordCountCard)
+            .replace(/\{\{USER_PROFILE\}\}/g, userProfileHtml)
+            .replace(/\{\{STATS_GRID\}\}/g, statsGridHtml)
             .replace(/\{\{GENERATE_TIME\}\}/g, timeInfo)
             .replace(/\{\{VERSION\}\}/g, version);
     }
@@ -434,21 +530,44 @@ class TemplateManager {
 
         const timeInfo = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
         const version = this.version;
-        const title = '群统计信息';
+
+        // 生成头部HTML
+        const headerHtml = `
+			<div class="title">群统计信息</div>
+			<div class="group-id">${groupId}</div>
+        `;
+
+        // 生成统计卡片HTML
+        const statsGridHtml = `
+			<div class="stat-card">
+				<div class="stat-value">${CommonUtils.formatNumber(groupStats.userCount || 0)}</div>
+				<div class="stat-label">统计用户总数</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">${CommonUtils.formatNumber(groupStats.totalMessages || 0)}</div>
+				<div class="stat-label">消息总量</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">${CommonUtils.formatNumber(groupStats.todayActive || 0)}</div>
+				<div class="stat-label">今日活跃人数</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-value">${CommonUtils.formatNumber(groupStats.monthActive || 0)}</div>
+				<div class="stat-label">本月活跃人数</div>
+			</div>
+        `;
 
         // 生成前三用户HTML
         const topUsersHtml = await this.generateTopUsersHtml(topUsers, groupId);
 
+        // 生成页脚HTML
+        const footerHtml = `生成时间：${timeInfo} | Speaker-statistics-plugin v${version}`;
+
         return template
-            .replace(/\{\{TITLE\}\}/g, title)
-            .replace(/\{\{GROUP_ID\}\}/g, groupId)
-            .replace(/\{\{USER_COUNT\}\}/g, CommonUtils.formatNumber(groupStats.userCount || 0))
-            .replace(/\{\{TOTAL_MESSAGES\}\}/g, CommonUtils.formatNumber(groupStats.totalMessages || 0))
-            .replace(/\{\{TODAY_ACTIVE\}\}/g, CommonUtils.formatNumber(groupStats.todayActive || 0))
-            .replace(/\{\{MONTH_ACTIVE\}\}/g, CommonUtils.formatNumber(groupStats.monthActive || 0))
+            .replace(/\{\{HEADER\}\}/g, headerHtml)
+            .replace(/\{\{STATS_GRID\}\}/g, statsGridHtml)
             .replace(/\{\{TOP_USERS\}\}/g, topUsersHtml)
-            .replace(/\{\{GENERATE_TIME\}\}/g, timeInfo)
-            .replace(/\{\{VERSION\}\}/g, version);
+            .replace(/\{\{FOOTER\}\}/g, footerHtml);
     }
 
     /**
@@ -517,53 +636,57 @@ class TemplateManager {
         const timestamp = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
         const version = this.version;
 
+        // 生成头部HTML
+        const headerHtml = `
+			<div class="title">全局统计</div>
+			<div class="subtitle">所有群聊的综合统计信息</div>
+        `;
+
+        // 生成概览统计卡片HTML
+        const overviewCardsHtml = `
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.totalGroups || 0)}</div>
+				<div class="overview-label">统计群数</div>
+			</div>
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.totalUsers || 0)}</div>
+				<div class="overview-label">统计用户总数</div>
+			</div>
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.totalMessages || 0)}</div>
+				<div class="overview-label">消息总量</div>
+			</div>
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.todayActive || 0)}</div>
+				<div class="overview-label">今日活跃人数</div>
+			</div>
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.monthActive || 0)}</div>
+				<div class="overview-label">本月活跃人数</div>
+			</div>
+        `;
+
         // 生成群聊统计卡片HTML
         const groupsHtml = this.generateGroupsStatsHtml(globalStats.groups || []);
 
         // 处理无群组情况
         const noGroupsHtml = globalStats.groups && globalStats.groups.length === 0 
             ? '<div class="no-groups" id="no-groups"><div class="text">暂无群聊统计数据</div></div>'
-            : '';
+            : '<div class="no-groups" id="no-groups" style="display: none;"><div class="text">暂无群聊统计数据</div></div>';
 
-        // 先替换所有变量，totalGroups 出现两次需要分别处理
-        let html = template
-            .replace(/\{\{totalUsers\}\}/g, CommonUtils.formatNumber(globalStats.totalUsers || 0))
-            .replace(/\{\{totalMessages\}\}/g, CommonUtils.formatNumber(globalStats.totalMessages || 0))
-            .replace(/\{\{todayActive\}\}/g, CommonUtils.formatNumber(globalStats.todayActive || 0))
-            .replace(/\{\{monthActive\}\}/g, CommonUtils.formatNumber(globalStats.monthActive || 0))
-            .replace(/\{\{timestamp\}\}/g, timestamp)
-            .replace(/\{\{version\}\}/g, version)
-            .replace(/\{\{currentPage\}\}/g, (globalStats.currentPage || 1).toString())
-            .replace(/\{\{totalPages\}\}/g, (globalStats.totalPages || 1).toString());
+        // 生成页脚HTML
+        const footerHtml = `
+			<div class="timestamp">生成时间：${timestamp}</div>
+			<div class="pagination-info">第 ${globalStats.currentPage || 1} 页，共 ${globalStats.totalPages || 1} 页（显示 ${CommonUtils.formatNumber((globalStats.groups || []).length)} 个群聊）</div>
+			<div class="version">Speaker-statistics-plugin v${version}</div>
+        `;
 
-        // 替换概览中的 totalGroups（统计群数）
-        html = html.replace(/\{\{totalGroups\}\}/, CommonUtils.formatNumber(globalStats.totalGroups || 0));
-        // 替换页脚中的 totalGroups（显示的总群数，这里应该是当前页显示的群数）
-        html = html.replace(/\{\{totalGroups\}\}/, CommonUtils.formatNumber((globalStats.groups || []).length));
-
-        // 替换群聊统计容器
-        if (groupsHtml) {
-            // 使用正则表达式匹配，避免空格问题
-            html = html.replace(
-                /<div class="groups-grid" id="groups-container">[\s\S]*?<\/div>/,
-                `<div class="groups-grid" id="groups-container">\n\t\t\t\t${groupsHtml}\n\t\t\t</div>`
-            );
-        }
-
-        // 替换无群组提示
-        if (noGroupsHtml) {
-            html = html.replace(
-                '<div class="no-groups" id="no-groups" style="display: none;">',
-                '<div class="no-groups" id="no-groups">'
-            );
-        } else {
-            html = html.replace(
-                '<div class="no-groups" id="no-groups" style="display: none;">',
-                '<div class="no-groups" id="no-groups" style="display: none;">'
-            );
-        }
-
-        return html;
+        return template
+            .replace(/\{\{HEADER\}\}/g, headerHtml)
+            .replace(/\{\{OVERVIEW_STATS\}\}/g, overviewCardsHtml)
+            .replace(/\{\{GROUPS_GRID\}\}/g, groupsHtml || '')
+            .replace(/\{\{NO_GROUPS\}\}/g, noGroupsHtml)
+            .replace(/\{\{FOOTER\}\}/g, footerHtml);
     }
 
     /**
@@ -613,6 +736,149 @@ class TemplateManager {
         });
 
         return cards.join('\n\t\t\t\t');
+    }
+
+    /**
+     * 渲染成就列表模板
+     * @param {Object} allDefinitions 所有成就定义（默认+自定义+群专属）
+     * @param {Object} userAchievements 用户的成就解锁状态
+     * @param {string} groupId 群ID
+     * @param {string} groupName 群名称
+     * @returns {string} 渲染后的HTML
+     */
+    renderAchievementListTemplate(allDefinitions, userAchievements, groupId, groupName) {
+        const template = this.loadTemplate('achievementListTemplate.html');
+        if (!template) return '';
+
+        const timestamp = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
+        const version = this.version;
+
+        // 计算已解锁数量
+        let unlockedCount = 0;
+        for (const [id, _] of Object.entries(allDefinitions)) {
+            if (userAchievements[id]?.unlocked) {
+                unlockedCount++;
+            }
+        }
+
+        // 按稀有度排序
+        const rarityOrder = {
+            common: 1,
+            uncommon: 2,
+            rare: 3,
+            epic: 4,
+            legendary: 5,
+            mythic: 6,
+            festival: 7
+        };
+
+        // 分离已解锁和未解锁的成就
+        const unlockedAchievements = [];
+        const lockedAchievements = [];
+
+        for (const [id, definition] of Object.entries(allDefinitions)) {
+            const isUnlocked = userAchievements[id]?.unlocked || false;
+            const unlockTime = userAchievements[id]?.unlocked_at 
+                ? new Date(userAchievements[id].unlocked_at).getTime() 
+                : 0;
+
+            if (isUnlocked) {
+                unlockedAchievements.push({ id, definition, unlockTime });
+            } else {
+                lockedAchievements.push({ id, definition, unlockTime: 0 });
+            }
+        }
+
+        // 已解锁成就排序：先按稀有度，再按解锁时间倒序（最新的在前）
+        unlockedAchievements.sort((a, b) => {
+            const rarityA = rarityOrder[a.definition.rarity] || 0;
+            const rarityB = rarityOrder[b.definition.rarity] || 0;
+            if (rarityB !== rarityA) {
+                return rarityB - rarityA;
+            }
+            // 稀有度相同时，按解锁时间倒序
+            return b.unlockTime - a.unlockTime;
+        });
+
+        // 未解锁成就排序：按稀有度，稀有度相同时按名称
+        lockedAchievements.sort((a, b) => {
+            const rarityA = rarityOrder[a.definition.rarity] || 0;
+            const rarityB = rarityOrder[b.definition.rarity] || 0;
+            if (rarityB !== rarityA) {
+                return rarityB - rarityA;
+            }
+            return a.definition.name.localeCompare(b.definition.name, 'zh-CN');
+        });
+
+        // 合并列表：已解锁在前，未解锁在后
+        const sortedAchievements = [...unlockedAchievements, ...lockedAchievements];
+
+        // 生成成就列表HTML
+        let lastWasUnlocked = null;
+        const achievementsHtml = sortedAchievements.map((item, index) => {
+            const { id, definition } = item;
+            const isUnlocked = userAchievements[id]?.unlocked || false;
+            const unlockTime = userAchievements[id]?.unlocked_at 
+                ? this.formatDate(userAchievements[id].unlocked_at) 
+                : null;
+            
+            const rarityEmoji = {
+                common: '🥉',
+                uncommon: '🥈',
+                rare: '🥇',
+                epic: '💎',
+                legendary: '👑',
+                mythic: '🔥',
+                festival: '🎊'
+            };
+            const emoji = rarityEmoji[definition.rarity] || '🏆';
+
+            const statusClass = isUnlocked ? 'unlocked' : 'locked';
+            const statusIcon = isUnlocked ? '✅' : '🔒';
+
+            // 在已解锁和未解锁之间添加分隔条
+            let separatorHtml = '';
+            if (index === 0) {
+                // 第一个成就，根据状态显示对应的分隔条
+                if (isUnlocked) {
+                    separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">已解锁成就</div><div class="separator-line"></div></div>';
+                } else {
+                    separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">未解锁成就</div><div class="separator-line"></div></div>';
+                }
+            } else if (lastWasUnlocked === true && !isUnlocked) {
+                // 从已解锁切换到未解锁
+                separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">未解锁成就</div><div class="separator-line"></div></div>';
+            }
+
+            lastWasUnlocked = isUnlocked;
+
+            const itemHtml = `<div class="achievement-item ${statusClass}">
+					<div class="achievement-status ${statusClass}">${statusIcon}</div>
+					<div class="achievement-badge">
+						<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+					</div>
+					<div class="achievement-info">
+						<div class="achievement-name">${definition.name}</div>
+						<div class="achievement-description">${definition.description || '暂无描述'}</div>
+					</div>
+					${unlockTime ? `<div class="achievement-unlock-time">解锁于：${unlockTime}</div>` : '<div class="achievement-unlock-time"></div>'}
+				</div>`;
+
+            return separatorHtml + itemHtml;
+        }).join('\n\t\t\t\t');
+
+        // 生成头部信息HTML
+        const headerHtml = `
+			<div class="title">成就列表</div>
+			<div class="achievement-count">解锁进度：<span>${unlockedCount}</span> / <span>${Object.keys(allDefinitions).length}</span></div>
+			<div class="group-info">${groupName || `群${groupId}`} (${CommonUtils.maskGroupId(groupId)})</div>
+        `;
+
+        return template
+            .replace(/\{\{HEADER\}\}/g, headerHtml)
+            .replace(/\{\{ACHIEVEMENT_ITEMS\}\}/g, achievementsHtml)
+            .replace(/\{\{GENERATE_TIME\}\}/g, timestamp)
+            .replace(/\{\{VERSION\}\}/g, version);
     }
 }
 
