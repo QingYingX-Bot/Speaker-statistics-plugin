@@ -902,6 +902,92 @@ class DatabaseService {
     }
 
     /**
+     * 检查用户是否在任何群中已解锁某个成就（用于节日成就）
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @returns {Promise<boolean>} 是否已解锁
+     */
+    async hasAchievementInAnyGroup(userId, achievementId) {
+        const result = await this.get(
+            'SELECT 1 FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true LIMIT 1',
+            userId,
+            achievementId
+        );
+        return result !== null;
+    }
+
+    /**
+     * 获取用户在任意群中解锁某个成就的详细信息（用于节日成就）
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @returns {Promise<Object|null>} 成就信息（包含 unlocked_at 和 progress）
+     */
+    async getAchievementFromAnyGroup(userId, achievementId) {
+        return await this.get(
+            'SELECT * FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true ORDER BY unlocked_at ASC LIMIT 1',
+            userId,
+            achievementId
+        );
+    }
+
+    /**
+     * 获取用户所在的所有群列表
+     * @param {string} userId 用户ID
+     * @returns {Promise<Array<string>>} 群ID数组
+     */
+    async getUserGroups(userId) {
+        const rows = await this.all(
+            'SELECT DISTINCT group_id FROM user_stats WHERE user_id = $1',
+            userId
+        );
+        return rows.map(row => row.group_id);
+    }
+
+    /**
+     * 批量保存节日成就到用户所在的所有群
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @param {Object} achievementData 成就数据
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async saveFestivalAchievementToAllGroups(userId, achievementId, achievementData) {
+        const now = this.getCurrentTime();
+        
+        // 获取用户所在的所有群
+        const groups = await this.getUserGroups(userId);
+        
+        if (groups.length === 0) {
+            return false;
+        }
+
+        // 使用事务或批量插入
+        for (const groupId of groups) {
+            await this.run(`
+                INSERT INTO achievements (
+                    group_id, user_id, achievement_id, unlocked, unlocked_at, progress, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (group_id, user_id, achievement_id) 
+                DO UPDATE SET
+                    unlocked = EXCLUDED.unlocked,
+                    unlocked_at = EXCLUDED.unlocked_at,
+                    progress = EXCLUDED.progress,
+                    updated_at = EXCLUDED.updated_at
+            `,
+                groupId,
+                userId,
+                achievementId,
+                achievementData.unlocked ? true : false,
+                achievementData.unlocked_at || null,
+                achievementData.progress || 0,
+                now,
+                now
+            );
+        }
+
+        return true;
+    }
+
+    /**
      * 设置用户显示成就（使用 UPSERT 避免并发冲突）
      * @param {string} groupId 群号
      * @param {string} userId 用户ID

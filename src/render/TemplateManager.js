@@ -6,6 +6,7 @@ import { globalConfig } from '../core/ConfigManager.js';
 import { AchievementService } from '../core/AchievementService.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
+import { AchievementUtils } from '../core/utils/AchievementUtils.js';
 
 /**
  * 模板管理器
@@ -761,17 +762,6 @@ class TemplateManager {
             }
         }
 
-        // 按稀有度排序
-        const rarityOrder = {
-            common: 1,
-            uncommon: 2,
-            rare: 3,
-            epic: 4,
-            legendary: 5,
-            mythic: 6,
-            festival: 7
-        };
-
         // 分离已解锁和未解锁的成就
         const unlockedAchievements = [];
         const lockedAchievements = [];
@@ -790,25 +780,18 @@ class TemplateManager {
         }
 
         // 已解锁成就排序：先按稀有度，再按解锁时间倒序（最新的在前）
-        unlockedAchievements.sort((a, b) => {
-            const rarityA = rarityOrder[a.definition.rarity] || 0;
-            const rarityB = rarityOrder[b.definition.rarity] || 0;
-            if (rarityB !== rarityA) {
-                return rarityB - rarityA;
-            }
-            // 稀有度相同时，按解锁时间倒序
-            return b.unlockTime - a.unlockTime;
-        });
+        AchievementUtils.sortUnlockedAchievements(
+            unlockedAchievements,
+            (item) => item.definition.rarity,
+            (item) => item.unlockTime
+        );
 
         // 未解锁成就排序：按稀有度，稀有度相同时按名称
-        lockedAchievements.sort((a, b) => {
-            const rarityA = rarityOrder[a.definition.rarity] || 0;
-            const rarityB = rarityOrder[b.definition.rarity] || 0;
-            if (rarityB !== rarityA) {
-                return rarityB - rarityA;
-            }
-            return a.definition.name.localeCompare(b.definition.name, 'zh-CN');
-        });
+        AchievementUtils.sortLockedAchievements(
+            lockedAchievements,
+            (item) => item.definition.rarity,
+            (item) => item.definition.name
+        );
 
         // 合并列表：已解锁在前，未解锁在后
         const sortedAchievements = [...unlockedAchievements, ...lockedAchievements];

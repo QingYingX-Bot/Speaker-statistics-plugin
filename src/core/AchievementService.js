@@ -4,6 +4,7 @@ import { getDatabaseService } from './database/DatabaseService.js';
 import { globalConfig } from './ConfigManager.js';
 import { PathResolver } from './utils/PathResolver.js';
 import { TimeUtils } from './utils/TimeUtils.js';
+import { AchievementUtils } from './utils/AchievementUtils.js';
 
 /**
  * 成就服务类
@@ -188,6 +189,9 @@ class AchievementService {
             const achievements = {};
             let unlockedCount = 0;
 
+            // 获取所有成就定义（用于识别节日成就）
+            const allDefinitions = this.getAllAchievementDefinitions(groupId);
+
             for (const achievement of allAchievements) {
                 achievements[achievement.achievement_id] = {
                     unlocked: achievement.unlocked === true,
@@ -199,47 +203,60 @@ class AchievementService {
                 }
             }
 
+            // 对于节日成就，检查是否在其他群已解锁（当前群未解锁的情况下）
+            for (const [achievementId, definition] of Object.entries(allDefinitions)) {
+                const isFestival = AchievementUtils.isFestivalAchievement(definition.rarity);
+                
+                if (isFestival) {
+                    // 如果当前群未解锁，检查其他群是否已解锁
+                    if (!achievements[achievementId] || !achievements[achievementId].unlocked) {
+                        const otherGroupAchievement = await this.dbService.getAchievementFromAnyGroup(userId, achievementId);
+                        if (otherGroupAchievement && otherGroupAchievement.unlocked === true) {
+                            // 如果其他群已解锁，合并到当前群的成就数据中（不写入数据库，仅用于显示）
+                            achievements[achievementId] = {
+                                unlocked: true,
+                                unlocked_at: otherGroupAchievement.unlocked_at,
+                                progress: otherGroupAchievement.progress || 0
+                            };
+                            unlockedCount++;
+                        }
+                    }
+                }
+            }
+
             // 获取显示成就
             let displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
             
             // 如果没有手动设置的显示成就，自动选择史诗级及以上成就（按稀有度降序）
             if (!displayAchievement) {
-                const rarityOrder = {
-                    'mythic': 6,
-                    'legendary': 5,
-                    'festival': 5,  // festival 和 legendary 同级
-                    'epic': 4,
-                    'rare': 3,
-                    'uncommon': 2,
-                    'common': 1
-                };
-                
-                // 获取所有成就定义
+                // 获取所有成就定义（已在上面获取过，但为了代码清晰再次获取）
                 const allDefinitions = this.getAllAchievementDefinitions(groupId);
                 
-                const epicOrHigher = allAchievements
-                    .filter(a => {
-                        if (a.unlocked !== true) return false;
-                        const definition = allDefinitions[a.achievement_id];
+                // 使用 achievements 对象而不是 allAchievements 数组，以确保包含节日成就
+                const epicOrHigher = Object.entries(achievements)
+                    .filter(([achievementId, achievementData]) => {
+                        if (!achievementData.unlocked) return false;
+                        const definition = allDefinitions[achievementId];
                         if (!definition) return false;
-                        const rarity = definition.rarity || 'common';
-                        return rarityOrder[rarity] >= rarityOrder['epic'];
+                        return AchievementUtils.isRarityOrHigher(definition.rarity, 'epic');
                     })
-                    .sort((a, b) => {
-                        const defA = allDefinitions[a.achievement_id];
-                        const defB = allDefinitions[b.achievement_id];
-                        const aRarity = rarityOrder[defA?.rarity || 'common'] || 0;
-                        const bRarity = rarityOrder[defB?.rarity || 'common'] || 0;
-                        if (bRarity !== aRarity) {
-                            return bRarity - aRarity;
-                        }
-                        // 稀有度相同按解锁时间排序
-                        return new Date(b.unlocked_at) - new Date(a.unlocked_at);
-                    });
+                    .map(([achievementId, achievementData]) => ({
+                        achievement_id: achievementId,
+                        unlocked: achievementData.unlocked,
+                        unlocked_at: achievementData.unlocked_at,
+                        definition: allDefinitions[achievementId]
+                    }));
+                
+                // 按稀有度和解锁时间排序
+                AchievementUtils.sortUnlockedAchievements(
+                    epicOrHigher,
+                    (item) => item.definition?.rarity || 'common',
+                    (item) => new Date(item.unlocked_at).getTime()
+                );
                 
                 if (epicOrHigher.length > 0) {
                     const topAchievement = epicOrHigher[0];
-                    const definition = allDefinitions[topAchievement.achievement_id];
+                    const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id];
                     displayAchievement = {
                         achievement_id: topAchievement.achievement_id,
                         achievement_name: definition?.name || topAchievement.achievement_id,
@@ -303,9 +320,28 @@ class AchievementService {
 
         // 检查每个成就（包含群专属）
         for (const [achievementId, definition] of Object.entries(allDefinitions)) {
-            // 如果已经解锁，跳过
-            if (achievementData.achievements[achievementId]?.unlocked) {
-                continue;
+            // 判断是否为节日成就
+            const isFestival = AchievementUtils.isFestivalAchievement(definition.rarity);
+
+            // 对于节日成就，如果已在其他群解锁，则跳过（视为已解锁）
+            if (isFestival) {
+                // 先检查当前群是否已解锁
+                if (!achievementData.achievements[achievementId]?.unlocked) {
+                    // 检查是否在其他群已解锁
+                    const unlockedInAnyGroup = await this.dbService.hasAchievementInAnyGroup(userId, achievementId);
+                    if (unlockedInAnyGroup) {
+                        // 在其他群已解锁，跳过检查（视为已解锁）
+                        continue;
+                    }
+                } else {
+                    // 当前群已解锁，跳过
+                    continue;
+                }
+            } else {
+                // 非节日成就，如果当前群已解锁，跳过
+                if (achievementData.achievements[achievementId]?.unlocked) {
+                    continue;
+                }
             }
 
             // 检查成就条件
@@ -325,11 +361,19 @@ class AchievementService {
                 // 解锁成就（使用 UTC+8 时区）
                 const unlockedAt = TimeUtils.formatDateTimeForDB();
                 
-                await this.saveUserAchievement(groupId, userId, achievementId, {
+                const achievementDataToSave = {
                     unlocked: true,
                     unlocked_at: unlockedAt,
                     progress: definition.condition?.value || 1
-                });
+                };
+
+                if (isFestival) {
+                    // 节日成就：同步到所有群
+                    await this.dbService.saveFestivalAchievementToAllGroups(userId, achievementId, achievementDataToSave);
+                } else {
+                    // 普通成就：只保存到当前群
+                    await this.saveUserAchievement(groupId, userId, achievementId, achievementDataToSave);
+                }
 
                 newAchievements.push({
                     ...definition,

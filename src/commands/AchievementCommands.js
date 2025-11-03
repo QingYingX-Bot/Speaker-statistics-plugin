@@ -2,6 +2,7 @@ import { DataService } from '../core/DataService.js';
 import { AchievementService } from '../core/AchievementService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { AchievementUtils } from '../core/utils/AchievementUtils.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
 import { segment } from 'oicq';
 
@@ -66,25 +67,16 @@ class AchievementCommands {
                 text += `已解锁: ${achievementData.unlockedCount} / ${Object.keys(allDefinitions).length} 个\n\n`;
                 
                 // 按稀有度排序显示
-                const rarityOrder = {
-                    common: 1,
-                    uncommon: 2,
-                    rare: 3,
-                    epic: 4,
-                    legendary: 5,
-                    mythic: 6,
-                    festival: 7
-                };
-
-                const sortedAchievements = Object.entries(allDefinitions)
-                    .sort(([idA, defA], [idB, defB]) => {
-                        const rarityA = rarityOrder[defA.rarity] || 0;
-                        const rarityB = rarityOrder[defB.rarity] || 0;
-                        if (rarityB !== rarityA) {
-                            return rarityB - rarityA;
-                        }
-                        return defA.name.localeCompare(defB.name, 'zh-CN');
-                    });
+                const achievementEntries = Object.entries(allDefinitions)
+                    .map(([id, def]) => ({ id, definition: def }));
+                
+                AchievementUtils.sortLockedAchievements(
+                    achievementEntries,
+                    (item) => item.definition.rarity,
+                    (item) => item.definition.name
+                );
+                
+                const sortedAchievements = achievementEntries.map(item => [item.id, item.definition]);
 
                 for (const [id, definition] of sortedAchievements) {
                     const isUnlocked = achievementData.achievements[id]?.unlocked || false;
