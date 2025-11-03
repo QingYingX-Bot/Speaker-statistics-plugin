@@ -7,7 +7,6 @@
 **✨ Yunzai-Bot 专业的群聊发言统计与成就系统**
 
 > 插件 by QingYing & AI  
-> 🏠 **仓库地址**: [Gitee](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
 
 ---
 
@@ -134,10 +133,16 @@ pnpm install
 
 3. **配置数据库**
 
+> 📖 **详细安装教程**：请参考 [数据库安装教程](DATABASE_SETUP.md)
+
+快速配置步骤：
+
 创建 PostgreSQL 数据库：
 
 ```sql
 CREATE DATABASE speech_statistics;
+CREATE USER speech_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 ```
 
 编辑 `data/global.json` 配置数据库连接：
@@ -148,8 +153,8 @@ CREATE DATABASE speech_statistics;
     "host": "localhost",
     "port": 5432,
     "database": "speech_statistics",
-    "user": "your_username",
-    "password": "your_password",
+    "user": "speech_user",
+    "password": "your_secure_password",
     "max": 20,
     "idleTimeoutMillis": 30000
   }
@@ -203,6 +208,8 @@ data/
 ---
 
 ## 🗂️ 数据存储
+
+> 📖 **数据库安装指南**：详细安装教程请参考 [DATABASE_SETUP.md](DATABASE_SETUP.md)
 
 ### 数据库表结构
 
