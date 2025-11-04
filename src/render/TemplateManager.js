@@ -210,7 +210,8 @@ class TemplateManager {
                 epic: '💎',
                 legendary: '👑',
                 mythic: '🔥',
-                festival: '🎊'
+                festival: '🎊',
+                special: '✨'
             };
             const emoji = rarityEmoji[achievement.rarity] || '';
             return `${nickname}<span class="achievement-inline achievement-${achievement.rarity}">${emoji} ${achievement.name}</span>`;
@@ -751,7 +752,7 @@ class TemplateManager {
      * @param {string} groupName 群名称
      * @returns {string} 渲染后的HTML
      */
-    renderAchievementListTemplate(allDefinitions, userAchievements, groupId, groupName) {
+    renderAchievementListTemplate(allDefinitions, userAchievements, groupId, groupName, displayAchievement = null) {
         const template = this.loadTemplate('achievementListTemplate.html');
         if (!template) return '';
 
@@ -809,6 +810,33 @@ class TemplateManager {
                 ? this.formatDate(userAchievements[id].unlocked_at) 
                 : null;
             
+            // 检查是否是当前佩戴的成就
+            const isDisplayed = displayAchievement && displayAchievement.id === id;
+            let displayStatusHtml = '';
+            if (isDisplayed) {
+                if (displayAchievement.isManual) {
+                    // 手动设置，无时限
+                    displayStatusHtml = '<span class="display-status manual">✅ 已佩戴（手动设置）</span>';
+                } else if (displayAchievement.autoDisplayAt) {
+                    // 自动佩戴，计算剩余时间
+                    const autoDisplayAt = new Date(displayAchievement.autoDisplayAt);
+                    const now = new Date();
+                    const diffMs = now - autoDisplayAt;
+                    const diffHours = diffMs / (1000 * 60 * 60);
+                    const remainingHours = Math.max(0, 24 - diffHours);
+                    const remainingMinutes = Math.floor((remainingHours % 1) * 60);
+                    
+                    if (remainingHours > 0) {
+                        const hours = Math.floor(remainingHours);
+                        displayStatusHtml = `<span class="display-status auto">✅ 已佩戴（自动佩戴剩余 ${hours}小时${remainingMinutes > 0 ? remainingMinutes + '分钟' : ''}）</span>`;
+                    } else {
+                        displayStatusHtml = '<span class="display-status expired">⏰ 已过期（将自动卸下）</span>';
+                    }
+                } else {
+                    displayStatusHtml = '<span class="display-status manual">✅ 已佩戴</span>';
+                }
+            }
+            
             const rarityEmoji = {
                 common: '🥉',
                 uncommon: '🥈',
@@ -816,7 +844,8 @@ class TemplateManager {
                 epic: '💎',
                 legendary: '👑',
                 mythic: '🔥',
-                festival: '🎊'
+                festival: '🎊',
+                special: '✨'
             };
             const emoji = rarityEmoji[definition.rarity] || '🏆';
 
@@ -845,10 +874,17 @@ class TemplateManager {
 						<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
 					</div>
 					<div class="achievement-info">
-						<div class="achievement-name">${definition.name}</div>
-						<div class="achievement-description">${definition.description || '暂无描述'}</div>
+						<div class="achievement-name-row">
+							<div class="achievement-name">${definition.name}</div>
+							${displayStatusHtml ? `<div class="achievement-display-status">${displayStatusHtml}</div>` : ''}
+						</div>
+						<div class="achievement-description-row">
+							<div class="achievement-description">${definition.description || '暂无描述'}</div>
+							${unlockTime ? `<div class="achievement-meta-row">
+								<div class="achievement-unlock-time">解锁于：${unlockTime}</div>
+							</div>` : ''}
+						</div>
 					</div>
-					${unlockTime ? `<div class="achievement-unlock-time">解锁于：${unlockTime}</div>` : '<div class="achievement-unlock-time"></div>'}
 				</div>`;
 
             return separatorHtml + itemHtml;
@@ -858,6 +894,105 @@ class TemplateManager {
         const headerHtml = `
 			<div class="title">成就列表</div>
 			<div class="achievement-count">解锁进度：<span>${unlockedCount}</span> / <span>${Object.keys(allDefinitions).length}</span></div>
+			<div class="group-info">${groupName || `群${groupId}`} (${CommonUtils.maskGroupId(groupId)})</div>
+        `;
+
+        return template
+            .replace(/\{\{HEADER\}\}/g, headerHtml)
+            .replace(/\{\{ACHIEVEMENT_ITEMS\}\}/g, achievementsHtml)
+            .replace(/\{\{GENERATE_TIME\}\}/g, timestamp)
+            .replace(/\{\{VERSION\}\}/g, version);
+    }
+
+    /**
+     * 渲染成就统计模板（复用 achievementListTemplate.html，但显示获取人数）
+     * @param {Array} globalStats 全局成就统计数组
+     * @param {Array} groupStats 群专属成就统计数组
+     * @param {string} groupId 群ID
+     * @param {string} groupName 群名称
+     * @returns {string} 渲染后的HTML
+     */
+    renderAchievementStatisticsTemplate(globalStats, groupStats, groupId, groupName) {
+        const template = this.loadTemplate('achievementListTemplate.html');
+        if (!template) return '';
+
+        const timestamp = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/');
+        const version = this.version;
+
+        // 合并所有成就统计
+        const allStats = [...globalStats, ...groupStats];
+        const totalAchievements = allStats.length;
+
+        // 按获取人数排序（降序），然后按稀有度排序
+        allStats.sort((a, b) => {
+            if (b.unlockCount !== a.unlockCount) {
+                return b.unlockCount - a.unlockCount;
+            }
+            return AchievementUtils.compareRarity(b.definition.rarity, a.definition.rarity);
+        });
+
+        // 生成群专属成就ID集合（用于快速判断）
+        const groupOnlyIds = new Set(groupStats.map(stat => stat.id));
+
+        // 生成成就统计HTML
+        const achievementsHtml = allStats.map((stat, index) => {
+            const { definition, unlockCount, isGlobal } = stat;
+            const isGroupOnly = groupOnlyIds.has(stat.id);
+            
+            const rarityEmoji = {
+                common: '🥉',
+                uncommon: '🥈',
+                rare: '🥇',
+                epic: '💎',
+                legendary: '👑',
+                mythic: '🔥',
+                festival: '🎊',
+                special: '✨'
+            }[definition.rarity] || '🏆';
+            const emoji = rarityEmoji;
+
+            const statusClass = 'unlocked'; // 统计页面所有成就都显示为已解锁样式
+
+            // 添加分隔条（全局成就和群专属成就之间）
+            let separatorHtml = '';
+            if (index === globalStats.length && groupStats.length > 0) {
+                separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">群专属成就</div><div class="separator-line"></div></div>';
+            }
+
+            // 生成作用域标签
+            let scopeLabel = '';
+            if (isGroupOnly) {
+                scopeLabel = '<span class="display-status manual">（群专属）</span>';
+            } else if (isGlobal) {
+                scopeLabel = '<span class="display-status auto">（全局）</span>';
+            }
+
+            const itemHtml = `<div class="achievement-item ${statusClass}">
+					<div class="achievement-status ${statusClass}">📊</div>
+					<div class="achievement-badge">
+						<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+					</div>
+					<div class="achievement-info">
+						<div class="achievement-name-row">
+							<div class="achievement-name">${definition.name}</div>
+							${scopeLabel}
+						</div>
+						<div class="achievement-description-row">
+							<div class="achievement-description">${definition.description || '暂无描述'}</div>
+							<div class="achievement-meta-row">
+								<div class="achievement-unlock-time">获取人数: ${unlockCount} 人</div>
+							</div>
+						</div>
+					</div>
+				</div>`;
+
+            return separatorHtml + itemHtml;
+        }).join('\n\t\t\t\t');
+
+        // 生成头部信息HTML
+        const headerHtml = `
+			<div class="title">成就统计</div>
+			<div class="achievement-count">成就总数: <span>${totalAchievements}</span> 个</div>
 			<div class="group-info">${groupName || `群${groupId}`} (${CommonUtils.maskGroupId(groupId)})</div>
         `;
 

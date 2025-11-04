@@ -455,8 +455,8 @@ class ConfigManager {
      */
     getUserAchievementsConfig() {
         try {
-            const configDir = PathResolver.getConfigDir();
-            const achievementsDir = path.join(configDir, 'achievements');
+            const dataDir = PathResolver.getDataDir();
+            const achievementsDir = path.join(dataDir, 'achievements');
             const achievements = {};
 
             // 检查是否存在用户自定义目录
@@ -488,8 +488,8 @@ class ConfigManager {
      */
     setUserAchievementsConfig(achievements, fileName = 'custom.json') {
         try {
-            const configDir = PathResolver.getConfigDir();
-            const achievementsDir = path.join(configDir, 'achievements');
+            const dataDir = PathResolver.getDataDir();
+            const achievementsDir = path.join(dataDir, 'achievements');
             
             // 确保目录存在
             PathResolver.ensureDirectory(achievementsDir);
@@ -534,8 +534,8 @@ class ConfigManager {
      */
     getGroupAchievementsConfig(groupId) {
         try {
-            const configDir = PathResolver.getConfigDir();
-            const groupAchievementsDir = path.join(configDir, 'achievements', 'group', groupId);
+            const dataDir = PathResolver.getDataDir();
+            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId);
             const achievements = {};
 
             // 检查是否存在群专属目录
@@ -568,8 +568,8 @@ class ConfigManager {
      */
     setGroupAchievementsConfig(groupId, achievements, fileName = 'group.json') {
         try {
-            const configDir = PathResolver.getConfigDir();
-            const groupAchievementsDir = path.join(configDir, 'achievements', 'group', groupId);
+            const dataDir = PathResolver.getDataDir();
+            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId);
             
             // 确保目录存在
             PathResolver.ensureDirectory(groupAchievementsDir);

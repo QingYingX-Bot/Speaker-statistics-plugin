@@ -124,6 +124,10 @@ class Plugin extends plugin {
         return await this.achievementCommands.setDisplayAchievement(e);
     }
 
+    async showAchievementStatistics(e) {
+        return await this.achievementCommands.showAchievementStatistics(e);
+    }
+
     // 帮助命令
     async showHelp(e) {
         return await this.helpCommands.showHelp(e);

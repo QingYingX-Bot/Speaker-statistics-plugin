@@ -496,7 +496,8 @@ function getAchievementSchemas(disabled = false) {
           { label: '史诗', value: 'epic' },
           { label: '传说', value: 'legendary' },
           { label: '神话', value: 'mythic' },
-          { label: '节日', value: 'festival' }
+          { label: '节日', value: 'festival' },
+          { label: '特殊', value: 'special' }
         ]
       }
     },

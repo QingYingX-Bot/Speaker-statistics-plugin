@@ -286,11 +286,40 @@ class DatabaseService {
                 achievement_id VARCHAR(255) NOT NULL,
                 achievement_name VARCHAR(255) NOT NULL,
                 rarity VARCHAR(50) DEFAULT 'common',
+                is_manual BOOLEAN DEFAULT false,
+                auto_display_at TIMESTAMP,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (group_id, user_id)
             )
         `);
+
+        // 检查并添加新字段（数据库迁移）
+        try {
+            await this.pool.query(`
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'user_display_achievements' 
+                        AND column_name = 'is_manual'
+                    ) THEN
+                        ALTER TABLE user_display_achievements ADD COLUMN is_manual BOOLEAN DEFAULT false;
+                    END IF;
+                    
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'user_display_achievements' 
+                        AND column_name = 'auto_display_at'
+                    ) THEN
+                        ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TIMESTAMP;
+                    END IF;
+                END $$;
+            `);
+        } catch (error) {
+            // 忽略迁移错误（字段可能已存在）
+            this.error('数据库迁移失败（可能字段已存在）:', error);
+        }
 
         // 群组信息表
         await this.pool.query(`
@@ -944,6 +973,33 @@ class DatabaseService {
     }
 
     /**
+     * 统计成就获取情况（全局成就统计所有群，群专属只统计当前群）
+     * @param {string} achievementId 成就ID
+     * @param {string} groupId 群号（用于群专属成就，全局成就传null）
+     * @param {boolean} isGlobal 是否为全局成就（特殊成就或节日成就）
+     * @returns {Promise<number>} 获取人数
+     */
+    async getAchievementUnlockCount(achievementId, groupId = null, isGlobal = false) {
+        if (isGlobal) {
+            // 全局成就：统计所有群中不同的用户数量
+            const result = await this.get(
+                'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE achievement_id = $1 AND unlocked = true',
+                achievementId
+            );
+            return result ? parseInt(result.count) : 0;
+        } else {
+            // 群专属成就：只统计当前群
+            if (!groupId) return 0;
+            const result = await this.get(
+                'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE group_id = $1 AND achievement_id = $2 AND unlocked = true',
+                groupId,
+                achievementId
+            );
+            return result ? parseInt(result.count) : 0;
+        }
+    }
+
+    /**
      * 批量保存节日成就到用户所在的所有群
      * @param {string} userId 用户ID
      * @param {string} achievementId 成就ID
@@ -996,16 +1052,20 @@ class DatabaseService {
      */
     async setDisplayAchievement(groupId, userId, achievementData) {
         const now = this.getCurrentTime();
+        const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false;
+        const autoDisplayAt = achievementData.isManual === false ? now : (achievementData.autoDisplayAt || null);
         
         await this.run(`
             INSERT INTO user_display_achievements (
-                group_id, user_id, achievement_id, achievement_name, rarity, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                group_id, user_id, achievement_id, achievement_name, rarity, is_manual, auto_display_at, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (group_id, user_id) 
             DO UPDATE SET
                 achievement_id = EXCLUDED.achievement_id,
                 achievement_name = EXCLUDED.achievement_name,
                 rarity = EXCLUDED.rarity,
+                is_manual = EXCLUDED.is_manual,
+                auto_display_at = EXCLUDED.auto_display_at,
                 updated_at = EXCLUDED.updated_at
         `,
             groupId,
@@ -1013,6 +1073,8 @@ class DatabaseService {
             achievementData.id,
             achievementData.name,
             achievementData.rarity || 'common',
+            isManual,
+            autoDisplayAt,
             now,
             now
         );

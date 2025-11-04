@@ -14,7 +14,8 @@ class AchievementUtils {
         'epic': 4,
         'legendary': 5,
         'festival': 5,  // festival 和 legendary 同级
-        'mythic': 6
+        'mythic': 6,
+        'special': 7   // 特殊等级，最高稀有度
     };
 
     /**
@@ -24,6 +25,26 @@ class AchievementUtils {
      */
     static isFestivalAchievement(rarity) {
         return (rarity || '').toLowerCase() === 'festival';
+    }
+
+    /**
+     * 判断是否为特殊成就
+     * @param {string} rarity 稀有度
+     * @returns {boolean} 是否为特殊成就
+     */
+    static isSpecialAchievement(rarity) {
+        return (rarity || '').toLowerCase() === 'special';
+    }
+
+    /**
+     * 判断是否为全局成就（特殊成就或节日成就）
+     * 全局成就：获取后在任意群都显示为已获取，不重复获取
+     * @param {string} rarity 稀有度
+     * @returns {boolean} 是否为全局成就
+     */
+    static isGlobalAchievement(rarity) {
+        const lowerRarity = (rarity || '').toLowerCase();
+        return lowerRarity === 'festival' || lowerRarity === 'special';
     }
 
     /**

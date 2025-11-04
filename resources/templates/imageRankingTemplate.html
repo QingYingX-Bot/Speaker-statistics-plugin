@@ -325,6 +325,22 @@
 				box-shadow: 0 2px 8px rgba(255, 217, 61, 0.4);
 			}
 
+			.achievement-inline.achievement-special {
+				background: linear-gradient(135deg, #9D4EDD 0%, #C77DFF 50%, #E0AAFF 100%);
+				color: #FEF9FF;
+				box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
+				animation: special-glow 2s ease-in-out infinite alternate;
+			}
+
+			@keyframes special-glow {
+				from {
+					box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
+				}
+				to {
+					box-shadow: 0 4px 16px rgba(157, 78, 221, 0.8);
+				}
+			}
+
 			.stats {
 				text-align: right;
 				margin-left: 30px;

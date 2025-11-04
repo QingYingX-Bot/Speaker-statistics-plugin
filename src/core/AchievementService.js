@@ -28,6 +28,11 @@ class AchievementService {
         this.categories = null;
         this.rarities = null;
         this.definitionsLoaded = false;
+
+        // 文件监听相关
+        this.achievementWatchers = new Map();
+        this.reloadTimeout = null;
+        this.startWatchingAchievements();
     }
 
     /**
@@ -143,6 +148,73 @@ class AchievementService {
     }
 
     /**
+     * 开始监听成就配置文件变化
+     */
+    startWatchingAchievements() {
+        try {
+            // 监听系统默认成就文件（config/achievements.json）
+            const defaultAchievementsPath = path.join(this.configDir, 'achievements.json');
+            if (fs.existsSync(defaultAchievementsPath)) {
+                const watcher = fs.watch(defaultAchievementsPath, (eventType) => {
+                    if (eventType === 'change') {
+                        this.handleAchievementFileChange();
+                    }
+                });
+                this.achievementWatchers.set(defaultAchievementsPath, watcher);
+            }
+
+            // 监听用户自定义成就目录（data/achievements/）
+            if (fs.existsSync(this.achievementsDir)) {
+                const watcher = fs.watch(this.achievementsDir, { recursive: true }, (eventType, filename) => {
+                    if (eventType === 'change' && filename && filename.endsWith('.json')) {
+                        this.handleAchievementFileChange();
+                    }
+                });
+                this.achievementWatchers.set(this.achievementsDir, watcher);
+            }
+
+            if (globalConfig.getConfig('global.debugLog')) {
+                globalConfig.debug('已启动成就配置文件监听');
+            }
+        } catch (error) {
+            globalConfig.error('启动成就配置文件监听失败:', error);
+        }
+    }
+
+    /**
+     * 处理成就配置文件变化（带防抖）
+     */
+    handleAchievementFileChange() {
+        // 增加防抖机制，避免频繁触发
+        if (this.reloadTimeout) {
+            clearTimeout(this.reloadTimeout);
+        }
+        this.reloadTimeout = setTimeout(() => {
+            if (globalConfig.getConfig('global.debugLog')) {
+                globalConfig.debug('检测到成就配置文件变化，正在重新加载...');
+            }
+            this.reloadAchievements();
+        }, 2000); // 2秒延迟，减少频繁重载
+    }
+
+    /**
+     * 停止监听成就配置文件
+     */
+    stopWatchingAchievements() {
+        for (const [path, watcher] of this.achievementWatchers) {
+            try {
+                watcher.close();
+            } catch (error) {
+                globalConfig.error(`关闭成就文件监听失败 (${path}):`, error);
+            }
+        }
+        this.achievementWatchers.clear();
+        if (this.reloadTimeout) {
+            clearTimeout(this.reloadTimeout);
+        }
+    }
+
+    /**
      * 获取所有成就定义（包括群专属）
      * @param {string} groupId 群号
      * @returns {Object} 成就定义对象
@@ -190,7 +262,7 @@ class AchievementService {
             const achievements = {};
             let unlockedCount = 0;
 
-            // 获取所有成就定义（用于识别节日成就）
+            // 获取所有成就定义（用于识别全局成就：特殊成就或节日成就）
             const allDefinitions = this.getAllAchievementDefinitions(groupId);
 
             for (const achievement of allAchievements) {
@@ -204,11 +276,11 @@ class AchievementService {
                 }
             }
 
-            // 对于节日成就，检查是否在其他群已解锁（当前群未解锁的情况下）
+            // 对于全局成就（特殊成就或节日成就），检查是否在其他群已解锁（当前群未解锁的情况下）
             for (const [achievementId, definition] of Object.entries(allDefinitions)) {
-                const isFestival = AchievementUtils.isFestivalAchievement(definition.rarity);
+                const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);
                 
-                if (isFestival) {
+                if (isGlobal) {
                     // 如果当前群未解锁，检查其他群是否已解锁
                     if (!achievements[achievementId] || !achievements[achievementId].unlocked) {
                         const otherGroupAchievement = await this.dbService.getAchievementFromAnyGroup(userId, achievementId);
@@ -225,15 +297,15 @@ class AchievementService {
                 }
             }
 
+            // 先检查并自动卸下超过24小时的自动佩戴成就
+            await this.checkAndRemoveExpiredAutoDisplay(groupId, userId);
+            
             // 获取显示成就
             let displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
             
-            // 如果没有手动设置的显示成就，自动选择史诗级及以上成就（按稀有度降序）
+            // 如果没有显示成就，自动选择史诗级及以上成就（按稀有度降序，24小时时限）
             if (!displayAchievement) {
-                // 获取所有成就定义（已在上面获取过，但为了代码清晰再次获取）
-                const allDefinitions = this.getAllAchievementDefinitions(groupId);
-                
-                // 使用 achievements 对象而不是 allAchievements 数组，以确保包含节日成就
+                // 使用 achievements 对象而不是 allAchievements 数组，以确保包含全局成就（特殊成就或节日成就）
                 const epicOrHigher = Object.entries(achievements)
                     .filter(([achievementId, achievementData]) => {
                         if (!achievementData.unlocked) return false;
@@ -261,8 +333,18 @@ class AchievementService {
                     displayAchievement = {
                         achievement_id: topAchievement.achievement_id,
                         achievement_name: definition?.name || topAchievement.achievement_id,
-                        rarity: definition?.rarity || 'common'
+                        rarity: definition?.rarity || 'common',
+                        is_manual: false,
+                        auto_display_at: TimeUtils.formatDateTimeForDB()
                     };
+                    // 自动设置为显示成就（24小时时限）
+                    await this.dbService.setDisplayAchievement(groupId, userId, {
+                        id: topAchievement.achievement_id,
+                        name: definition?.name || topAchievement.achievement_id,
+                        rarity: definition?.rarity || 'common',
+                        isManual: false,
+                        autoDisplayAt: TimeUtils.formatDateTimeForDB()
+                    });
                 }
             }
 
@@ -272,7 +354,9 @@ class AchievementService {
                 displayAchievement: displayAchievement ? {
                     id: displayAchievement.achievement_id,
                     name: displayAchievement.achievement_name,
-                    rarity: displayAchievement.rarity
+                    rarity: displayAchievement.rarity,
+                    isManual: displayAchievement.is_manual || false,
+                    autoDisplayAt: displayAchievement.auto_display_at || null
                 } : null
             };
         } catch (error) {
@@ -312,6 +396,7 @@ class AchievementService {
      * @returns {Array} 新解锁的成就列表
      */
     async checkAndUpdateAchievements(groupId, userId, userData) {
+        // getUserAchievements 内部会先检查并自动卸下超过24小时的自动佩戴成就，这里不需要重复调用
         const achievementData = await this.getUserAchievements(groupId, userId);
         // 合并全量成就定义（全局 + 群专属）
         const allDefinitions = this.getAllAchievementDefinitions(groupId);
@@ -321,11 +406,11 @@ class AchievementService {
 
         // 检查每个成就（包含群专属）
         for (const [achievementId, definition] of Object.entries(allDefinitions)) {
-            // 判断是否为节日成就
-            const isFestival = AchievementUtils.isFestivalAchievement(definition.rarity);
+            // 判断是否为全局成就（特殊成就或节日成就）
+            const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);
 
-            // 对于节日成就，如果已在其他群解锁，则跳过（视为已解锁）
-            if (isFestival) {
+            // 对于全局成就，如果已在其他群解锁，则跳过（视为已解锁）
+            if (isGlobal) {
                 // 先检查当前群是否已解锁
                 if (!achievementData.achievements[achievementId]?.unlocked) {
                     // 检查是否在其他群已解锁
@@ -339,7 +424,7 @@ class AchievementService {
                     continue;
                 }
             } else {
-                // 非节日成就，如果当前群已解锁，跳过
+                // 非全局成就，如果当前群已解锁，跳过
                 if (achievementData.achievements[achievementId]?.unlocked) {
                     continue;
                 }
@@ -368,8 +453,8 @@ class AchievementService {
                     progress: definition.condition?.value || 1
                 };
 
-                if (isFestival) {
-                    // 节日成就：同步到所有群
+                if (isGlobal) {
+                    // 全局成就（特殊成就或节日成就）：同步到所有群
                     await this.dbService.saveFestivalAchievementToAllGroups(userId, achievementId, achievementDataToSave);
                 } else {
                     // 普通成就：只保存到当前群
@@ -709,17 +794,57 @@ class AchievementService {
     /**
      * 设置用户显示成就
      */
-    async setDisplayAchievement(groupId, userId, achievementId, achievementName, rarity) {
+    async setDisplayAchievement(groupId, userId, achievementId, achievementName, rarity, isManual = true) {
         try {
             await this.dbService.setDisplayAchievement(groupId, userId, {
                 id: achievementId,
                 name: achievementName,
-                rarity: rarity
+                rarity: rarity,
+                isManual: isManual,
+                autoDisplayAt: isManual ? null : TimeUtils.formatDateTimeForDB()
             });
             return true;
         } catch (error) {
             globalConfig.error('设置显示成就失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 检查并自动卸下超过24小时的自动佩戴成就
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     */
+    async checkAndRemoveExpiredAutoDisplay(groupId, userId) {
+        try {
+            const displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
+            if (!displayAchievement) return;
+
+            // 如果是手动设置的，不自动卸下
+            if (displayAchievement.is_manual === true) return;
+
+            // 如果没有 auto_display_at 时间，不处理（可能是旧数据）
+            if (!displayAchievement.auto_display_at) return;
+
+            // 计算时间差（毫秒）
+            const autoDisplayAt = new Date(displayAchievement.auto_display_at);
+            const now = new Date();
+            const diffMs = now - autoDisplayAt;
+            const diffHours = diffMs / (1000 * 60 * 60);
+
+            // 如果超过24小时，自动卸下
+            if (diffHours >= 24) {
+                await this.dbService.run(
+                    'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
+                    groupId,
+                    userId
+                );
+                if (globalConfig.getConfig('global.debugLog')) {
+                    globalConfig.debug(`自动卸下用户 ${userId} 在群 ${groupId} 的自动佩戴成就（已超过24小时）`);
+                }
+            }
+        } catch (error) {
+            globalConfig.error('检查自动卸下成就失败:', error);
         }
     }
 }

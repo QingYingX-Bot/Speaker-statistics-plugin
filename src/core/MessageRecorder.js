@@ -2,6 +2,7 @@ import { getDataService } from './DataService.js';
 import { AchievementService } from './AchievementService.js';
 import { globalConfig } from './ConfigManager.js';
 import { TimeUtils } from './utils/TimeUtils.js';
+import { AchievementUtils } from './utils/AchievementUtils.js';
 
 /**
  * 消息记录处理类
@@ -61,7 +62,8 @@ class MessageRecorder {
             epic: global.logger.magenta.bind(global.logger),
             legendary: global.logger.yellow.bind(global.logger),
             mythic: global.logger.red.bind(global.logger),
-            festival: global.logger.red.bind(global.logger)
+            festival: global.logger.red.bind(global.logger),
+            special: (global.logger.rainbow ? global.logger.rainbow.bind(global.logger) : global.logger.cyan.bind(global.logger))  // 特殊等级使用彩虹色，如果没有则使用青色
         };
         return colorMap[rarity] || colorMap.common;
     }
@@ -487,6 +489,45 @@ class MessageRecorder {
                             totalNewAchievements += newAchievements.length;
                             // 输出成就解锁日志（带颜色，带去重）
                             const userNickname = userData?.nickname || userId;
+                            
+                            // 检查是否需要自动设置显示成就
+                            let shouldAutoSetDisplay = false;
+                            let bestAchievement = null;
+                            
+                            // 检查当前是否有手动设置的显示成就
+                            const currentDisplay = await achievementService.dataService.dbService.getDisplayAchievement(groupId, userId);
+                            const hasManualDisplay = currentDisplay && currentDisplay.is_manual === true;
+                            
+                            // 如果没有手动设置的显示成就，检查新解锁的成就是否符合自动佩戴条件
+                            if (!hasManualDisplay) {
+                                for (const achievement of newAchievements) {
+                                    const rarity = achievement.rarity || 'common';
+                                    // 检查是否是史诗及以上
+                                    if (AchievementUtils.isRarityOrHigher(rarity, 'epic')) {
+                                        if (!bestAchievement || AchievementUtils.compareRarity(rarity, bestAchievement.rarity) > 0) {
+                                            bestAchievement = achievement;
+                                            shouldAutoSetDisplay = true;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 如果符合条件，自动设置为显示成就（24小时时限）
+                            if (shouldAutoSetDisplay && bestAchievement) {
+                                try {
+                                    await achievementService.setDisplayAchievement(
+                                        groupId,
+                                        userId,
+                                        bestAchievement.id,
+                                        bestAchievement.name || bestAchievement.id,
+                                        bestAchievement.rarity || 'common',
+                                        false  // isManual = false，自动佩戴
+                                    );
+                                } catch (error) {
+                                    globalConfig.error('自动设置显示成就失败:', error);
+                                }
+                            }
+                            
                             newAchievements.forEach(achievement => {
                                 const rarity = achievement.rarity || 'common';
                                 const rarityColor = this.getRarityColor(rarity);
