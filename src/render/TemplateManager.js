@@ -494,10 +494,10 @@ class TemplateManager {
         // 6. 本月发言（如果与总数不同，显示本月数据）
         if (monthCount !== totalCount && monthCount > 0) {
             statCards.push(`
-					<div class="stat-card">
+                    <div class="stat-card">
 						<div class="stat-label">本月发言</div>
 						<div class="stat-value">${CommonUtils.formatNumber(monthCount)}</div>
-					</div>
+                    </div>
             `);
         }
         
@@ -664,6 +664,10 @@ class TemplateManager {
 			<div class="overview-card">
 				<div class="overview-number">${CommonUtils.formatNumber(globalStats.monthActive || 0)}</div>
 				<div class="overview-label">本月活跃人数</div>
+			</div>
+			<div class="overview-card">
+				<div class="overview-number">${CommonUtils.formatNumber(globalStats.statsDurationHours || 0)}</div>
+				<div class="overview-label">统计时长（小时）</div>
 			</div>
         `;
 

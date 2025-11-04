@@ -1003,7 +1003,7 @@ class DataService {
             const groupIds = await this.getGroupIds();
             
             let totalGroups = 0;
-            let totalUsers = 0;
+            let totalUsersSet = new Set(); // 使用 Set 来避免重复计算用户
             let totalMessages = 0;
             let totalWords = 0;
             let todayActive = 0;
@@ -1023,7 +1023,10 @@ class DataService {
                     if (users.length === 0) continue;
 
                     totalGroups++;
-                    totalUsers += users.length;
+                    // 将所有用户ID添加到 Set 中（自动去重）
+                    for (const user of users) {
+                        totalUsersSet.add(user.user_id);
+                    }
 
                     let groupMessages = 0;
                     let groupWords = 0;
@@ -1107,9 +1110,29 @@ class DataService {
             const endIndex = startIndex + pageSize;
             const pagedGroups = groupStatsList.slice(startIndex, endIndex);
 
+            // 获取最早统计时间
+            let earliestTime = null;
+            let statsDurationHours = 0;
+            try {
+                const earliestResult = await this.dbService.get(
+                    'SELECT MIN(created_at) as earliest_time FROM user_stats'
+                );
+                earliestTime = earliestResult?.earliest_time || null;
+                
+                // 计算统计时长（小时）
+                if (earliestTime) {
+                    const earliestDate = new Date(earliestTime);
+                    const now = new Date();
+                    const diffMs = now - earliestDate;
+                    statsDurationHours = Math.floor(diffMs / (1000 * 60 * 60)); // 转换为小时并向下取整
+                }
+            } catch (error) {
+                this.error('获取最早统计时间失败:', error);
+            }
+
             return {
                 totalGroups: totalGroups,
-                totalUsers: totalUsers,
+                totalUsers: totalUsersSet.size, // 使用 Set 的大小作为唯一用户数
                 totalMessages: totalMessages,
                 totalWords: totalWords,
                 todayActive: todayActiveSet.size,
@@ -1117,7 +1140,9 @@ class DataService {
                 groups: pagedGroups,
                 currentPage: page,
                 totalPages: totalPages,
-                pageSize: pageSize
+                pageSize: pageSize,
+                earliestTime: earliestTime,
+                statsDurationHours: statsDurationHours
             };
         } catch (error) {
             this.error('获取全局统计数据失败:', error);

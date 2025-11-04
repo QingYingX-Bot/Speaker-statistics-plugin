@@ -576,7 +576,7 @@ class RankCommands {
      * 显示全局统计
      */
     async showGlobalStats(e) {
-        const validation = CommonUtils.validateGroupMessage(e);
+        const validation = CommonUtils.validateGroupMessage(e, false);
         if (!validation.valid) {
             return e.reply(validation.message);
         }
