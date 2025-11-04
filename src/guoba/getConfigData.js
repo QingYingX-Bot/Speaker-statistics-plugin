@@ -60,8 +60,8 @@ export async function getConfigData() {
     // 获取群专属成就并转换为表单格式
     const groupAchievementsList = [];
     try {
-      const configDir = PathResolver.getConfigDir();
-      const groupDir = path.join(configDir, 'achievements', 'group');
+      const dataDir = PathResolver.getDataDir();
+      const groupDir = path.join(dataDir, 'achievements', 'group');
       
       // 遍历所有群组目录
       if (fs.existsSync(groupDir)) {

@@ -123,8 +123,8 @@ export async function setConfigData(data, { Result }) {
           }
         } else {
           // 如果群专属成就列表为空，需要清空所有群组配置
-          const configDir = PathResolver.getConfigDir();
-          const groupDir = path.join(configDir, 'achievements', 'group');
+          const dataDir = PathResolver.getDataDir();
+          const groupDir = path.join(dataDir, 'achievements', 'group');
           
           if (fs.existsSync(groupDir)) {
             const groups = fs.readdirSync(groupDir, { withFileTypes: true })

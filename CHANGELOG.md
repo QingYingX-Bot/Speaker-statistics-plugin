@@ -71,6 +71,7 @@
 - ✅ 修复排行榜分页问题（支持后续页面查询）
 - ✅ 修复成就设置显示时的参数错误（`achievement_id`/`achievement_name` 改为 `id`/`name`）
 - ✅ 修复全局统计用户数重复计算问题（`#水群总统计` 中用户数现在使用 Set 去重，确保跨群用户不重复计算）
+- ✅ 修复 Guoba-Plugin 集成中群专属成就路径错误（`getConfigData.js` 和 `setConfigData.js` 中路径从 `config/achievements/group` 更新为 `data/achievements/group`）
 
 ### 🔧 配置优化
 
@@ -80,6 +81,7 @@
   - 用户自定义成就现在存放在 `data/achievements/` 目录下
   - 群专属成就现在存放在 `data/achievements/group/{群ID}/` 目录下
   - 更符合数据与配置的分离原则，便于版本控制和数据管理
+  - 更新相关代码路径：`AchievementService.js`、`getConfigData.js`、`setConfigData.js`
 - ✅ **Git 忽略规则优化**：精确控制 `.gitignore`，确保用户配置不被提交，但保留 README.md 文档
 
 ### 📝 文档更新
