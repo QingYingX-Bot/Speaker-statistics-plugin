@@ -1,5 +1,21 @@
 node_modules/
-data/
+# data 目录下的文件忽略规则（精确控制，而不是忽略整个目录）
+# 忽略配置文件（这些是用户自定义的，不应该提交）
+data/*.json
+# 忽略数据库文件
+data/*.db
+data/*.db-journal
+data/*.db-wal
+# 忽略日志文件
+data/*.log
+# 忽略临时文件和备份目录
+data/temp/
+data/backups/
+data/backgrounds/
+# 成就目录：忽略所有 JSON 文件（用户自定义成就），但保留 README.md 文档
+data/achievements/*.json
+data/achievements/group/**/*.json
+# 其他通用忽略规则
 *.db
 *.db-journal
 *.db-wal

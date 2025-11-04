@@ -100,10 +100,10 @@
 插件支持三层成就配置结构：
 
 1. **系统默认成就**：`config/achievements.json`（只读，27个）
-2. **用户自定义成就**：`config/achievements/*.json`（可编辑）
-3. **群专属成就**：`config/achievements/group/{群ID}/*.json`（群组专用）
+2. **用户自定义成就**：`data/achievements/*.json`（可编辑）
+3. **群专属成就**：`data/achievements/group/{群ID}/*.json`（群组专用）
 
-详细的成就配置说明请参考 [config/achievements/README.md](config/achievements/README.md)
+详细的成就配置说明请参考 [data/achievements/README.md](data/achievements/README.md)
 
 ---
 
@@ -174,15 +174,16 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 ```
 config/
 ├── configTemplate.js         # 配置模板（包含所有可配置项）
-├── achievements.json          # 系统默认成就（27个）
+└── achievements.json          # 系统默认成就（27个，只读）
+
+data/
+├── global.json               # 全局配置（数据库、显示、通知等）
 └── achievements/              # 用户自定义成就目录
+    ├── README.md             # 成就配置说明文档
     ├── *.json                # 用户自定义成就文件
     └── group/                # 群专属成就目录
         └── {群ID}/           # 特定群组目录
             └── *.json        # 群专属成就文件
-
-data/
-└── global.json               # 全局配置（数据库、显示、通知等）
 ```
 
 ### 配置管理
@@ -200,8 +201,8 @@ data/
 #### 方式二：直接编辑配置文件
 
 - **全局配置**：编辑 `data/global.json`
-- **用户成就**：在 `config/achievements/` 目录创建 JSON 文件
-- **群专属成就**：在 `config/achievements/group/{群ID}/` 目录创建 JSON 文件
+- **用户成就**：在 `data/achievements/` 目录创建 JSON 文件
+- **群专属成就**：在 `data/achievements/group/{群ID}/` 目录创建 JSON 文件
 
 详细配置说明请参考 `config/configTemplate.js` 文件中的注释。
 
@@ -287,10 +288,12 @@ Speaker-statistics-plugin/
 │       └── BackgroundServer.js        # 背景编辑器服务器
 ├── config/
 │   ├── configTemplate.js              # 配置模板
-│   ├── achievements.json              # 系统默认成就
-│   └── achievements/                  # 用户自定义成就
+│   └── achievements.json              # 系统默认成就（只读）
 ├── data/
 │   ├── global.json                    # 全局配置
+│   ├── achievements/                  # 用户自定义成就目录
+│   │   ├── README.md                  # 成就配置说明文档
+│   │   └── group/                     # 群专属成就目录
 │   └── backups/                       # 备份目录
 ├── guoba.support.js                   # Guoba-Plugin 集成
 ├── index.js                           # 插件入口

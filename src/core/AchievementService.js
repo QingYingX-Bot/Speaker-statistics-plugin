@@ -15,7 +15,8 @@ class AchievementService {
         this.dataService = dataService;
         this.dbService = getDatabaseService();
         this.configDir = PathResolver.getConfigDir();
-        this.achievementsDir = path.join(this.configDir, 'achievements');
+        this.dataDir = PathResolver.getDataDir();
+        this.achievementsDir = path.join(this.dataDir, 'achievements');
 
         // 缓存相关
         this.achievementCache = new Map();
@@ -66,7 +67,7 @@ class AchievementService {
                 globalConfig.error('未找到系统默认成就配置文件');
             }
 
-            // 第二步：加载用户自定义成就（config/achievements/ 目录），覆盖默认成就
+            // 第二步：加载用户自定义成就（data/achievements/ 目录），覆盖默认成就
             if (fs.existsSync(this.achievementsDir)) {
                 const files = fs.readdirSync(this.achievementsDir).filter(file => {
                     // 跳过 README.md 和 group 目录
