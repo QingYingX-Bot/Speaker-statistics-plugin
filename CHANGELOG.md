@@ -72,11 +72,22 @@
 - ✅ 修复成就设置显示时的参数错误（`achievement_id`/`achievement_name` 改为 `id`/`name`）
 - ✅ 修复全局统计用户数重复计算问题（`#水群总统计` 中用户数现在使用 Set 去重，确保跨群用户不重复计算）
 
+### 🔧 配置优化
+
+#### 目录结构优化
+- ✅ **成就配置目录迁移**：将用户自定义成就配置目录从 `config/achievements` 迁移到 `data/achievements`
+  - 系统默认成就仍保留在 `config/achievements.json`（只读）
+  - 用户自定义成就现在存放在 `data/achievements/` 目录下
+  - 群专属成就现在存放在 `data/achievements/group/{群ID}/` 目录下
+  - 更符合数据与配置的分离原则，便于版本控制和数据管理
+- ✅ **Git 忽略规则优化**：精确控制 `.gitignore`，确保用户配置不被提交，但保留 README.md 文档
+
 ### 📝 文档更新
 
 - ✅ 更新 README.md，添加新功能说明
 - ✅ 创建 CHANGELOG.md，详细记录所有更新内容
 - ✅ 添加 Gitee 仓库链接
+- ✅ 更新成就配置说明文档路径（`data/achievements/README.md`）
 
 ---
 
