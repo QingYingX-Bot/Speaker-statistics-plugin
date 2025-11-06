@@ -1,0 +1,510 @@
+/* 基础样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #4A90E2;
+    --primary-hover: #357ABD;
+    --secondary-color: #f8f9fa;
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --border-color: #e9ecef;
+    --bg-white: #ffffff;
+    --bg-gray: #f8f9fa;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.15);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --transition: all 0.3s ease;
+}
+
+/* 全局滚动条美化 - 统一管理，只显示一个滚动条 */
+html {
+    overflow-y: scroll; /* 强制显示滚动条（常驻） */
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft YaHei', sans-serif;
+    background: var(--bg-gray);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    scroll-behavior: smooth;
+}
+
+/* 美化滚动条 - 只美化body的滚动条（避免重复） */
+/* Webkit浏览器 (Chrome, Safari, Edge) */
+body::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+body::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+body::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #b8b8b8 0%, #a0a0a0 100%);
+    border-radius: 5px;
+    border: 1px solid #909090;
+    transition: background 0.2s ease;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #a8a8a8 0%, #909090 100%);
+}
+
+body::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #909090 0%, #787878 100%);
+}
+
+/* Firefox */
+body {
+    scrollbar-width: thin;
+    scrollbar-color: #a0a0a0 #f5f5f5;
+}
+
+/* 隐藏html的滚动条，只显示body的 */
+html::-webkit-scrollbar {
+    width: 0;
+    display: none;
+}
+
+/* 美化下拉选择框 */
+.select-custom {
+    background-image: none;
+    padding-right: 2.5rem;
+    transition: all 0.2s ease;
+}
+
+.select-custom::-ms-expand {
+    display: none;
+}
+
+.select-custom:focus {
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+    transform: translateY(-1px);
+}
+
+.select-custom:active {
+    transform: translateY(0);
+}
+
+.select-custom option {
+    padding: 0.625rem 1rem;
+    background-color: white;
+    color: #1f2937;
+    font-weight: 400;
+}
+
+.select-custom option:hover {
+    background-color: #f3f4f6;
+}
+
+/* 移除选中项的特殊背景，让浏览器使用默认样式 */
+.select-custom option:checked,
+.select-custom option[selected] {
+    background-color: white;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* 下拉菜单打开时焦点项的样式 */
+.select-custom option:focus {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+/* IE/Edge 特殊处理 */
+.select-custom::-ms-value {
+    background-color: transparent;
+    color: inherit;
+}
+
+/* 其他内部元素的滚动条美化 */
+.page-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.page-content::-webkit-scrollbar-track {
+    background: #f8f8f8;
+    border-radius: 4px;
+}
+
+.page-content::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 4px;
+}
+
+.page-content::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.page-content {
+    scrollbar-width: thin;
+    scrollbar-color: #c0c0c0 #f8f8f8;
+}
+
+/* 成就页面内容区域 - 移除滚动条，使用页面滚动 */
+.achievement-content-scroll {
+    overflow: visible;
+}
+
+/* 背景设置页面 - Fabric.js 画布样式优化 */
+#canvasWrapper .canvas-container {
+    position: relative !important;
+    display: inline-block !important;
+    margin: 0 auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#canvasWrapper .upper-canvas {
+    background: transparent !important;
+}
+
+#canvasWrapper canvas {
+    display: block !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 导航栏 */
+.navbar {
+    background: var(--bg-white);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    padding: 0 20px;
+}
+
+.navbar-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.brand-icon {
+    font-size: 1.5rem;
+}
+
+.navbar-menu {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nav-link {
+    padding: 8px 16px;
+    text-decoration: none;
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+    font-weight: 500;
+}
+
+.nav-link:hover {
+    background: var(--bg-gray);
+    color: var(--primary-color);
+}
+
+.nav-link.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-id {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.btn-icon:hover {
+    background: var(--bg-gray);
+}
+
+/* 主内容区 - 现代简约风格 */
+.main-content {
+    padding: 0;
+    height: calc(100vh - 64px);
+    background: transparent;
+    overflow: hidden;
+}
+
+.page-container {
+    max-width: 100%;
+    margin: 0;
+    height: 100%;
+    overflow: hidden; /* 防止出现滚动条 */
+}
+
+.page-content {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    height: 100%;
+    overflow-y: scroll; /* 强制显示滚动条（常驻） */
+    overflow-x: hidden;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.page-header p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* 加载动画 */
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--bg-gray);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toast 提示 */
+.toast {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    transform: translateX(400px);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    backdrop-filter: blur(10px);
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toast-icon {
+    font-size: 1.2rem;
+}
+
+.toast-message {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* 模态框 - 简约风格 */
+#modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+#modalOverlay[style*="display: flex"] {
+    opacity: 1;
+}
+
+/* 确保模态框内容正确显示 */
+#modalOverlay > div {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 模态框滚动条美化 */
+#modalOverlay #modalBody::-webkit-scrollbar {
+    width: 6px;
+}
+
+#modalOverlay #modalBody::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 3px;
+}
+
+#modalOverlay #modalBody::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 3px;
+}
+
+#modalOverlay #modalBody::-webkit-scrollbar-thumb:hover {
+    background: #a0a0a0;
+}
+
+#modalOverlay #modalBody {
+    scrollbar-width: thin;
+    scrollbar-color: #c0c0c0 #f5f5f5;
+}
+
+/* 移动端菜单样式优化 */
+#mobileMenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-out;
+    opacity: 0;
+}
+
+#mobileMenu:not(.hidden) {
+    opacity: 1;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-in;
+}
+
+.mobile-nav-link {
+    position: relative;
+}
+
+.mobile-nav-link.bg-primary {
+    background-color: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+}
+
+.mobile-nav-link.bg-primary svg {
+    color: var(--primary-color) !important;
+}
+
+/* 响应式设计 - 移动端优化 */
+@media (max-width: 640px) {
+    .main-content {
+        padding: 0;
+    }
+
+    .page-content {
+        padding: 0;
+    }
+
+    .toast {
+        top: 70px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+        max-width: calc(100% - 20px);
+        transform: translateY(-100px);
+    }
+    
+    .toast.show {
+        transform: translateY(0);
+    }
+    
+    /* 移动端模态框优化 */
+    #modalOverlay > div {
+        margin: 10px;
+        max-width: calc(100% - 20px);
+        max-height: calc(100vh - 20px);
+    }
+    
+    /* 移动端表格优化 */
+    .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-container {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 10px 0;
+    }
+
+    .navbar-menu {
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 10px;
+    }
+}

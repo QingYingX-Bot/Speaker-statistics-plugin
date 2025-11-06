@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.0.1-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.0.5-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
 
 ---
 
@@ -293,7 +293,20 @@ Speaker-statistics-plugin/
 │   │   ├── ImageGenerator.js          # 图片生成
 │   │   └── TemplateManager.js         # 模板管理
 │   └── services/
-│       └── BackgroundServer.js        # 背景编辑器服务器
+│       ├── WebServer.js                # Web服务器（主服务器）
+│       ├── auth/                       # 认证相关服务
+│       │   ├── TokenManager.js         # Token管理
+│       │   ├── VerificationCodeManager.js # 验证码管理
+│       │   └── AuthService.js          # 认证服务
+│       ├── api/                        # API路由
+│       │   ├── AuthApi.js              # 认证API
+│       │   ├── StatsApi.js              # 统计API
+│       │   ├── RankingApi.js           # 排行榜API
+│       │   ├── AchievementApi.js      # 成就API
+│       │   ├── BackgroundApi.js        # 背景API
+│       │   └── AdminApi.js             # 管理API
+│       └── routes/                     # 页面路由
+│           └── PageRoutes.js          # 页面路由处理
 ├── config/
 │   ├── configTemplate.js              # 配置模板
 │   └── achievements.json              # 系统默认成就（只读）

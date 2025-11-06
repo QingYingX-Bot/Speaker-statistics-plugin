@@ -1,12 +1,14 @@
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
 import { globalConfig } from '../core/ConfigManager.js';
+import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js';
 import fs from 'fs';
 import path from 'path';
 
 /**
  * 背景管理器
- * 负责背景图片的管理
+ * 负责背景图片的文件管理和删除操作
+ * 注意：背景设置链接生成功能已移至 UserCommands.openBackgroundPage
  */
 class BackgroundManager {
     /**
@@ -14,10 +16,6 @@ class BackgroundManager {
      */
     static getRules() {
         return [
-            {
-                reg: '^#水群设置背景$',
-                fnc: 'setBackground'
-            },
             {
                 reg: '^#水群删除背景$',
                 fnc: 'removeBackground'
@@ -27,38 +25,6 @@ class BackgroundManager {
                 fnc: 'showBackgroundHelp'
             }
         ];
-    }
-
-    /**
-     * 设置背景
-     */
-    async setBackground(e) {
-        const validation = CommonUtils.validateGroupMessage(e);
-        if (!validation.valid) {
-            return e.reply(validation.message);
-        }
-
-        try {
-            const userId = String(e.sender.user_id);
-            const config = globalConfig.getConfig('backgroundServer') || {};
-            const port = config.port || 39999;
-            const host = config.domain || config.host || 'localhost';
-            const protocol = config.protocol || 'http';
-
-            const editorUrl = `${protocol}://${host}:${port}/?userId=${userId}`;
-
-            const text = `🎨 背景设置\n\n` +
-                `个人统计背景尺寸: 760×360像素\n` +
-                `排行榜背景尺寸: 1520×200像素\n\n` +
-                `点击下方链接进入背景编辑器：\n` +
-                `${editorUrl}\n\n` +
-                `提示：首次使用需要设置访问秘钥`;
-
-            return e.reply(text);
-        } catch (error) {
-            globalConfig.error('设置背景失败:', error);
-            return e.reply('背景设置功能暂时不可用');
-        }
     }
 
     /**
@@ -108,11 +74,8 @@ class BackgroundManager {
             return e.reply(validation.message);
         }
 
-        const config = globalConfig.getConfig('backgroundServer') || {};
-        const port = config.port || 39999;
-        const host = config.domain || config.host || 'localhost';
-        const protocol = config.protocol || 'http';
-        const editorUrl = `${protocol}://${host}:${port}/`;
+        const config = WebLinkGenerator.getServerConfig();
+        const editorUrl = `${config.protocol}://${config.domain || config.host}:${config.port}/`;
 
         const helpText = `🎨 背景设置帮助
 

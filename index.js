@@ -1,6 +1,6 @@
 import { Plugin } from './src/core/Plugin.js';
 import { PathResolver } from './src/core/utils/PathResolver.js';
-import { BackgroundServer } from './src/services/BackgroundServer.js';
+import { getWebServer } from './src/services/WebServer.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -20,19 +20,9 @@ try {
 
 const version = packageJson.version;
 
-// 全局服务器实例
-let globalBackgroundServer = null;
-
-// 启动背景编辑器服务器
-async function startBackgroundServer() {
-    try {
-        globalBackgroundServer = new BackgroundServer();
-        await globalBackgroundServer.start();
-        logger.info('[发言统计] 背景编辑器服务器启动成功');
-    } catch (error) {
-        logger.error('[发言统计] 背景编辑器服务器启动失败:', error.message);
-    }
-}
+// 全局服务器实例（使用WebServer单例）
+// 注意：服务器启动由 Plugin.init() 方法负责，这里只获取实例
+let globalWebServer = null;
 
 // 初始化数据库
 import { getDatabaseService } from './src/core/database/DatabaseService.js';
@@ -52,18 +42,20 @@ try {
     logger.info(`[发言统计] 发言统计插件 v${version} 初始化成功~`);
     logger.info('[发言统计] 使用PostgreSQL数据库存储');
     logger.info('[发言统计] 支持功能：总榜、日榜、周榜、月榜、个人统计、背景自定义、僵尸群清理');
+    logger.info('[发言统计] Web服务器将在插件初始化时自动启动');
 
-    // 启动背景编辑器服务器
-    startBackgroundServer();
+    // 获取WebServer实例（服务器启动由 Plugin.init() 方法负责）
+    globalWebServer = getWebServer();
 
     logger.info('[发言统计] ---------^_^---------');
 } catch (error) {
     logger.error('[发言统计] 插件初始化失败:', error);
 }
 
-// 导出全局服务器实例
+// 导出全局服务器实例（兼容性导出）
 export {
-    globalBackgroundServer
+    globalWebServer as globalBackgroundServer,
+    globalWebServer
 };
 
 // 导出

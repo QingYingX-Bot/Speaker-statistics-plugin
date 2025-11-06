@@ -44,6 +44,62 @@ class Plugin extends plugin {
         logger.debug('[发言统计] 插件实例创建完成');
     }
 
+    // 静态标志，防止多次初始化
+    static _initialized = false;
+    static _initializing = false;
+
+    /**
+     * 插件初始化
+     * 启动Web服务器
+     */
+    async init() {
+        // 如果已经初始化完成，直接返回
+        if (Plugin._initialized) {
+            logger.debug('[发言统计] 插件已初始化，跳过重复初始化');
+            return;
+        }
+
+        // 如果正在初始化，等待完成
+        if (Plugin._initializing) {
+            logger.debug('[发言统计] 插件正在初始化中，请稍候...');
+            let waitCount = 0;
+            while (Plugin._initializing && waitCount < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                waitCount++;
+            }
+            // 等待完成后，如果已初始化则返回
+            if (Plugin._initialized) {
+                return;
+            }
+        }
+
+        // 设置初始化标志
+        Plugin._initializing = true;
+
+        try {
+            const { getWebServer } = await import('../services/WebServer.js');
+            const webServer = getWebServer();
+            
+            // 检查是否已在运行，避免重复启动
+            if (webServer.isRunning) {
+                logger.info('[发言统计] Web服务器已在运行');
+                Plugin._initialized = true;
+                Plugin._initializing = false;
+                return;
+            }
+            
+            await webServer.start();
+            logger.info('[发言统计] Web服务器启动成功');
+            Plugin._initialized = true;
+        } catch (error) {
+            logger.error('[发言统计] Web服务器启动失败:', error);
+            // 即使失败也标记为已初始化，避免重复尝试
+            Plugin._initialized = true;
+        } finally {
+            Plugin._initializing = false;
+        }
+    }
+
     // 命令处理方法 - 排行榜相关
     async showTotalRank(e) {
         return await this.rankCommands.showTotalRank(e);
@@ -84,6 +140,14 @@ class Plugin extends plugin {
 
     async listUserGroups(e) {
         return await this.userCommands.listUserGroups(e);
+    }
+
+    async openWebPage(e) {
+        return await this.userCommands.openWebPage(e);
+    }
+
+    async openBackgroundPage(e) {
+        return await this.userCommands.openBackgroundPage(e);
     }
 
     // 管理员命令
@@ -134,10 +198,6 @@ class Plugin extends plugin {
     }
 
     // 背景设置
-    async setBackground(e) {
-        return await this.backgroundCommands.setBackground(e);
-    }
-
     async removeBackground(e) {
         return await this.backgroundCommands.removeBackground(e);
     }
