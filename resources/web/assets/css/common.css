@@ -340,14 +340,14 @@ html::-webkit-scrollbar {
 /* Toast 提示 */
 .toast {
     position: fixed;
-    top: 80px;
+    top: 20px;
     right: 20px;
     background: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 15px 20px;
     border-radius: 8px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    z-index: 9999;
+    z-index: 99999;
     transform: translateX(400px);
     transition: transform 0.3s ease, opacity 0.3s ease;
     opacity: 0;
@@ -470,12 +470,13 @@ html::-webkit-scrollbar {
     }
 
     .toast {
-        top: 70px;
+        top: 10px;
         right: 10px;
         left: 10px;
         min-width: auto;
         max-width: calc(100% - 20px);
         transform: translateY(-100px);
+        z-index: 99999;
     }
     
     .toast.show {
