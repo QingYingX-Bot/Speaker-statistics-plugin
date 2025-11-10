@@ -1,6 +1,9 @@
 import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { PathResolver } from '../core/utils/PathResolver.js';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * 管理员命令处理类
@@ -26,6 +29,10 @@ class AdminCommands {
             {
                 reg: '^#水群设置(开启|关闭)(转发|图片|记录|日志)$',
                 fnc: 'toggleSetting'
+            },
+            {
+                reg: '^#水群(强制)?更新$',
+                fnc: 'updatePlugin'
             }
         ];
     }
@@ -134,6 +141,105 @@ class AdminCommands {
         } catch (error) {
             globalConfig.error('切换设置失败:', error);
             return e.reply('设置失败，请稍后重试');
+        }
+    }
+
+    /**
+     * 更新插件
+     */
+    async updatePlugin(e) {
+        const validation = CommonUtils.validateAdminPermission(e);
+        if (!validation.valid) {
+            return e.reply(validation.message);
+        }
+
+        try {
+            const isForce = e.msg.includes('强制');
+            const pluginDir = PathResolver.getPluginDir();
+            
+            // 检查是否是git仓库
+            const gitDir = path.join(pluginDir, '.git');
+            if (!fs.existsSync(gitDir)) {
+                return e.reply('❌ 当前插件目录不是git仓库，无法更新');
+            }
+
+            await e.reply(`🔄 开始${isForce ? '强制' : ''}更新插件...`);
+
+            // 执行git命令
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+
+            let stdout = '';
+            let stderr = '';
+
+            if (isForce) {
+                // 强制更新：先获取当前分支，然后重置到远程分支
+                try {
+                    // 获取当前分支名
+                    const branchResult = await execAsync('git branch --show-current', {
+                        cwd: pluginDir,
+                        timeout: 10000
+                    });
+                    const currentBranch = branchResult.stdout.trim() || 'main';
+                    
+                    // 获取远程分支
+                    await execAsync('git fetch origin', {
+                        cwd: pluginDir,
+                        timeout: 30000
+                    });
+                    
+                    // 重置到远程分支
+                    const resetResult = await execAsync(`git reset --hard origin/${currentBranch}`, {
+                        cwd: pluginDir,
+                        timeout: 10000
+                    });
+                    stdout = resetResult.stdout;
+                    stderr = resetResult.stderr || '';
+                } catch (error) {
+                    stderr = error.message || '';
+                    throw error;
+                }
+            } else {
+                // 普通更新：拉取最新代码
+                const pullResult = await execAsync('git pull', {
+                    cwd: pluginDir,
+                    timeout: 60000 // 60秒超时
+                });
+                stdout = pullResult.stdout;
+                stderr = pullResult.stderr || '';
+            }
+
+            const output = stdout + (stderr ? '\n' + stderr : '');
+            
+            // 检查是否已是最新
+            if (/Already up to date|已经是最新/.test(output)) {
+                return e.reply('✅ 插件已是最新版本');
+            }
+
+            // 检查是否有package.json变更，需要重新安装依赖
+            const needInstall = /package\.json/.test(output);
+            
+            let replyMsg = `✅ 插件${isForce ? '强制' : ''}更新成功\n\n更新日志：\n${output.substring(0, 500)}`;
+            
+            if (needInstall) {
+                replyMsg += '\n\n⚠️ 检测到依赖变更，建议重启后运行 pnpm install 安装新依赖';
+            } else {
+                replyMsg += '\n\n⚠️ 请重启插件以应用更新';
+            }
+
+            return e.reply(replyMsg);
+        } catch (error) {
+            globalConfig.error('更新插件失败:', error);
+            
+            let errorMsg = '❌ 更新失败：';
+            if (error.message) {
+                errorMsg += error.message.substring(0, 200);
+            } else {
+                errorMsg += '未知错误';
+            }
+            
+            return e.reply(errorMsg);
         }
     }
 

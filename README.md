@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.0.5-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
 
 ---
 
@@ -98,6 +98,8 @@
 | 切换图片 | `#水群设置开启/关闭图片` | 切换图片显示模式 |
 | 切换记录 | `#水群设置开启/关闭记录` | 切换消息记录功能 |
 | 切换日志 | `#水群设置开启/关闭日志` | 切换调试日志输出 |
+| 更新插件 | `#水群更新` | 更新插件到最新版本 |
+| 强制更新 | `#水群强制更新` | 强制更新插件（覆盖本地修改） |
 | 切换通知 | `#水群设置开启/关闭通知` | 切换成就解锁通知 |
 
 ---
