@@ -169,11 +169,9 @@ export default class Home {
             this.currentGroupId = 'all';
             select.value = 'all';
             
-            // 加载全部群聊的统计数据（如果支持）或第一个群聊的数据
-            if (this.currentGroupId === 'all' && this.groups.length > 0) {
-                // 如果选择全部群聊，可以加载第一个群聊的数据作为示例
-                // 或者实现聚合所有群聊数据的逻辑
-                await this.loadStats(this.groups[0].group_id);
+            // 加载全部群聊的统计数据
+            if (this.currentGroupId === 'all') {
+                await this.loadAllGroupsStats();
             } else if (this.groups.length > 0) {
                 await this.loadStats(this.currentGroupId);
             }
@@ -189,11 +187,8 @@ export default class Home {
             select.addEventListener('change', async (e) => {
                 this.currentGroupId = e.target.value;
                 if (this.currentGroupId === 'all') {
-                    // 如果选择全部群聊，加载第一个群聊的数据作为示例
-                    // 或者实现聚合所有群聊数据的逻辑
-                    if (this.groups.length > 0) {
-                        await this.loadStats(this.groups[0].group_id);
-                    }
+                    // 如果选择全部群聊，聚合所有群聊的数据
+                    await this.loadAllGroupsStats();
                 } else if (this.currentGroupId) {
                     await this.loadStats(this.currentGroupId);
                 }
@@ -210,6 +205,137 @@ export default class Home {
             console.error('加载统计数据失败:', error);
             Toast.show('加载统计数据失败', 'error');
         }
+    }
+    
+    async loadAllGroupsStats() {
+        if (!this.groups || this.groups.length === 0) {
+            Toast.show('暂无群聊数据', 'info');
+            return;
+        }
+        
+        try {
+            // 获取所有群聊的统计数据
+            const allStats = await Promise.all(
+                this.groups.map(async (group) => {
+                    try {
+                        const response = await api.getUserStats(this.app.userId, group.group_id);
+                        if (response.success && response.data) {
+                            return response.data;
+                        }
+                    } catch (error) {
+                        console.debug(`获取群 ${group.group_id} 的统计数据失败:`, error);
+                    }
+                    return null;
+                })
+            );
+            
+            // 过滤掉失败的数据
+            const validStats = allStats.filter(stat => stat !== null);
+            
+            if (validStats.length === 0) {
+                Toast.show('无法获取统计数据', 'error');
+                return;
+            }
+            
+            // 聚合所有群聊的数据
+            const aggregatedData = this.aggregateStats(validStats);
+            this.userData = aggregatedData;
+            this.renderStats();
+        } catch (error) {
+            console.error('加载全部群聊统计数据失败:', error);
+            Toast.show('加载统计数据失败', 'error');
+        }
+    }
+    
+    aggregateStats(statsArray) {
+        const today = new Date().toISOString().split('T')[0];
+        const currentWeek = window.TimeUtils ? window.TimeUtils.getCurrentWeekKey() : this.getCurrentWeekKey();
+        const currentMonth = window.TimeUtils ? window.TimeUtils.getCurrentMonthKey() : this.getCurrentMonthKey();
+        
+        // 初始化聚合数据
+        let totalCount = 0;
+        let totalWords = 0;
+        let todayCount = 0;
+        let todayWords = 0;
+        let weeklyCount = 0;
+        let monthlyCount = 0;
+        let maxContinuousDays = 0;
+        const allActiveDays = new Set(); // 用于去重活跃天数
+        let latestNickname = '';
+        let latestSpeakingTime = null;
+        
+        // 遍历所有群聊的统计数据
+        statsArray.forEach(stat => {
+            // 累计总发言和总字数
+            totalCount += parseInt(stat.total || stat.total_count || 0, 10);
+            totalWords += parseInt(stat.total_number_of_words || stat.total_words || 0, 10);
+            
+            // 累计今日数据
+            const todayStat = stat.daily_stats?.[today] || {};
+            todayCount += parseInt(todayStat.count || 0, 10);
+            todayWords += parseInt(todayStat.words || 0, 10);
+            
+            // 累计本周数据
+            const weeklyStat = stat.weekly_stats?.[currentWeek] || {};
+            weeklyCount += parseInt(weeklyStat.count || 0, 10);
+            
+            // 累计本月数据
+            const monthlyStat = stat.monthly_stats?.[currentMonth] || {};
+            monthlyCount += parseInt(monthlyStat.count || 0, 10);
+            
+            // 收集活跃天数（需要去重）
+            if (stat.daily_stats) {
+                Object.keys(stat.daily_stats).forEach(date => {
+                    allActiveDays.add(date);
+                });
+            }
+            
+            // 取最大连续天数
+            const continuousDays = parseInt(stat.continuous_days || 0, 10);
+            if (continuousDays > maxContinuousDays) {
+                maxContinuousDays = continuousDays;
+            }
+            
+            // 获取最新的昵称和最后发言时间
+            if (stat.last_speaking_time) {
+                if (!latestSpeakingTime || stat.last_speaking_time > latestSpeakingTime) {
+                    latestSpeakingTime = stat.last_speaking_time;
+                    latestNickname = stat.nickname || '';
+                }
+            }
+            if (!latestNickname && stat.nickname) {
+                latestNickname = stat.nickname;
+            }
+        });
+        
+        // 构建聚合后的数据结构
+        return {
+            total: totalCount,
+            total_count: totalCount,
+            total_number_of_words: totalWords,
+            total_words: totalWords,
+            active_days: allActiveDays.size,
+            continuous_days: maxContinuousDays,
+            nickname: latestNickname || statsArray[0]?.nickname || '',
+            last_speaking_time: latestSpeakingTime || statsArray[0]?.last_speaking_time || null,
+            rank: null, // 全部群聊时不显示排名
+            daily_stats: {
+                [today]: {
+                    count: todayCount,
+                    words: todayWords
+                }
+            },
+            weekly_stats: {
+                [currentWeek]: {
+                    count: weeklyCount
+                }
+            },
+            monthly_stats: {
+                [currentMonth]: {
+                    count: monthlyCount
+                }
+            }
+        };
     }
     
     renderStats() {
@@ -315,7 +441,41 @@ export default class Home {
                 }
             });
         } else {
-            // 如果选择全部群聊，显示"-"
+            // 如果选择全部群聊，计算所有群聊的总消息数
+            this.calculateAllGroupsMessagePercentage(totalCount);
+        }
+    }
+    
+    async calculateAllGroupsMessagePercentage(userTotalCount) {
+        const percentageEl = document.getElementById('messagePercentage');
+        if (!percentageEl) return;
+        
+        percentageEl.textContent = '计算中...';
+        
+        try {
+            // 获取所有群聊的总消息数
+            const groupStatsPromises = this.groups.map(group => 
+                api.getGroupStats(group.group_id).catch(() => null)
+            );
+            
+            const groupStatsResults = await Promise.all(groupStatsPromises);
+            
+            // 汇总所有群聊的总消息数
+            let totalMessages = 0;
+            groupStatsResults.forEach(response => {
+                if (response && response.success && response.data) {
+                    totalMessages += parseInt(response.data.total_messages || 0, 10);
+                }
+            });
+            
+            if (totalMessages > 0 && userTotalCount > 0) {
+                const percentage = ((userTotalCount / totalMessages) * 100).toFixed(2);
+                percentageEl.textContent = percentage + '%';
+            } else {
+                percentageEl.textContent = '0.00%';
+            }
+        } catch (error) {
+            console.error('计算全部群聊消息占比失败:', error);
             percentageEl.textContent = '-';
         }
     }

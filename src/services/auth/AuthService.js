@@ -11,6 +11,31 @@ import { getDataService } from '../../core/DataService.js';
  */
 class AuthService {
     /**
+     * 安全读取 JSON 文件
+     * @param {string} filePath 文件路径
+     * @returns {object} JSON 对象，如果文件不存在或无效则返回空对象
+     */
+    _safeReadJsonFile(filePath) {
+        try {
+            if (!fs.existsSync(filePath)) {
+                return {};
+            }
+            
+            const content = fs.readFileSync(filePath, 'utf8').trim();
+            
+            // 如果文件为空，返回空对象
+            if (!content) {
+                return {};
+            }
+            
+            return JSON.parse(content);
+        } catch (error) {
+            globalConfig.error('读取JSON文件失败:', error);
+            // 如果解析失败，返回空对象
+            return {};
+        }
+    }
+    /**
      * 验证秘钥
      * @param {string} userId 用户ID
      * @param {string} secretKey 秘钥
@@ -20,14 +45,14 @@ class AuthService {
         try {
             const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
 
-            if (!fs.existsSync(keyFilePath)) {
+            const keyData = this._safeReadJsonFile(keyFilePath);
+            
+            if (Object.keys(keyData).length === 0) {
                 return {
                     valid: false,
-                    message: '秘钥文件不存在'
+                    message: '秘钥文件不存在或为空'
                 };
             }
-
-            const keyData = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
             const userKeyData = keyData[userId];
 
             if (!userKeyData || !userKeyData.hash || !userKeyData.salt) {
@@ -64,14 +89,14 @@ class AuthService {
         try {
             const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
 
-            if (!fs.existsSync(keyFilePath)) {
+            const keyData = this._safeReadJsonFile(keyFilePath);
+            
+            if (Object.keys(keyData).length === 0) {
                 return {
                     hasExistingKey: false,
-                    message: '秘钥文件不存在'
+                    message: '秘钥文件不存在或为空'
                 };
             }
-
-            const keyData = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
             const userKeyData = keyData[userId];
 
             if (!userKeyData) {
@@ -130,10 +155,7 @@ class AuthService {
             const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
 
             // 读取现有数据
-            let keyData = {};
-            if (fs.existsSync(keyFilePath)) {
-                keyData = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
-            }
+            const keyData = this._safeReadJsonFile(keyFilePath);
 
             // 如果提供了原秘钥，验证原秘钥
             if (oldSecretKey && keyData[userId]) {
@@ -159,7 +181,7 @@ class AuthService {
                 hash: hash,
                 salt: salt,
                 originalKey: secretKey,
-                role: existingUser?.role, // 保留原有角色
+                role: existingUser?.role || 'user', // 保留原有角色，新用户默认为 'user'
                 createdAt: existingUser?.createdAt || TimeUtils.formatDateTimeForDB(),
                 updatedAt: TimeUtils.formatDateTimeForDB()
             };
@@ -187,27 +209,35 @@ class AuthService {
         try {
             const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
             
-            if (!fs.existsSync(keyFilePath)) {
+            const keyData = this._safeReadJsonFile(keyFilePath);
+            
+            // 如果文件为空，返回 null
+            if (Object.keys(keyData).length === 0) {
+                globalConfig.debug(`[权限检查] 用户 ${userId}: key.json 文件为空，返回 null`);
                 return null;
             }
-
-            const keyData = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
             
             // admin 用户始终是管理员
             if (userId === 'admin') {
+                globalConfig.debug(`[权限检查] 用户 ${userId}: admin 用户，返回 'admin'`);
                 return 'admin';
             }
             
             // 检查用户是否在 key.json 中
             if (keyData[userId]) {
+                const userRole = keyData[userId].role;
                 // 如果配置了 role 字段，使用配置的角色
-                if (keyData[userId].role === 'admin') {
+                if (userRole === 'admin') {
+                    globalConfig.debug(`[权限检查] 用户 ${userId}: 在 key.json 中找到，role='${userRole}'，返回 'admin'`);
                     return 'admin';
                 }
                 // 默认在 key.json 中的用户是普通用户
+                const finalRole = userRole || 'user';
+                globalConfig.debug(`[权限检查] 用户 ${userId}: 在 key.json 中找到，role='${finalRole}'，返回 'user'`);
                 return 'user';
             }
             
+            globalConfig.debug(`[权限检查] 用户 ${userId}: 不在 key.json 中，返回 null`);
             return null;
         } catch (error) {
             globalConfig.error('获取用户权限失败:', error);
@@ -223,19 +253,25 @@ class AuthService {
      */
     async checkAdminPermission(userId, secretKey = null) {
         try {
+            globalConfig.debug(`[权限检查] 开始检查用户 ${userId} 的管理员权限${secretKey ? '（需要验证秘钥）' : ''}`);
+            
             // 验证秘钥（如果提供）
             if (secretKey) {
                 const validation = await this.validateSecretKey(userId, secretKey);
                 if (!validation.valid) {
+                    globalConfig.debug(`[权限检查] 用户 ${userId}: 秘钥验证失败`);
                     return {
                         isAdmin: false,
                         message: '秘钥验证失败'
                     };
                 }
+                globalConfig.debug(`[权限检查] 用户 ${userId}: 秘钥验证成功`);
             }
 
             const role = await this.getUserRole(userId);
             const isAdmin = role === 'admin';
+
+            globalConfig.debug(`[权限检查] 用户 ${userId}: 最终角色='${role || 'none'}'，isAdmin=${isAdmin}`);
 
             return {
                 isAdmin,
@@ -252,6 +288,54 @@ class AuthService {
     }
 
     /**
+     * 更新用户角色
+     * @param {string} userId 用户ID
+     * @param {string} role 角色 ('admin' | 'user')
+     * @returns {Promise<{success: boolean, message?: string}>}
+     */
+    async updateUserRole(userId, role) {
+        try {
+            if (!userId || !role) {
+                return { success: false, message: '缺少必要参数' };
+            }
+
+            if (role !== 'admin' && role !== 'user') {
+                return { success: false, message: '角色必须是 admin 或 user' };
+            }
+
+            const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
+
+            // 读取现有数据
+            const keyData = this._safeReadJsonFile(keyFilePath);
+
+            // 检查用户是否存在
+            if (!keyData[userId]) {
+                return { success: false, message: '用户不存在' };
+            }
+
+            // 更新角色
+            const { TimeUtils } = await import('../../core/utils/TimeUtils.js');
+            keyData[userId] = {
+                ...keyData[userId],
+                role: role,
+                updatedAt: TimeUtils.formatDateTimeForDB()
+            };
+
+            // 确保目录存在
+            PathResolver.ensureDirectory(path.dirname(keyFilePath));
+
+            // 保存文件
+            fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8');
+
+            return { success: true, message: '角色更新成功' };
+
+        } catch (error) {
+            globalConfig.error('更新用户角色失败:', error);
+            return { success: false, message: '更新用户角色失败' };
+        }
+    }
+
+    /**
      * 获取所有用户列表（仅管理员）
      * @returns {Promise<Array<{userId: string, role: string, createdAt?: string, updatedAt?: string}>>}
      */
@@ -259,11 +343,12 @@ class AuthService {
         try {
             const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json');
             
-            if (!fs.existsSync(keyFilePath)) {
+            const keyData = this._safeReadJsonFile(keyFilePath);
+            
+            // 如果文件为空，返回空数组
+            if (Object.keys(keyData).length === 0) {
                 return [];
             }
-
-            const keyData = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
             const dataService = getDataService();
             const users = [];
             const seenUserIds = new Set(); // 用于去重
@@ -275,11 +360,10 @@ class AuthService {
                 }
                 seenUserIds.add(userId);
 
-                // 确定角色：优先使用配置的 role，否则根据 userId 判断
-                let role = 'user';
+                // 确定角色：优先使用配置的 role，否则默认为 'user'
+                let role = userData.role || 'user';
+                // 如果 userId 是 'admin'，强制设置为 'admin'
                 if (userId === 'admin') {
-                    role = 'admin';
-                } else if (userData.role === 'admin') {
                     role = 'admin';
                 }
 

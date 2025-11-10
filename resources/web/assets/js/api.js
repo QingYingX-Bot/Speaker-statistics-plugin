@@ -321,6 +321,21 @@ class API {
     }
     
     /**
+     * 更新用户角色（管理员）
+     * @param {string} targetUserId 目标用户ID
+     * @param {string} role 角色 ('admin' | 'user')
+     * @param {string} userId 当前用户ID
+     * @param {string} secretKey 秘钥
+     * @returns {Promise} 更新结果
+     */
+    async updateUserRole(targetUserId, role, userId, secretKey) {
+        return this.request(`/api/admin/users/${targetUserId}/role?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`, {
+            method: 'PUT',
+            body: { role },
+        });
+    }
+    
+    /**
      * 获取统计概览（管理员）
      * @param {string} userId 用户ID
      * @param {string} secretKey 秘钥

@@ -603,6 +603,9 @@ class App {
     // 加载页面
     async loadPage(pageName) {
         try {
+            // 每次加载页面时更新用户信息（包括权限），确保权限变化能及时反映
+            await this.updateUserInfo();
+            
             // 动态加载页面组件
             const pageModule = await import(`/pages/${pageName}.js`);
             const content = document.getElementById('pageContent');
@@ -635,6 +638,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.warn('组件加载失败，使用基础功能:', error);
     }
+    
+    // 初始化应用
+    const app = new App();
+    window.app = app;
+    
+    // 监听页面可见性变化，当页面重新可见时更新用户信息（包括权限）
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && app.userId) {
+            // 页面重新可见时，更新用户信息以检测权限变化
+            console.debug('页面重新可见，更新用户信息');
+            await app.updateUserInfo();
+        }
+    });
+    
+    // 监听窗口焦点变化，当窗口重新获得焦点时更新用户信息
+    window.addEventListener('focus', async () => {
+        if (app.userId) {
+            console.debug('窗口重新获得焦点，更新用户信息');
+            await app.updateUserInfo();
+        }
+    });
     
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) {
@@ -687,8 +711,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
-    // 初始化应用
-    const app = new App();
-    window.app = app;
+    // 初始化应用（app 已在上面创建）
     app.init();
 });
