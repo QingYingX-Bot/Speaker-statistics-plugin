@@ -16,9 +16,32 @@ export default class Background {
     destroy() {
         // 清理画布
         if (this.canvas) {
-            this.canvas.dispose();
+            try {
+                // 清除所有对象
+                this.canvas.clear();
+                // 移除所有事件监听器
+                this.canvas.off();
+                // 销毁画布
+                this.canvas.dispose();
+            } catch (e) {
+                console.warn('销毁画布时出错:', e);
+            }
             this.canvas = null;
         }
+        
+        // 清理可能残留的 canvas 元素
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        if (canvasWrapper) {
+            const allCanvases = canvasWrapper.querySelectorAll('canvas');
+            allCanvases.forEach(canvas => {
+                if (canvas.id !== 'fabricCanvas') {
+                    canvas.remove();
+                }
+            });
+            const oldContainers = canvasWrapper.querySelectorAll('.canvas-container');
+            oldContainers.forEach(container => container.remove());
+        }
+        
         this.currentImage = null;
         this.isInitialized = false;
     }
@@ -39,17 +62,21 @@ export default class Background {
                             <!-- 背景类型选择 -->
                             <div class="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
                                 <label class="block text-xs font-medium text-gray-600 mb-2">背景类型</label>
-                                <div class="relative">
-                                    <select id="backgroundTypeSelect" class="select-custom w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 text-sm appearance-none cursor-pointer hover:border-gray-300">
-                                        <option value="normal">普通背景</option>
-                                        <option value="ranking">排行榜背景</option>
-                                    </select>
-                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button type="button" id="backgroundTypeNormal" class="background-type-card px-3 py-2.5 rounded-lg border-2 border-gray-200 bg-white text-gray-700 text-sm font-medium transition-all hover:border-primary hover:bg-primary/5 active:bg-primary/10" data-value="normal">
+                                        <div class="text-center">普通背景</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">760×360</div>
+                                    </button>
+                                    <button type="button" id="backgroundTypeRanking" class="background-type-card px-3 py-2.5 rounded-lg border-2 border-gray-200 bg-white text-gray-700 text-sm font-medium transition-all hover:border-primary hover:bg-primary/5 active:bg-primary/10" data-value="ranking">
+                                        <div class="text-center">排行榜背景</div>
+                                        <div class="text-xs text-gray-500 mt-0.5">1520×200</div>
+                                    </button>
                                 </div>
+                                <!-- 隐藏的 select 用于保持兼容性 -->
+                                <select id="backgroundTypeSelect" class="hidden">
+                                    <option value="normal">普通背景</option>
+                                    <option value="ranking">排行榜背景</option>
+                                </select>
                             </div>
                             
                             <!-- 上传图片 -->
@@ -97,8 +124,8 @@ export default class Background {
                             <!-- 当前背景预览 -->
                             <div class="bg-white rounded-lg border border-gray-200 p-4">
                                 <div class="text-xs font-medium text-gray-600 mb-2">当前背景</div>
-                                <div id="currentBackgroundPreview" class="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-200" style="aspect-ratio: 760/360; min-height: 120px;">
-                                    <div class="absolute inset-0 flex items-center justify-center">
+                                <div id="currentBackgroundPreview" class="relative bg-gray-100 rounded-lg overflow-hidden border border-gray-200 w-full lg:max-w-[800px] xl:max-w-[1000px] 2xl:max-w-[1200px] mx-auto" style="aspect-ratio: 760/360;">
+                                    <div class="absolute inset-0 flex items-center justify-center z-10">
                                         <div class="text-center text-gray-400">
                                             <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -106,7 +133,7 @@ export default class Background {
                                             <div class="text-xs">未设置背景</div>
                                         </div>
                                     </div>
-                                    <img id="currentBackgroundImage" src="" alt="当前背景" class="hidden w-full h-full object-cover">
+                                    <img id="currentBackgroundImage" src="" alt="当前背景" class="hidden w-full h-full object-cover relative z-0">
                                 </div>
                                 <button id="deleteBackgroundBtn" class="mt-2 w-full px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 hidden">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,17 +148,22 @@ export default class Background {
                         <div class="lg:col-span-2">
                             <div class="bg-white rounded-lg border border-gray-200 p-5">
                                 <div class="text-xs font-medium text-gray-600 mb-3">预览</div>
-                                <div id="canvasWrapper" class="relative bg-gray-50 rounded-lg overflow-visible border-2 border-dashed border-gray-300 flex items-center justify-center p-4" style="min-height: 400px;">
-                                    <canvas id="fabricCanvas" style="display: block !important; max-width: 100%; position: relative; z-index: 1;"></canvas>
+                                <div id="canvasWrapper" class="relative bg-gray-50 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 flex items-center justify-center p-2 sm:p-4" style="min-height: 300px; touch-action: none;">
+                                    <!-- Canvas 容器 -->
+                                    <div id="canvasContainer" class="relative w-full h-full flex items-center justify-center" style="touch-action: none;">
+                                        <canvas id="fabricCanvas" style="display: block !important; max-width: 100%; max-height: 100%; position: relative; z-index: 1; touch-action: none;"></canvas>
+                                    </div>
+                                    <!-- 空状态提示 -->
                                     <div id="emptyCanvas" class="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
                                         <div class="text-center text-gray-400">
                                             <svg class="w-16 h-16 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                             </svg>
                                             <div class="text-sm font-medium">请上传图片开始编辑</div>
-                                            <div class="text-xs mt-1">支持拖拽调整位置和大小</div>
+                                            <div class="text-xs mt-1">PC端：滚轮缩放 | 移动端：双指缩放 | 单指拖拽移动</div>
                                         </div>
                                     </div>
+                                    <!-- 加载状态 -->
                                     <div id="canvasLoading" class="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-75 hidden z-20">
                                         <div class="text-center">
                                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
@@ -193,12 +225,42 @@ export default class Background {
             return;
         }
         
-        // 如果画布已经初始化，先销毁它
+        // 如果画布已经初始化，先彻底销毁它
         if (this.canvas && this.isInitialized) {
             console.log('画布已存在，先销毁旧画布');
-            this.canvas.dispose();
+            try {
+                // 清除所有对象
+                this.canvas.clear();
+                // 移除所有事件监听器
+                this.canvas.off();
+                // 销毁画布
+                this.canvas.dispose();
+            } catch (e) {
+                console.warn('销毁画布时出错:', e);
+            }
             this.canvas = null;
             this.currentImage = null;
+        }
+        
+        // 清理可能残留的 canvas 元素（Fabric.js 创建的 lower-canvas 和 upper-canvas）
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasContainerEl = document.getElementById('canvasContainer');
+        if (canvasWrapper) {
+            // 移除所有 canvas 元素（除了主 canvas）
+            const allCanvases = canvasWrapper.querySelectorAll('canvas');
+            allCanvases.forEach(canvas => {
+                if (canvas.id !== 'fabricCanvas') {
+                    canvas.remove();
+                }
+            });
+            // 移除可能残留的 canvas-container（Fabric.js 自动创建的）
+            const oldContainers = canvasWrapper.querySelectorAll('.canvas-container');
+            oldContainers.forEach(container => {
+                // 保留我们手动创建的 canvasContainer
+                if (container.id !== 'canvasContainer') {
+                    container.remove();
+                }
+            });
         }
         
         // 初始化画布
@@ -211,19 +273,31 @@ export default class Background {
             renderOnAddRemove: true
         });
         
+        // 将 Fabric.js 创建的容器移动到我们的 canvasContainer 中
+        const fabricContainer = this.canvas.wrapperEl;
+        if (fabricContainer && canvasContainerEl) {
+            // 如果容器不在 canvasContainer 中，移动它
+            if (fabricContainer.parentElement !== canvasContainerEl) {
+                canvasContainerEl.innerHTML = '';
+                canvasContainerEl.appendChild(fabricContainer);
+            }
+        }
+        
         console.log('画布初始化成功', this.canvas);
         console.log('画布元素:', canvasEl);
         console.log('画布尺寸:', this.canvas.getWidth(), this.canvas.getHeight());
         
         // 优化 Fabric.js 创建的容器样式
-        const canvasContainer = this.canvas.wrapperEl;
-        if (canvasContainer) {
-            canvasContainer.style.background = 'transparent';
-            canvasContainer.style.border = 'none';
-            canvasContainer.style.boxShadow = 'none';
-            canvasContainer.style.position = 'relative';
-            canvasContainer.style.display = 'inline-block';
-            canvasContainer.style.margin = '0 auto';
+        const fabricWrapper = this.canvas.wrapperEl;
+        if (fabricWrapper) {
+            fabricWrapper.style.background = 'transparent';
+            fabricWrapper.style.border = 'none';
+            fabricWrapper.style.boxShadow = 'none';
+            fabricWrapper.style.position = 'relative';
+            fabricWrapper.style.display = 'inline-block';
+            fabricWrapper.style.margin = '0 auto';
+            // 确保容器只有一个
+            fabricWrapper.className = 'canvas-container';
             console.log('canvas-container 样式已优化');
         }
         
@@ -231,13 +305,32 @@ export default class Background {
         const upperCanvas = this.canvas.upperCanvasEl;
         if (upperCanvas) {
             upperCanvas.style.background = 'transparent';
+            upperCanvas.style.position = 'absolute';
+            upperCanvas.style.zIndex = '1';
             console.log('upper-canvas 背景已设为透明');
+        }
+        
+        // 确保 lower-canvas 样式正确
+        const lowerCanvas = this.canvas.lowerCanvasEl;
+        if (lowerCanvas) {
+            lowerCanvas.style.position = 'relative';
+            lowerCanvas.style.zIndex = '0';
         }
         
         // 确保画布可交互
         this.canvas.selection = true;
         this.canvas.hoverCursor = 'move';
         this.canvas.moveCursor = 'move';
+        
+        // 初始化缩放相关变量
+        this.minZoom = 0.1;
+        this.maxZoom = 5;
+        this.lastTouchDistance = 0;
+        this.isPinching = false;
+        this.initialScale = 1; // 图片初始缩放值
+        
+        // 添加缩放功能（PC端滚轮 + 移动端双指）
+        this.setupZoom();
         
         // 标记为已初始化
         this.isInitialized = true;
@@ -250,12 +343,21 @@ export default class Background {
             const upperCanvas = this.canvas.upperCanvasEl;
             if (upperCanvas) {
                 upperCanvas.style.background = 'transparent';
+                upperCanvas.style.position = 'absolute';
+                upperCanvas.style.zIndex = '1';
             }
-            const canvasContainer = this.canvas.wrapperEl;
-            if (canvasContainer) {
-                canvasContainer.style.background = 'transparent';
-                canvasContainer.style.border = 'none';
-                canvasContainer.style.boxShadow = 'none';
+            const lowerCanvas = this.canvas.lowerCanvasEl;
+            if (lowerCanvas) {
+                lowerCanvas.style.position = 'relative';
+                lowerCanvas.style.zIndex = '0';
+            }
+            const fabricWrapperEl = this.canvas.wrapperEl;
+            if (fabricWrapperEl) {
+                fabricWrapperEl.style.background = 'transparent';
+                fabricWrapperEl.style.border = 'none';
+                fabricWrapperEl.style.boxShadow = 'none';
+                fabricWrapperEl.style.position = 'relative';
+                fabricWrapperEl.style.display = 'inline-block';
             }
         });
         
@@ -273,9 +375,235 @@ export default class Background {
         });
     }
     
+    /**
+     * 统一的缩放功能（PC端滚轮 + 移动端双指）
+     */
+    setupZoom() {
+        const canvasEl = this.canvas.getElement();
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        if (!canvasEl || !canvasWrapper) return;
+        
+        // 缩放函数：以指定点为中心进行缩放
+        const zoomAtPoint = (point, zoomFactor) => {
+            if (!this.currentImage) return;
+            
+            const currentScale = this.currentImage.scaleX || 1;
+            const newScale = currentScale * zoomFactor;
+            
+            // 计算相对于初始缩放的缩放比例
+            const relativeZoom = newScale / this.initialScale;
+            
+            // 限制缩放范围
+            if (relativeZoom < this.minZoom || relativeZoom > this.maxZoom) {
+                return;
+            }
+            
+            // 获取图片当前位置（center origin）
+            const imgLeft = this.currentImage.left || 0;
+            const imgTop = this.currentImage.top || 0;
+            const imgWidth = this.currentImage.width || 1;
+            const imgHeight = this.currentImage.height || 1;
+            
+            // 由于origin是center，需要计算图片左上角的位置
+            const imgTopLeftX = imgLeft - (imgWidth * currentScale) / 2;
+            const imgTopLeftY = imgTop - (imgHeight * currentScale) / 2;
+            
+            // 计算缩放中心点相对于图片左上角的位置（在原始尺寸下）
+            const pointXInImage = (point.x - imgTopLeftX) / currentScale;
+            const pointYInImage = (point.y - imgTopLeftY) / currentScale;
+            
+            // 应用新缩放
+            this.currentImage.set({
+                scaleX: newScale,
+                scaleY: newScale
+            });
+            
+            // 计算新位置（center origin），使缩放中心点指向的图片位置保持不变
+            const newTopLeftX = point.x - pointXInImage * newScale;
+            const newTopLeftY = point.y - pointYInImage * newScale;
+            const newLeft = newTopLeftX + (imgWidth * newScale) / 2;
+            const newTop = newTopLeftY + (imgHeight * newScale) / 2;
+            
+            this.currentImage.set({
+                left: newLeft,
+                top: newTop
+            });
+            
+            this.currentImage.setCoords();
+            this.canvas.renderAll();
+        };
+        
+        // PC端滚轮缩放 - 绑定到canvasWrapper和canvas元素上
+        const handleWheel = (e) => {
+            if (!this.currentImage) return;
+            
+            // 立即阻止默认行为，防止页面滚动
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 计算缩放增量
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            
+            // 获取鼠标在画布上的位置
+            // 需要从事件中获取相对于canvas的位置
+            const rect = canvasEl.getBoundingClientRect();
+            const pointer = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            
+            // 执行缩放
+            zoomAtPoint(pointer, zoomFactor);
+        };
+        
+        // 同时绑定到canvasWrapper和canvas元素
+        canvasWrapper.addEventListener('wheel', handleWheel, { passive: false });
+        canvasEl.addEventListener('wheel', handleWheel, { passive: false });
+        
+        // 移动端双指缩放
+        let touchStartDistance = 0;
+        let touchStartScale = 1;
+        let touchStartCenter = null;
+        let touchStartImagePos = null;
+        
+        const getTouchDistance = (touch1, touch2) => {
+            const dx = touch1.clientX - touch2.clientX;
+            const dy = touch1.clientY - touch2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        };
+        
+        const getTouchCenter = (touch1, touch2, canvasEl) => {
+            const centerX = (touch1.clientX + touch2.clientX) / 2;
+            const centerY = (touch1.clientY + touch2.clientY) / 2;
+            const rect = canvasEl.getBoundingClientRect();
+            return {
+                x: centerX - rect.left,
+                y: centerY - rect.top
+            };
+        };
+        
+        // 移动端触摸事件 - 同时绑定到canvasWrapper和canvas元素
+        const handleTouchStart = (e) => {
+            if (e.touches.length === 2 && this.currentImage) {
+                e.preventDefault();
+                this.isPinching = true;
+                
+                const touches = Array.from(e.touches);
+                touchStartDistance = getTouchDistance(touches[0], touches[1]);
+                touchStartScale = this.currentImage.scaleX || 1;
+                touchStartCenter = getTouchCenter(touches[0], touches[1], canvasEl);
+                touchStartImagePos = {
+                    left: this.currentImage.left || 0,
+                    top: this.currentImage.top || 0
+                };
+            } else if (e.touches.length === 1) {
+                this.isPinching = false;
+            }
+        };
+        
+        canvasWrapper.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvasEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+        
+        const handleTouchMove = (e) => {
+            if (e.touches.length === 2 && this.currentImage && this.isPinching) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const touches = Array.from(e.touches);
+                const currentDistance = getTouchDistance(touches[0], touches[1]);
+                
+                if (touchStartDistance > 0 && touchStartCenter) {
+                    // 计算缩放比例
+                    const scaleRatio = currentDistance / touchStartDistance;
+                    const newScale = touchStartScale * scaleRatio;
+                    
+                    // 计算相对于初始缩放的缩放比例
+                    const relativeZoom = newScale / this.initialScale;
+                    
+                    // 限制缩放范围
+                    if (relativeZoom >= this.minZoom && relativeZoom <= this.maxZoom) {
+                        // 获取当前两指中心点
+                        const currentCenter = getTouchCenter(touches[0], touches[1], canvasEl);
+                        
+                        // 由于origin是center，需要计算图片左上角的位置
+                        const imgWidth = this.currentImage.width || 1;
+                        const imgHeight = this.currentImage.height || 1;
+                        const startTopLeftX = touchStartImagePos.left - (imgWidth * touchStartScale) / 2;
+                        const startTopLeftY = touchStartImagePos.top - (imgHeight * touchStartScale) / 2;
+                        
+                        // 计算中心点相对于图片左上角的位置（在touchstart时的尺寸下）
+                        const centerXRelative = (touchStartCenter.x - startTopLeftX) / touchStartScale;
+                        const centerYRelative = (touchStartCenter.y - startTopLeftY) / touchStartScale;
+                        
+                        // 应用新缩放
+                        this.currentImage.set({
+                            scaleX: newScale,
+                            scaleY: newScale
+                        });
+                        
+                        // 计算新位置（center origin），使中心点指向的图片位置保持不变
+                        const newTopLeftX = currentCenter.x - centerXRelative * newScale;
+                        const newTopLeftY = currentCenter.y - centerYRelative * newScale;
+                        const newLeft = newTopLeftX + (imgWidth * newScale) / 2;
+                        const newTop = newTopLeftY + (imgHeight * newScale) / 2;
+                        
+                        this.currentImage.set({
+                            left: newLeft,
+                            top: newTop
+                        });
+                        
+                        this.currentImage.setCoords();
+                        this.canvas.renderAll();
+                        
+                        // 更新初始状态用于连续缩放
+                        touchStartScale = newScale;
+                        touchStartCenter = currentCenter;
+                        touchStartImagePos = {
+                            left: newLeft,
+                            top: newTop
+                        };
+                        touchStartDistance = currentDistance;
+                    }
+                }
+            }
+        };
+        
+        const handleTouchEnd = (e) => {
+            if (e.touches.length < 2) {
+                this.isPinching = false;
+                touchStartDistance = 0;
+                touchStartScale = 1;
+                touchStartCenter = null;
+                touchStartImagePos = null;
+            }
+        };
+        
+        canvasWrapper.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvasEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvasWrapper.addEventListener('touchend', handleTouchEnd, { passive: false });
+        canvasEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+    }
+    
     updateTargetSize() {
         const select = document.getElementById('backgroundTypeSelect');
-        if (select.value === 'ranking') {
+        const normalCard = document.getElementById('backgroundTypeNormal');
+        const rankingCard = document.getElementById('backgroundTypeRanking');
+        
+        // 同步背景类型（优先从卡片获取，如果没有则从 select 获取）
+        if (normalCard && normalCard.classList.contains('border-primary')) {
+            this.backgroundType = 'normal';
+        } else if (rankingCard && rankingCard.classList.contains('border-primary')) {
+            this.backgroundType = 'ranking';
+        } else if (select) {
+            this.backgroundType = select.value;
+        }
+        
+        // 同步 select 的值
+        if (select) {
+            select.value = this.backgroundType;
+        }
+        
+        if (this.backgroundType === 'ranking') {
             this.targetWidth = 1520;
             this.targetHeight = 200;
         } else {
@@ -308,33 +636,118 @@ export default class Background {
             const upperCanvas = this.canvas.upperCanvasEl;
             if (upperCanvas) {
                 upperCanvas.style.background = 'transparent';
+                upperCanvas.style.position = 'absolute';
+                upperCanvas.style.zIndex = '1';
             }
-            const canvasContainer = this.canvas.wrapperEl;
-            if (canvasContainer) {
-                canvasContainer.style.background = 'transparent';
-                canvasContainer.style.border = 'none';
-                canvasContainer.style.boxShadow = 'none';
+            const lowerCanvas = this.canvas.lowerCanvasEl;
+            if (lowerCanvas) {
+                lowerCanvas.style.position = 'relative';
+                lowerCanvas.style.zIndex = '0';
+            }
+            const fabricWrapperEl = this.canvas.wrapperEl;
+            if (fabricWrapperEl) {
+                fabricWrapperEl.style.background = 'transparent';
+                fabricWrapperEl.style.border = 'none';
+                fabricWrapperEl.style.boxShadow = 'none';
+                fabricWrapperEl.style.position = 'relative';
             }
         }
         
-        // 更新当前背景预览的宽高比
+        // 更新当前背景预览，按固定尺寸显示
         const previewContainer = document.getElementById('currentBackgroundPreview');
         if (previewContainer) {
-            previewContainer.style.aspectRatio = `${this.targetWidth}/${this.targetHeight}`;
+            // 移除所有 max-w 相关的类
+            const classList = previewContainer.classList;
+            const maxWidthClasses = Array.from(classList).filter(cls => cls.startsWith('max-w-'));
+            maxWidthClasses.forEach(cls => classList.remove(cls));
+            
+            // 根据背景类型设置固定的宽高比和最大宽度
+            if (this.backgroundType === 'ranking') {
+                // 排行榜背景：1520×200（非常宽的长条）
+                previewContainer.style.aspectRatio = '1520/200';
+                // 排行榜背景在PC端上可以显示得更长
+                previewContainer.classList.add('lg:max-w-[1200px]', 'xl:max-w-[1400px]', '2xl:max-w-[1600px]');
+            } else {
+                // 普通背景：760×360
+                previewContainer.style.aspectRatio = '760/360';
+                // 普通背景在PC端上的最大宽度
+                previewContainer.classList.add('lg:max-w-[800px]', 'xl:max-w-[1000px]', '2xl:max-w-[1200px]');
+            }
+            previewContainer.style.width = '100%';
+            previewContainer.style.height = 'auto';
+            previewContainer.style.overflow = 'hidden';
         }
     }
     
     setupEventListeners() {
-        // 背景类型选择
+        // 背景类型选择 - 卡片切换
+        const normalCard = document.getElementById('backgroundTypeNormal');
+        const rankingCard = document.getElementById('backgroundTypeRanking');
         const typeSelect = document.getElementById('backgroundTypeSelect');
-        typeSelect.addEventListener('change', (e) => {
-            this.backgroundType = e.target.value;
-            this.updateTargetSize();
-            this.loadCurrentBackground();
-            if (this.currentImage) {
-                this.fitImageToCanvas();
+        
+        // 更新卡片选中状态
+        const updateCardState = (selectedValue) => {
+            // 移除所有选中状态
+            [normalCard, rankingCard].forEach(card => {
+                if (card) {
+                    card.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
+                    card.classList.add('border-gray-200', 'bg-white', 'text-gray-700');
+                }
+            });
+            
+            // 添加选中状态
+            const selectedCard = selectedValue === 'normal' ? normalCard : rankingCard;
+            if (selectedCard) {
+                selectedCard.classList.remove('border-gray-200', 'bg-white', 'text-gray-700');
+                selectedCard.classList.add('border-primary', 'bg-primary/10', 'text-primary');
             }
-        });
+            
+            // 同步 select 的值
+            if (typeSelect) {
+                typeSelect.value = selectedValue;
+            }
+        };
+        
+        // 初始化选中状态
+        updateCardState(this.backgroundType || 'normal');
+        
+        // 卡片点击事件
+        if (normalCard) {
+            normalCard.addEventListener('click', () => {
+                this.backgroundType = 'normal';
+                updateCardState('normal');
+                this.updateTargetSize();
+                this.loadCurrentBackground();
+                if (this.currentImage) {
+                    this.fitImageToCanvas();
+                }
+            });
+        }
+        
+        if (rankingCard) {
+            rankingCard.addEventListener('click', () => {
+                this.backgroundType = 'ranking';
+                updateCardState('ranking');
+                this.updateTargetSize();
+                this.loadCurrentBackground();
+                if (this.currentImage) {
+                    this.fitImageToCanvas();
+                }
+            });
+        }
+        
+        // 保持 select 的 change 事件监听（兼容性）
+        if (typeSelect) {
+            typeSelect.addEventListener('change', (e) => {
+                this.backgroundType = e.target.value;
+                updateCardState(e.target.value);
+                this.updateTargetSize();
+                this.loadCurrentBackground();
+                if (this.currentImage) {
+                    this.fitImageToCanvas();
+                }
+            });
+        }
         
         // 上传按钮
         const uploadBtn = document.getElementById('uploadBtn');
@@ -404,6 +817,9 @@ export default class Background {
                 if (previewImg) {
                     previewImg.src = backgroundUrl;
                     previewImg.classList.remove('hidden');
+                    
+                    // 图片加载完成后，容器已经通过 aspect-ratio 设置了固定尺寸，无需调整
+                    // 图片使用 object-cover 填充容器，保持固定比例显示
                 }
                 if (emptyState) {
                     emptyState.classList.add('hidden');
@@ -625,7 +1041,7 @@ export default class Background {
         
         console.log('计算缩放比例:', scale, '图片尺寸:', imageWidth, imageHeight);
         
-        // 设置图片属性，允许用户自由缩放和移动
+        // 设置图片属性，禁用缩放控制点，只允许移动和通过滚轮/双指缩放
         this.currentImage.set({
             scaleX: scale,
             scaleY: scale,
@@ -635,13 +1051,13 @@ export default class Background {
             originY: 'center',
             selectable: true,
             evented: true,
-            hasControls: true,
-            hasBorders: true,
-            lockRotation: false,
-            lockScalingX: false,
-            lockScalingY: false,
-            lockMovementX: false,
-            lockMovementY: false,
+            hasControls: false, // 禁用控制点
+            hasBorders: false, // 禁用边框
+            lockRotation: true, // 锁定旋转
+            lockScalingX: true, // 锁定X轴缩放（通过控制点）
+            lockScalingY: true, // 锁定Y轴缩放（通过控制点）
+            lockMovementX: false, // 允许移动
+            lockMovementY: false, // 允许移动
             transparentCorners: false,
             cornerColor: '#4A90E2',
             cornerSize: 10,
@@ -651,6 +1067,9 @@ export default class Background {
         
         // 居中对象
         this.canvas.centerObject(this.currentImage);
+        
+        // 保存初始缩放值（用于计算相对缩放）
+        this.initialScale = scale;
         
         // 立即渲染画布
         this.canvas.renderAll();
