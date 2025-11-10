@@ -146,10 +146,6 @@ class Plugin extends plugin {
         return await this.userCommands.openWebPage(e);
     }
 
-    async openBackgroundPage(e) {
-        return await this.userCommands.openBackgroundPage(e);
-    }
-
     // 管理员命令
     async clearRanking(e) {
         return await this.adminCommands.clearRanking(e);
@@ -198,8 +194,16 @@ class Plugin extends plugin {
     }
 
     // 背景设置
+    async openBackgroundPage(e) {
+        return await this.backgroundCommands.openBackgroundPage(e);
+    }
+
     async removeBackground(e) {
         return await this.backgroundCommands.removeBackground(e);
+    }
+
+    async showBackgroundHelp(e) {
+        return await this.backgroundCommands.showBackgroundHelp(e);
     }
 
     // 消息处理

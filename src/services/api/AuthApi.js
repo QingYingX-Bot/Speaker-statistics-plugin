@@ -29,10 +29,11 @@ export class AuthApi {
                 const userId = req.cookies?.userId || req.query.userId;
                 
                 if (!userId) {
-                    return res.json({
-                        success: false,
+                    return ApiResponse.success(res, {
                         userId: null,
-                        message: '未登录'
+                        userName: null,
+                        role: null,
+                        isAdmin: false
                     });
                 }
                 
@@ -95,11 +96,10 @@ export class AuthApi {
                     return ApiResponse.error(res, result.message || '用户秘钥不存在', 404);
                 }
                 
-                res.json({
+                ApiResponse.success(res, {
                     secretKey: result.secretKey,
-                    message: result.message || '秘钥获取成功',
                     hasExistingKey: true
-                });
+                }, result.message || '秘钥获取成功');
             }, '读取秘钥文件失败')
         );
 
@@ -124,10 +124,9 @@ export class AuthApi {
             ApiResponse.asyncHandler(async (req, res) => {
                 const { userId, secretKey } = req.body;
                 const validation = await this.authService.validateSecretKey(userId, secretKey);
-                res.json({
-                    valid: validation.valid,
-                    message: validation.message
-                });
+                ApiResponse.success(res, {
+                    valid: validation.valid
+                }, validation.message);
             }, '验证秘钥失败')
         );
 
@@ -153,11 +152,9 @@ export class AuthApi {
                 const { userId, code } = req.body;
                 const result = this.verificationCodeManager.verifyCode(userId, code);
                 
-                res.json({ 
-                    success: true, 
-                    valid: result.valid, 
-                    message: result.message 
-                });
+                ApiResponse.success(res, {
+                    valid: result.valid
+                }, result.message);
             }, '验证码校验失败')
         );
     }

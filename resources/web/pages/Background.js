@@ -1283,8 +1283,8 @@ export default class Background {
         if (localKey) {
             // 验证秘钥是否有效
             try {
-                const validation = await api.validateSecretKey(this.app.userId, localKey);
-                if (validation.valid) {
+                const response = await api.validateSecretKey(this.app.userId, localKey);
+                if (response.success && response.data?.valid) {
                     // 验证成功，保存到sessionStorage
                     sessionStorage.setItem(`background_verified_${this.app.userId}`, localKey);
                     return localKey;
@@ -1344,14 +1344,16 @@ export default class Background {
                             confirmBtn.textContent = '验证中...';
                             
                             // 验证秘钥
-                            const validation = await api.validateSecretKey(this.app.userId, secretKey);
+                            const response = await api.validateSecretKey(this.app.userId, secretKey);
                             
-                            if (!validation.valid) {
-                                Toast.show(validation.message || '秘钥验证失败', 'error');
+                            if (!response.success || !response.data?.valid) {
+                                Toast.show(response.message || '秘钥验证失败', 'error');
                                 confirmBtn.disabled = false;
                                 confirmBtn.textContent = '确认验证';
                                 return;
                             }
+                            
+                            Toast.show(response.message || '秘钥验证成功', 'success');
                             
                             // 验证成功，保存秘钥
                             await SecretKeyManager.save(this.app.userId, secretKey);

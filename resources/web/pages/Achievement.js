@@ -8,6 +8,7 @@ export default class Achievement {
         this.currentGroupId = null;
         this.achievements = [];
         this.currentDisplayAchievementId = null; // 当前显示的成就ID
+        this.displayInfo = null; // 显示成就的详细信息（包含autoDisplayAt等）
     }
     
     async render() {
@@ -76,8 +77,8 @@ export default class Achievement {
         if (localKey) {
             // 验证秘钥是否有效
             try {
-                const validation = await api.validateSecretKey(this.app.userId, localKey);
-                if (validation.valid) {
+                const response = await api.validateSecretKey(this.app.userId, localKey);
+                if (response.success && response.data?.valid) {
                     // 验证成功，保存到sessionStorage
                     sessionStorage.setItem(`achievement_verified_${this.app.userId}`, localKey);
                     return localKey;
@@ -137,14 +138,16 @@ export default class Achievement {
                             confirmBtn.textContent = '验证中...';
                             
                             // 验证秘钥
-                            const validation = await api.validateSecretKey(this.app.userId, secretKey);
+                            const response = await api.validateSecretKey(this.app.userId, secretKey);
                             
-                            if (!validation.valid) {
-                                Toast.show(validation.message || '秘钥验证失败', 'error');
+                            if (!response.success || !response.data?.valid) {
+                                Toast.show(response.message || '秘钥验证失败', 'error');
                                 confirmBtn.disabled = false;
                                 confirmBtn.textContent = '确认验证';
                                 return;
                             }
+                            
+                            Toast.show(response.message || '秘钥验证成功', 'success');
                             
                             // 验证成功，保存秘钥
                             await SecretKeyManager.save(this.app.userId, secretKey);
@@ -335,10 +338,19 @@ export default class Achievement {
             const groupId = this.currentGroupId;
             
             const response = await api.getAchievementList(groupId, this.app.userId);
-            this.achievements = response.data || [];
             
-            // 从API响应中获取当前显示的成就ID
-            this.currentDisplayAchievementId = response.current_display || null;
+            // API返回的data是一个对象，包含achievements数组
+            if (response.success && response.data) {
+                this.achievements = response.data.achievements || [];
+                
+                // 从API响应中获取当前显示的成就ID和显示信息
+                this.currentDisplayAchievementId = response.data.current_display || null;
+                this.displayInfo = response.data.display_info || null;
+            } else {
+                this.achievements = [];
+                this.currentDisplayAchievementId = null;
+                this.displayInfo = null;
+            }
             
             // 如果响应中没有，尝试从成就列表中查找标记为显示的成就
             if (!this.currentDisplayAchievementId && this.achievements.length > 0) {
@@ -495,6 +507,41 @@ export default class Achievement {
              this.currentDisplayAchievementId.toString() === achievementId.toString())) ||
             achievement.is_display === true;
         
+        // 计算卸下时间（如果是自动佩戴的）
+        let removeTimeInfo = '';
+        if (isDisplayed && this.displayInfo && !this.displayInfo.isManual && this.displayInfo.autoDisplayAt) {
+            const autoDisplayAt = new Date(this.displayInfo.autoDisplayAt);
+            const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000); // 24小时后
+            const now = new Date();
+            const diffMs = removeAt - now;
+            
+            if (diffMs > 0) {
+                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                removeTimeInfo = `
+                    <div class="mt-2 text-xs text-gray-500">
+                        <span class="inline-flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            自动卸下: ${hours}小时${minutes > 0 ? minutes + '分钟' : ''}后
+                        </span>
+                    </div>
+                `;
+            } else {
+                removeTimeInfo = `
+                    <div class="mt-2 text-xs text-orange-600">
+                        <span class="inline-flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            即将自动卸下
+                        </span>
+                    </div>
+                `;
+            }
+        }
+        
         // 如果是当前显示的成就，添加特殊样式
         const displayedClass = isDisplayed ? 'border-primary border-2' : '';
         const displayedBadge = isDisplayed ? `
@@ -523,16 +570,19 @@ export default class Achievement {
                 </div>
                 ${unlocked ? `
                     ${isDisplayed ? `
-                        <button 
-                            type="button"
-                            class="set-display-btn w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium cursor-not-allowed mt-auto"
-                            disabled
-                            data-achievement-id="${achievementId}"
-                            data-achievement-name="${achievement.name || achievementId}"
-                            data-achievement-rarity="${achievement.rarity || 'Common'}"
-                        >
-                            已设置为显示
-                        </button>
+                        <div class="mt-auto">
+                            <button 
+                                type="button"
+                                class="set-display-btn w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium cursor-not-allowed"
+                                disabled
+                                data-achievement-id="${achievementId}"
+                                data-achievement-name="${achievement.name || achievementId}"
+                                data-achievement-rarity="${achievement.rarity || 'Common'}"
+                            >
+                                已设置为显示
+                            </button>
+                            ${removeTimeInfo}
+                        </div>
                     ` : `
                         <button 
                             type="button"

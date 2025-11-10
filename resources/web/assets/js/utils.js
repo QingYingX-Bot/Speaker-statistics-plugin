@@ -408,8 +408,8 @@ class SecretKeyManager {
                 if (result.secretKey === '***已加密***') {
                     // 服务器有加密的秘钥，使用验证API验证本地秘钥
                     try {
-                        const validation = await api.validateSecretKey(userId, localSecretKey);
-                        if (validation && validation.valid) {
+                        const response = await api.validateSecretKey(userId, localSecretKey);
+                        if (response && response.success && response.data?.valid) {
                             return { matched: true };
                         } else {
                             return { 

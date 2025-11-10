@@ -2,13 +2,13 @@ import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js';
+import { segment } from 'oicq';
 import fs from 'fs';
 import path from 'path';
 
 /**
  * 背景管理器
- * 负责背景图片的文件管理和删除操作
- * 注意：背景设置链接生成功能已移至 UserCommands.openBackgroundPage
+ * 负责背景图片的文件管理、删除操作和背景设置链接生成
  */
 class BackgroundManager {
     /**
@@ -16,6 +16,10 @@ class BackgroundManager {
      */
     static getRules() {
         return [
+            {
+                reg: '^#水群设置背景$',
+                fnc: 'openBackgroundPage'
+            },
             {
                 reg: '^#水群删除背景$',
                 fnc: 'removeBackground'
@@ -25,6 +29,34 @@ class BackgroundManager {
                 fnc: 'showBackgroundHelp'
             }
         ];
+    }
+
+    /**
+     * 打开背景设置页面
+     */
+    async openBackgroundPage(e) {
+        const validation = CommonUtils.validateGroupMessage(e, false);
+        if (!validation.valid) {
+            return e.reply(validation.message);
+        }
+
+        try {
+            const userId = String(e.user_id);
+            const result = await WebLinkGenerator.generateBackgroundPageLink(userId);
+            
+            if (!result.success) {
+                return e.reply(`❌ ${result.message}`);
+            }
+            
+            return e.reply([
+                segment.text('🖼️ 背景设置页面链接：\n'),
+                segment.text(result.url),
+                segment.text('\n\n⚠️ 链接24小时内有效，请勿分享给他人')
+            ]);
+        } catch (error) {
+            globalConfig.error('生成背景设置链接失败:', error);
+            return e.reply('❌ 生成链接失败，请稍后重试');
+        }
     }
 
     /**

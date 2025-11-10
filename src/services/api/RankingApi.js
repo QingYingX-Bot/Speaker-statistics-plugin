@@ -30,14 +30,7 @@ export class RankingApi {
                     page: actualPage
                 });
 
-                const response = { success: true, data: rankings };
-                response.meta = {
-                    type,
-                    groupId: actualGroupId,
-                    limit: actualLimit,
-                    page: actualPage
-                };
-                res.json(response);
+                ApiResponse.success(res, rankings);
             }, '获取排行榜失败')
         );
     }

@@ -494,12 +494,13 @@ class MessageRecorder {
                             let shouldAutoSetDisplay = false;
                             let bestAchievement = null;
                             
-                            // 检查当前是否有手动设置的显示成就
+                            // 检查当前是否有显示成就（手动或自动）
                             const currentDisplay = await achievementService.dataService.dbService.getDisplayAchievement(groupId, userId);
                             const hasManualDisplay = currentDisplay && currentDisplay.is_manual === true;
+                            const hasAutoDisplay = currentDisplay && currentDisplay.is_manual === false;
                             
-                            // 如果没有手动设置的显示成就，检查新解锁的成就是否符合自动佩戴条件
-                            if (!hasManualDisplay) {
+                            // 如果没有显示成就（手动或自动都没有），检查新解锁的成就是否符合自动佩戴条件
+                            if (!hasManualDisplay && !hasAutoDisplay) {
                                 for (const achievement of newAchievements) {
                                     const rarity = achievement.rarity || 'common';
                                     // 检查是否是史诗及以上
@@ -512,7 +513,7 @@ class MessageRecorder {
                                 }
                             }
                             
-                            // 如果符合条件，自动设置为显示成就（24小时时限）
+                            // 如果符合条件，自动设置为显示成就（24小时时限，从解锁时间开始计算）
                             if (shouldAutoSetDisplay && bestAchievement) {
                                 try {
                                     await achievementService.setDisplayAchievement(

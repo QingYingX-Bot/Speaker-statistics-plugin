@@ -44,8 +44,8 @@ export class StatsApi {
             ApiResponse.asyncHandler(async (req, res) => {
                 const { groupId } = req.params;
                 
-                // 获取群基本信息
-                const groupInfo = await this.dataService.dbService.getGroupInfo(groupId);
+                // 获取格式化的群名称
+                const groupName = await this.dataService.dbService.getFormattedGroupName(groupId);
                 
                 // 获取群用户总数
                 const userCountResult = await this.dataService.dbService.get(
@@ -70,7 +70,7 @@ export class StatsApi {
                 
                 ApiResponse.success(res, {
                     group_id: groupId,
-                    group_name: groupInfo?.group_name || `群${groupId}`,
+                    group_name: groupName,
                     user_count: userCount,
                     total_messages: totalMessages,
                     total_words: totalWords
@@ -84,24 +84,13 @@ export class StatsApi {
                 const { userId } = req.params;
                 const groupIds = await this.dataService.dbService.getUserGroups(userId);
                 
-                // 格式化群信息，尝试获取群名称
+                // 格式化群信息，获取群名称
                 const groups = await Promise.all(groupIds.map(async (groupId) => {
-                    try {
-                        // 尝试从数据库获取群信息
-                        const groupInfo = await this.dataService.dbService.get(
-                            'SELECT group_name FROM group_info WHERE group_id = $1',
-                            groupId
-                        );
-                        return {
-                            group_id: groupId,
-                            group_name: groupInfo?.group_name || `群${groupId}`
-                        };
-                    } catch (error) {
-                        return {
-                            group_id: groupId,
-                            group_name: `群${groupId}`
-                        };
-                    }
+                    const groupName = await this.dataService.dbService.getFormattedGroupName(groupId);
+                    return {
+                        group_id: groupId,
+                        group_name: groupName
+                    };
                 }));
                 
                 ApiResponse.success(res, groups);

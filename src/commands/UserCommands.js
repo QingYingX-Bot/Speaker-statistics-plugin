@@ -32,10 +32,6 @@ class UserCommands {
             {
                 reg: '^#水群网页$',
                 fnc: 'openWebPage'
-            },
-            {
-                reg: '^#水群设置背景$',
-                fnc: 'openBackgroundPage'
             }
         ];
     }
@@ -343,29 +339,6 @@ class UserCommands {
         }
     }
 
-    /**
-     * 打开背景设置页面
-     */
-    async openBackgroundPage(e) {
-        try {
-            const userId = String(e.user_id);
-            const { WebLinkGenerator } = await import('../core/utils/WebLinkGenerator.js');
-            const result = await WebLinkGenerator.generateBackgroundPageLink(userId);
-            
-            if (!result.success) {
-                return e.reply(`❌ ${result.message}`);
-            }
-            
-            return e.reply([
-                segment.text('🖼️ 背景设置页面链接：\n'),
-                segment.text(result.url),
-                segment.text('\n\n⚠️ 链接24小时内有效，请勿分享给他人')
-            ]);
-        } catch (error) {
-            globalConfig.error('生成背景设置链接失败:', error);
-            return e.reply('❌ 生成链接失败，请稍后重试');
-        }
-    }
 }
 
 export { UserCommands };

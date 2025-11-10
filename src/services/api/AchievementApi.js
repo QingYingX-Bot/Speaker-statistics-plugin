@@ -52,11 +52,18 @@ export class AchievementApi {
                     });
                 }
 
-                const response = { success: true, data: achievements };
+                const responseData = {
+                    achievements: achievements
+                };
                 if (displayAchievement) {
-                    response.current_display = displayAchievement.id;
+                    responseData.current_display = displayAchievement.id;
+                    responseData.display_info = {
+                        id: displayAchievement.id,
+                        isManual: displayAchievement.isManual || false,
+                        autoDisplayAt: displayAchievement.autoDisplayAt || null
+                    };
                 }
-                res.json(response);
+                ApiResponse.success(res, responseData);
             }, '获取成就列表失败')
         );
 

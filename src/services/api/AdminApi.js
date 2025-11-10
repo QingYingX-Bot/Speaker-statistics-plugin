@@ -30,21 +30,11 @@ export class AdminApi {
                 // 格式化群信息
                 const groups = await Promise.all(groupRows.map(async (row) => {
                     const groupId = row.group_id;
-                    try {
-                        const groupInfo = await this.dataService.dbService.get(
-                            'SELECT group_name FROM group_info WHERE group_id = $1',
-                            groupId
-                        );
-                        return {
-                            group_id: groupId,
-                            group_name: groupInfo?.group_name || `群${groupId}`
-                        };
-                    } catch (error) {
-                        return {
-                            group_id: groupId,
-                            group_name: `群${groupId}`
-                        };
-                    }
+                    const groupName = await this.dataService.dbService.getFormattedGroupName(groupId);
+                    return {
+                        group_id: groupId,
+                        group_name: groupName
+                    };
                 }));
                 
                 ApiResponse.success(res, groups);
@@ -132,11 +122,14 @@ export class AdminApi {
                 `);
 
                 // 格式化群信息，确保有默认群名
-                const formattedGroupStats = groupStats.map(row => ({
-                    group_id: row.group_id,
-                    group_name: row.group_name || `群${row.group_id}`,
-                    user_count: parseInt(row.user_count || 0, 10),
-                    message_count: parseInt(row.message_count || 0, 10)
+                const formattedGroupStats = await Promise.all(groupStats.map(async (row) => {
+                    const groupName = row.group_name || await this.dataService.dbService.getFormattedGroupName(row.group_id);
+                    return {
+                        group_id: row.group_id,
+                        group_name: groupName,
+                        user_count: parseInt(row.user_count || 0, 10),
+                        message_count: parseInt(row.message_count || 0, 10)
+                    };
                 }));
 
                 ApiResponse.success(res, {

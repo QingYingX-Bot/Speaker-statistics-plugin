@@ -216,14 +216,16 @@ class App {
                             confirmBtn.textContent = '验证中...';
                             
                             // 验证秘钥
-                            const validation = await api.validateSecretKey(this.userId, secretKey);
+                            const response = await api.validateSecretKey(this.userId, secretKey);
                             
-                            if (!validation.valid) {
-                                Toast.show(validation.message || '秘钥验证失败', 'error');
+                            if (!response.success || !response.data?.valid) {
+                                Toast.show(response.message || '秘钥验证失败', 'error');
                                 confirmBtn.disabled = false;
                                 confirmBtn.textContent = '确认验证';
                                 return;
                             }
+                            
+                            Toast.show(response.message || '秘钥验证成功', 'success');
                             
                             // 验证成功，保存秘钥到本地
                             await SecretKeyManager.save(this.userId, secretKey);

@@ -239,6 +239,23 @@ export default class Home {
             
             // 聚合所有群聊的数据
             const aggregatedData = this.aggregateStats(validStats);
+            
+            // 获取全局排名（所有群聊的总排名）
+            try {
+                const rankingResponse = await api.getRanking('total', 'all', { limit: 999999, page: 1 });
+                if (rankingResponse.success && rankingResponse.data) {
+                    // 找到当前用户在排行榜中的位置
+                    const userIndex = rankingResponse.data.findIndex(
+                        user => String(user.user_id || user.userId) === String(this.app.userId)
+                    );
+                    if (userIndex !== -1) {
+                        aggregatedData.rank = userIndex + 1;
+                    }
+                }
+            } catch (error) {
+                console.debug('获取全局排名失败:', error);
+            }
+            
             this.userData = aggregatedData;
             this.renderStats();
         } catch (error) {
@@ -318,7 +335,7 @@ export default class Home {
             continuous_days: maxContinuousDays,
             nickname: latestNickname || statsArray[0]?.nickname || '',
             last_speaking_time: latestSpeakingTime || statsArray[0]?.last_speaking_time || null,
-            rank: null, // 全部群聊时不显示排名
+            rank: null, // 全局排名将在 loadAllGroupsStats 中设置
             daily_stats: {
                 [today]: {
                     count: todayCount,

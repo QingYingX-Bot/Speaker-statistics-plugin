@@ -15,58 +15,53 @@ export class PageRoutes {
     }
 
     /**
+     * 处理token验证并设置cookie
+     * @param {string} token Token字符串
+     * @param {Object} res Express响应对象
+     * @returns {Object|null} 验证结果，包含valid和userId
+     */
+    handleTokenValidation(token, res) {
+        const validation = this.tokenManager.consumeToken(token);
+        
+        if (validation.valid) {
+            res.cookie('userId', validation.userId, {
+                maxAge: 24 * 60 * 60 * 1000,
+                httpOnly: false,
+                sameSite: 'lax'
+            });
+        }
+        
+        return validation;
+    }
+
+    /**
      * 注册所有页面路由
      */
     registerRoutes() {
         // 带路由的token路径（必须在静态文件之前定义）
         // 精确匹配：/background/:token, /ranking/:token等
         this.app.get('/background/:token', (req, res) => {
-            const token = req.params.token;
-            const validation = this.tokenManager.consumeToken(token);
-            
+            const validation = this.handleTokenValidation(req.params.token, res);
             if (validation.valid) {
-                res.cookie('userId', validation.userId, {
-                    maxAge: 24 * 60 * 60 * 1000,
-                    httpOnly: false,
-                    sameSite: 'lax'
-                });
-                // 重定向到前端路由
                 return res.redirect('/#/background');
             }
-            
             this.sendIndexPage(res);
         });
         
         // 其他带token的路径
         this.app.get('/ranking/:token', (req, res) => {
-            const token = req.params.token;
-            const validation = this.tokenManager.consumeToken(token);
-            
+            const validation = this.handleTokenValidation(req.params.token, res);
             if (validation.valid) {
-                res.cookie('userId', validation.userId, {
-                    maxAge: 24 * 60 * 60 * 1000,
-                    httpOnly: false,
-                    sameSite: 'lax'
-                });
                 return res.redirect('/#/ranking');
             }
-            
             this.sendIndexPage(res);
         });
         
         this.app.get('/achievements/:token', (req, res) => {
-            const token = req.params.token;
-            const validation = this.tokenManager.consumeToken(token);
-            
+            const validation = this.handleTokenValidation(req.params.token, res);
             if (validation.valid) {
-                res.cookie('userId', validation.userId, {
-                    maxAge: 24 * 60 * 60 * 1000,
-                    httpOnly: false,
-                    sameSite: 'lax'
-                });
                 return res.redirect('/#/achievements');
             }
-            
             this.sendIndexPage(res);
         });
         
@@ -110,16 +105,7 @@ export class PageRoutes {
             }
             
             // 验证并消耗token
-            const validation = this.tokenManager.consumeToken(token);
-            if (validation.valid) {
-                // 设置cookie保存userId（有效期24小时）
-                res.cookie('userId', validation.userId, {
-                    maxAge: 24 * 60 * 60 * 1000,
-                    httpOnly: false,
-                    sameSite: 'lax'
-                });
-            }
-            
+            this.handleTokenValidation(token, res);
             this.sendIndexPage(res);
         });
     }

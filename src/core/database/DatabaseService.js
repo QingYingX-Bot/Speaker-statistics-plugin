@@ -1053,7 +1053,24 @@ class DatabaseService {
     async setDisplayAchievement(groupId, userId, achievementData) {
         const now = this.getCurrentTime();
         const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false;
-        const autoDisplayAt = achievementData.isManual === false ? now : (achievementData.autoDisplayAt || null);
+        
+        // 检查是否已存在显示成就
+        const existing = await this.getDisplayAchievement(groupId, userId);
+        
+        let autoDisplayAt;
+        if (isManual) {
+            // 手动设置，清除自动显示时间
+            autoDisplayAt = null;
+        } else {
+            // 自动设置
+            if (existing && existing.is_manual === false && existing.auto_display_at) {
+                // 如果已存在自动显示的成就，保留原有的 auto_display_at（不重置24小时）
+                autoDisplayAt = existing.auto_display_at;
+            } else {
+                // 首次自动设置，使用当前时间
+                autoDisplayAt = now;
+            }
+        }
         
         await this.run(`
             INSERT INTO user_display_achievements (
@@ -1108,6 +1125,20 @@ class DatabaseService {
             'SELECT * FROM group_info WHERE group_id = $1',
             groupId
         );
+    }
+
+    /**
+     * 获取格式化的群名称（如果不存在则返回默认格式）
+     * @param {string} groupId 群号
+     * @returns {Promise<string>} 群名称
+     */
+    async getFormattedGroupName(groupId) {
+        try {
+            const groupInfo = await this.getGroupInfo(groupId);
+            return groupInfo?.group_name || `群${groupId}`;
+        } catch (error) {
+            return `群${groupId}`;
+        }
     }
 
     /**
