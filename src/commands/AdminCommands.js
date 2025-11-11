@@ -2,7 +2,6 @@ import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
-import { RestartInfoManager } from '../core/utils/RestartInfoManager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -229,41 +228,21 @@ class AdminCommands {
             
             replyMsg += '\n\n🔄 正在自动重启以应用更新...';
             
-            // 保存重启信息到内存（用于重启后发送提示）
-            RestartInfoManager.saveRestartInfo({
-                userId: String(e.user_id),
-                groupId: e.group_id ? String(e.group_id) : null,
-                updateType: isForce ? 'force' : 'normal',
-                updateLog: output.substring(0, 500)
-            });
-            
             // 发送回复消息
             await e.reply(replyMsg);
             
             // 延迟一下，确保消息发送成功
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // 自动重启
+            // 使用系统重启功能
             try {
-                // 检查 Bot 对象是否可用
-                if (typeof Bot !== 'undefined' && typeof Bot.restart === 'function') {
-                    globalConfig.debug('[更新插件] 使用 Bot.restart() 重启');
-                    // 使用 Bot.restart() 重启
-                    await Bot.restart();
-                } else if (typeof process !== 'undefined' && process.exit) {
-                    // 如果 Bot.restart 不可用，使用 process.exit 退出（由进程管理器重启）
-                    globalConfig.warn('[更新插件] Bot.restart 不可用，使用 process.exit(0) 退出');
-                    // 延迟一下，确保消息已发送
-                    setTimeout(() => {
-                        process.exit(0);
-                    }, 500);
-                } else {
-                    throw new Error('无法找到重启方法');
-                }
+                // 导入 Restart 类（使用相对路径从插件目录到 other 目录）
+                const { Restart } = await import('../../../other/restart.js');
+                const restartInstance = new Restart(e);
+                // 调用重启方法（会自动保存重启信息到 redis 并在重启后发送提示）
+                await restartInstance.restart();
             } catch (restartError) {
                 globalConfig.error('[更新插件] 自动重启失败:', restartError);
-                // 清除重启信息（因为重启失败）
-                RestartInfoManager.getAndClearRestartInfo();
                 // 如果重启失败，至少提示用户手动重启
                 try {
                     await e.reply('⚠️ 自动重启失败，请手动重启插件以应用更新');

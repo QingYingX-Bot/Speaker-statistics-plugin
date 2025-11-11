@@ -8,7 +8,6 @@ import { HelpCommands } from '../commands/HelpCommands.js';
 import { AchievementCommands } from '../commands/AchievementCommands.js';
 import { BackgroundManager } from '../managers/BackgroundManager.js';
 import { globalConfig } from './ConfigManager.js';
-import { RestartInfoManager } from './utils/RestartInfoManager.js';
 
 /**
  * 主插件类
@@ -43,52 +42,11 @@ class Plugin extends plugin {
         this.backgroundCommands = new BackgroundManager();
 
         logger.debug('[发言统计] 插件实例创建完成');
-        
-        // 监听上线事件，检查是否有重启信息需要发送
-        if (typeof Bot !== 'undefined') {
-            Bot.once('online', () => {
-                this.checkAndSendRestartMessage();
-            });
-        }
     }
 
     // 静态标志，防止多次初始化
     static _initialized = false;
     static _initializing = false;
-    
-    /**
-     * 检查并发送重启完成消息
-     */
-    async checkAndSendRestartMessage() {
-        // 等待一下，确保Bot完全上线
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const restartInfo = RestartInfoManager.getAndClearRestartInfo();
-        if (!restartInfo) {
-            return; // 没有重启信息，直接返回
-        }
-        
-        try {
-            const updateTypeText = restartInfo.updateType === 'force' ? '强制' : '';
-            const message = `✅ 插件${updateTypeText}更新完成，重启成功！\n\n更新已应用，插件运行正常。`;
-            
-            // 尝试发送消息到原群聊或用户
-            if (restartInfo.groupId && typeof Bot !== 'undefined' && Bot.gl) {
-                const group = Bot.gl.get(restartInfo.groupId);
-                if (group) {
-                    await group.sendMsg(message);
-                    return;
-                }
-            }
-            
-            // 如果无法发送到原群聊，发送给主人
-            if (typeof Bot !== 'undefined' && Bot.sendMasterMsg) {
-                await Bot.sendMasterMsg(message);
-            }
-        } catch (error) {
-            globalConfig.error('[重启提示] 发送重启完成消息失败:', error);
-        }
-    }
 
     /**
      * 插件初始化
