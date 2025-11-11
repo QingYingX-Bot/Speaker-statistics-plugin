@@ -258,7 +258,7 @@ class App {
     }
     
     /**
-     * 显示秘钥不匹配警告并要求修改
+     * 显示秘钥不匹配警告，先让用户输入正确秘钥，如果输入错误再要求重新设置
      */
     async showKeyMismatchWarning(message, userName = null) {
         // 等待 Modal 组件加载
@@ -271,9 +271,140 @@ class App {
         }
         
         return new Promise((resolve) => {
-            const displayMessage = message || `本地秘钥与服务器不匹配${userName ? `\n用户名: ${userName}` : ''}\n请重新设置秘钥`;
+            const displayMessage = message || `本地秘钥与服务器不匹配${userName ? `\n用户名: ${userName}` : ''}\n请输入正确的秘钥进行验证`;
             
+            // 第一步：输入正确秘钥验证
             window.Modal.show('秘钥不匹配', `
+                <div class="space-y-4">
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-yellow-800 mb-2">提示</p>
+                                <p class="text-xs text-yellow-700 whitespace-pre-line mb-3">${displayMessage}</p>
+                                <div class="mt-3 pt-3 border-t border-yellow-200">
+                                    <p class="text-xs text-yellow-600 mb-1">当前用户ID:</p>
+                                    <p class="text-xl font-bold text-yellow-800">${this.userId}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">请输入正确的秘钥</label>
+                        <input type="password" id="correctSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入正确的秘钥">
+                        <div class="mt-2 text-xs text-gray-500">
+                            如果输入正确，将自动保存；如果输入错误，将要求重新设置
+                        </div>
+                    </div>
+                </div>
+            `, `
+                <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="verifyCorrectKeyBtn">验证秘钥</button>
+                <button class="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium border border-orange-300" id="notMyAccountBtn">这不是我账号</button>
+                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
+            `);
+            
+            setTimeout(() => {
+                const verifyBtn = document.getElementById('verifyCorrectKeyBtn');
+                const keyInput = document.getElementById('correctSecretKeyInput');
+                const notMyAccountBtn = document.getElementById('notMyAccountBtn');
+                
+                // 处理"这不是我账号"按钮
+                if (notMyAccountBtn) {
+                    notMyAccountBtn.addEventListener('click', () => {
+                        // 清除当前用户ID和相关信息
+                        this.userId = null;
+                        Storage.remove('userId');
+                        // 清除本地秘钥
+                        Storage.remove('secretKey');
+                        
+                        // 关闭弹窗
+                        window.Modal.hide();
+                        
+                        // 显示用户ID输入框，让用户重新输入
+                        this.showUserIdInput();
+                        
+                        // 更新导航栏
+                        this.updateUserInfo();
+                        
+                        resolve();
+                    });
+                }
+                
+                // 验证正确秘钥
+                if (verifyBtn && keyInput) {
+                    const handleVerify = async () => {
+                        const secretKey = keyInput.value.trim();
+                        
+                        if (!secretKey) {
+                            Toast.show('请输入秘钥', 'error');
+                            return;
+                        }
+                        
+                        try {
+                            verifyBtn.disabled = true;
+                            verifyBtn.textContent = '验证中...';
+                            
+                            // 验证秘钥
+                            const response = await api.validateSecretKey(this.userId, secretKey);
+                            
+                            if (response.success && response.data?.valid) {
+                                // 验证成功，保存秘钥
+                                Toast.show(response.message || '秘钥验证成功', 'success');
+                                await SecretKeyManager.save(this.userId, secretKey);
+                                
+                                window.Modal.hide();
+                                Toast.show('秘钥已更新', 'success');
+                                resolve();
+                            } else {
+                                // 验证失败，显示重新设置流程
+                                verifyBtn.disabled = false;
+                                verifyBtn.textContent = '验证秘钥';
+                                
+                                Toast.show(response.message || '秘钥验证失败，请重新设置', 'error');
+                                
+                                // 关闭当前弹窗，显示重新设置弹窗
+                                window.Modal.hide();
+                                
+                                // 显示重新设置流程（需要验证码）
+                                this.showResetSecretKeyModal(userName, resolve);
+                            }
+                        } catch (error) {
+                            console.error('验证秘钥失败:', error);
+                            Toast.show('验证失败: ' + (error.message || '未知错误'), 'error');
+                            verifyBtn.disabled = false;
+                            verifyBtn.textContent = '验证秘钥';
+                        }
+                    };
+                    
+                    verifyBtn.addEventListener('click', handleVerify);
+                    keyInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            handleVerify();
+                        }
+                    });
+                    keyInput.focus();
+                }
+            }, 100);
+        });
+    }
+    
+    /**
+     * 显示重新设置秘钥的弹窗（需要验证码）
+     */
+    async showResetSecretKeyModal(userName = null, resolveCallback = null) {
+        // 等待 Modal 组件加载
+        if (!window.Modal || typeof window.Modal.show !== 'function') {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (!window.Modal || typeof window.Modal.show !== 'function') {
+                console.warn('Modal 组件未加载，无法显示警告');
+                return;
+            }
+        }
+        
+        return new Promise((resolve) => {
+            window.Modal.show('重新设置秘钥', `
                 <div class="space-y-4">
                     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div class="flex items-start gap-3">
@@ -281,8 +412,8 @@ class App {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-red-800 mb-2">警告</p>
-                                <p class="text-xs text-red-700 whitespace-pre-line mb-3">${displayMessage}</p>
+                                <p class="text-sm font-medium text-red-800 mb-2">需要重新设置</p>
+                                <p class="text-xs text-red-700 mb-3">秘钥验证失败，请通过验证码重新设置秘钥</p>
                                 <div class="mt-3 pt-3 border-t border-red-200">
                                     <p class="text-xs text-red-600 mb-1">当前用户ID:</p>
                                     <p class="text-xl font-bold text-red-800">${this.userId}</p>
@@ -338,6 +469,7 @@ class App {
                         // 更新导航栏
                         this.updateUserInfo();
                         
+                        if (resolveCallback) resolveCallback();
                         resolve();
                     });
                 }
@@ -404,7 +536,7 @@ class App {
                         try {
                             // 验证验证码
                             const verifyResult = await api.verifyCode(this.userId, code);
-                            if (!verifyResult.valid) {
+                            if (!verifyResult.success || !verifyResult.data?.valid) {
                                 Toast.show(verifyResult.message || '验证码错误', 'error');
                                 return;
                             }
@@ -420,8 +552,9 @@ class App {
                                 clearInterval(countdownTimer);
                             }
                             
-                            Modal.hide();
+                            window.Modal.hide();
                             Toast.show('秘钥已更新', 'success');
+                            if (resolveCallback) resolveCallback();
                             resolve();
                         } catch (error) {
                             console.error('更新秘钥失败:', error);
