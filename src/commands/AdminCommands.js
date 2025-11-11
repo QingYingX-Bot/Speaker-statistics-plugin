@@ -223,12 +223,44 @@ class AdminCommands {
             let replyMsg = `✅ 插件${isForce ? '强制' : ''}更新成功\n\n更新日志：\n${output.substring(0, 500)}`;
             
             if (needInstall) {
-                replyMsg += '\n\n⚠️ 检测到依赖变更，建议重启后运行 pnpm install 安装新依赖';
-            } else {
-                replyMsg += '\n\n⚠️ 请重启插件以应用更新';
+                replyMsg += '\n\n⚠️ 检测到依赖变更，重启后请运行 pnpm install 安装新依赖';
             }
-
-            return e.reply(replyMsg);
+            
+            replyMsg += '\n\n🔄 正在自动重启以应用更新...';
+            
+            // 发送回复消息
+            await e.reply(replyMsg);
+            
+            // 延迟一下，确保消息发送成功
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 自动重启
+            try {
+                // 检查 Bot 对象是否可用
+                if (typeof Bot !== 'undefined' && typeof Bot.restart === 'function') {
+                    globalConfig.debug('[更新插件] 使用 Bot.restart() 重启');
+                    // 使用 Bot.restart() 重启
+                    await Bot.restart();
+                } else if (typeof process !== 'undefined' && process.exit) {
+                    // 如果 Bot.restart 不可用，使用 process.exit 退出（由进程管理器重启）
+                    globalConfig.warn('[更新插件] Bot.restart 不可用，使用 process.exit(0) 退出');
+                    // 延迟一下，确保消息已发送
+                    setTimeout(() => {
+                        process.exit(0);
+                    }, 500);
+                } else {
+                    throw new Error('无法找到重启方法');
+                }
+            } catch (restartError) {
+                globalConfig.error('[更新插件] 自动重启失败:', restartError);
+                // 如果重启失败，至少提示用户手动重启
+                try {
+                    await e.reply('⚠️ 自动重启失败，请手动重启插件以应用更新');
+                } catch (replyError) {
+                    // 如果连回复都失败了，至少记录日志
+                    globalConfig.error('[更新插件] 无法发送重启失败提示:', replyError);
+                }
+            }
         } catch (error) {
             globalConfig.error('更新插件失败:', error);
             
