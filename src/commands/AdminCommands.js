@@ -2,6 +2,7 @@ import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
+import { RestartInfoManager } from '../core/utils/RestartInfoManager.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -228,6 +229,14 @@ class AdminCommands {
             
             replyMsg += '\n\n🔄 正在自动重启以应用更新...';
             
+            // 保存重启信息到内存（用于重启后发送提示）
+            RestartInfoManager.saveRestartInfo({
+                userId: String(e.user_id),
+                groupId: e.group_id ? String(e.group_id) : null,
+                updateType: isForce ? 'force' : 'normal',
+                updateLog: output.substring(0, 500)
+            });
+            
             // 发送回复消息
             await e.reply(replyMsg);
             
@@ -253,6 +262,8 @@ class AdminCommands {
                 }
             } catch (restartError) {
                 globalConfig.error('[更新插件] 自动重启失败:', restartError);
+                // 清除重启信息（因为重启失败）
+                RestartInfoManager.getAndClearRestartInfo();
                 // 如果重启失败，至少提示用户手动重启
                 try {
                     await e.reply('⚠️ 自动重启失败，请手动重启插件以应用更新');
