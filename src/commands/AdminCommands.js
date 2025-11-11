@@ -2,6 +2,7 @@ import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -41,117 +42,93 @@ class AdminCommands {
      * 清除统计
      */
     async clearRanking(e) {
-        const validation = CommonUtils.validateAdminPermission(e);
-        if (!validation.valid) {
-            return e.reply(validation.message);
-        }
+        // 验证管理员权限和群消息
+        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateGroupMessage(e))) return;
 
-        const validationGroup = CommonUtils.validateGroupMessage(e);
-        if (!validationGroup.valid) {
-            return e.reply(validationGroup.message);
-        }
-
-        try {
-            const groupId = String(e.group_id);
-            const success = await this.dataService.clearGroupStats(groupId);
-
-            if (success) {
-                return e.reply('统计数据已清除');
-            } else {
-                return e.reply('清除统计数据失败');
-            }
-        } catch (error) {
-            globalConfig.error('清除统计失败:', error);
-            return e.reply('清除失败，请稍后重试');
-        }
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const groupId = String(e.group_id);
+                const success = await this.dataService.clearGroupStats(groupId);
+                return e.reply(success ? '统计数据已清除' : '清除统计数据失败');
+            },
+            '清除统计失败',
+            () => e.reply('清除失败，请稍后重试')
+        );
     }
 
     /**
      * 设置显示人数
      */
     async setDisplayCount(e) {
-        const validation = CommonUtils.validateAdminPermission(e);
-        if (!validation.valid) {
-            return e.reply(validation.message);
-        }
+        // 验证管理员权限
+        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
 
-        try {
-            const match = e.msg.match(/^#水群设置人数\+(\d+)$/);
-            if (!match) {
-                return e.reply('格式错误，正确格式：#水群设置人数+数字');
-            }
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const match = e.msg.match(/^#水群设置人数\+(\d+)$/);
+                if (!match) {
+                    return e.reply('格式错误，正确格式：#水群设置人数+数字');
+                }
 
-            const count = parseInt(match[1]);
-            if (count < 1 || count > 100) {
-                return e.reply('显示人数必须在1-100之间');
-            }
+                const count = parseInt(match[1]);
+                const numValidation = CommonUtils.validateNumber(String(count), 1, 100, '显示人数');
+                if (!numValidation.valid) {
+                    return e.reply(numValidation.message);
+                }
 
-            globalConfig.updateConfig('display.displayCount', count);
-            return e.reply(`显示人数已设置为 ${count}`);
-        } catch (error) {
-            globalConfig.error('设置显示人数失败:', error);
-            return e.reply('设置失败，请稍后重试');
-        }
+                globalConfig.updateConfig('display.displayCount', count);
+                return e.reply(`显示人数已设置为 ${count}`);
+            },
+            '设置显示人数失败',
+            () => e.reply('设置失败，请稍后重试')
+        );
     }
 
     /**
      * 切换设置
      */
     async toggleSetting(e) {
-        const validation = CommonUtils.validateAdminPermission(e);
-        if (!validation.valid) {
-            return e.reply(validation.message);
-        }
+        // 验证管理员权限
+        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
 
-        try {
-            const match = e.msg.match(/^#水群设置(开启|关闭)(转发|图片|记录|日志)$/);
-            if (!match) {
-                return e.reply('格式错误');
-            }
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const match = e.msg.match(/^#水群设置(开启|关闭)(转发|图片|记录|日志)$/);
+                if (!match) {
+                    return e.reply('格式错误');
+                }
 
-            const toggle = match[1] === '开启';
-            const setting = match[2];
+                const toggle = match[1] === '开启';
+                const setting = match[2];
 
-            let configKey = '';
-            let settingName = '';
+                // 设置映射表
+                const settingMap = {
+                    '转发': { key: 'display.useForward', name: '转发消息' },
+                    '图片': { key: 'display.usePicture', name: '图片模式' },
+                    '记录': { key: 'global.recordMessage', name: '消息记录' },
+                    '日志': { key: 'global.debugLog', name: '调试日志' }
+                };
 
-            switch (setting) {
-                case '转发':
-                    configKey = 'display.useForward';
-                    settingName = '转发消息';
-                    break;
-                case '图片':
-                    configKey = 'display.usePicture';
-                    settingName = '图片模式';
-                    break;
-                case '记录':
-                    configKey = 'global.recordMessage';
-                    settingName = '消息记录';
-                    break;
-                case '日志':
-                    configKey = 'global.debugLog';
-                    settingName = '调试日志';
-                    break;
-                default:
+                const settingConfig = settingMap[setting];
+                if (!settingConfig) {
                     return e.reply('未知设置项');
-            }
+                }
 
-            globalConfig.updateConfig(configKey, toggle);
-            return e.reply(`${settingName}已${toggle ? '开启' : '关闭'}`);
-        } catch (error) {
-            globalConfig.error('切换设置失败:', error);
-            return e.reply('设置失败，请稍后重试');
-        }
+                globalConfig.updateConfig(settingConfig.key, toggle);
+                return e.reply(`${settingConfig.name}已${toggle ? '开启' : '关闭'}`);
+            },
+            '切换设置失败',
+            () => e.reply('设置失败，请稍后重试')
+        );
     }
 
     /**
      * 更新插件
      */
     async updatePlugin(e) {
-        const validation = CommonUtils.validateAdminPermission(e);
-        if (!validation.valid) {
-            return e.reply(validation.message);
-        }
+        // 验证管理员权限
+        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
 
         try {
             const isForce = e.msg.includes('强制');

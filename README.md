@@ -390,7 +390,8 @@ Speaker-statistics-plugin/
 │   │   │   ├── PathResolver.js        # 路径解析器
 │   │   │   ├── TimeUtils.js           # 时间工具（UTC+8）
 │   │   │   ├── CommonUtils.js         # 通用工具
-│   │   │   └── AchievementUtils.js   # 成就工具（稀有度配置和排序）
+│   │   │   ├── AchievementUtils.js   # 成就工具（稀有度配置和排序）
+│   │   │   └── CommandWrapper.js     # 命令包装器（统一验证和错误处理）
 │   │   ├── ConfigManager.js           # 配置管理
 │   │   ├── DataService.js             # 数据服务（单例）
 │   │   ├── AchievementService.js      # 成就服务

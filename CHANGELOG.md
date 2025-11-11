@@ -94,11 +94,18 @@
   - 使用 Redis 存储重启信息（持久化，支持跨进程）
   - 自动发送重启完成提示消息
   - 简化代码，移除自定义重启逻辑
+- ✅ **代码重构优化**：创建 `CommandWrapper` 工具类
+  - 统一验证和错误处理逻辑，减少重复代码
+  - `validateAndReply()`：统一验证并回复模式
+  - `safeExecute()`：统一异步操作的错误处理
+  - 重构 `AdminCommands.js`，使用 CommandWrapper 简化代码
+  - 优化 `toggleSetting()` 方法，使用映射表替代 switch 语句
 - ✅ **代码清理**：
   - 移除重复的代码逻辑
   - 统一群名称格式化方法（`getFormattedGroupName`）
   - 提取重复的Token验证逻辑
   - 清理未使用的导入和代码
+  - 每个命令方法减少约 5-10 行重复代码
 
 #### 数据库优化
 - ✅ **自动显示成就逻辑优化**：
