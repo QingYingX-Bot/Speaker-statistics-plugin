@@ -12,6 +12,9 @@
     "node-fetch": "^3.3.2",
     "sharp": "^0.32.6"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^9.0.0"
+  },
   "author": "",
   "license": "MIT",
   "keywords": [

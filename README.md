@@ -12,7 +12,7 @@
 
 ## 📦 简介
 
-发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况，并提供完整的成就系统。采用 PostgreSQL 数据库存储，支持完整的查询、统计、排名功能。插件还提供完整的Web管理界面，支持通过浏览器查看统计、管理成就、设置背景等功能。
+发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况，并提供完整的成就系统。支持 PostgreSQL 和 SQLite 双数据库，可根据部署需求灵活选择。插件还提供完整的Web管理界面，支持通过浏览器查看统计、管理成就、设置背景等功能。
 
 ### 核心特性
 
@@ -22,7 +22,8 @@
 - 🌐 **Web管理界面**：完整的Web界面，支持查看统计、管理成就、设置背景等
 - ⚙️ **可视化配置**：支持通过 Guoba-Plugin 进行图形化配置
 - 🔒 **数据管理**：僵尸群清理、数据备份、权限控制
-- ⚡ **高性能**：PostgreSQL 连接池，优化查询性能
+- 🗄️ **双数据库支持**：支持 PostgreSQL（生产环境）和 SQLite（小型部署）
+- ⚡ **高性能**：PostgreSQL 连接池优化查询，SQLite WAL 模式提高并发
 - 📱 **移动端适配**：所有Web页面完全适配移动端设备
 
 ---
@@ -155,7 +156,9 @@
 ### 前置要求
 
 - Node.js 16+ 
-- PostgreSQL 12+（需要单独安装 PostgreSQL 服务器）
+- 数据库（二选一）：
+  - PostgreSQL 12+（需要单独安装 PostgreSQL 服务器）
+  - SQLite 3+（无需安装，插件自带支持）
 - Yunzai-Bot
 
 ### 安装步骤
@@ -174,11 +177,34 @@ cd Speaker-statistics-plugin
 pnpm install
 ```
 
+> 💡 **提示**：如果使用 SQLite，需要额外安装 SQLite 驱动：
+> ```bash
+> pnpm install better-sqlite3
+> ```
+> 如果只使用 PostgreSQL，则无需安装 SQLite 驱动。
+
 3. **配置数据库**
 
 > 📖 **详细安装教程**：请参考 [数据库安装教程](DATABASE_SETUP.md)
 
 快速配置步骤：
+
+**方式一：使用 SQLite（推荐新手，无需安装数据库）**
+
+编辑 `data/global.json` 配置 SQLite：
+
+```json
+{
+  "database": {
+    "type": "sqlite",
+    "path": "plugins/Speaker-statistics-plugin/data/speech_statistics.db"
+  }
+}
+```
+
+> 💡 **提示**：如果不指定 `path`，默认会在 `plugins/Speaker-statistics-plugin/data/` 目录下创建 `speech_statistics.db` 文件。
+
+**方式二：使用 PostgreSQL（适合生产环境）**
 
 创建 PostgreSQL 数据库：
 
@@ -188,21 +214,27 @@ CREATE USER speech_user WITH PASSWORD 'your_secure_password';
 GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 ```
 
-编辑 `data/global.json` 配置数据库连接：
+编辑 `data/global.json` 配置 PostgreSQL：
 
 ```json
 {
   "database": {
+    "type": "postgresql",
     "host": "localhost",
     "port": 5432,
     "database": "speech_statistics",
     "user": "speech_user",
     "password": "your_secure_password",
-    "max": 20,
-    "idleTimeoutMillis": 30000
+    "pool": {
+      "max": 20,
+      "min": 5,
+      "idleTimeoutMillis": 30000
+    }
   }
 }
 ```
+
+> 💡 **提示**：如果不指定 `type`，默认使用 PostgreSQL（向后兼容）。
 
 4. **启动插件**
 
@@ -213,6 +245,44 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 ---
 
 ## ⚙️ 配置说明
+
+### 数据库配置
+
+插件支持两种数据库，可在 `data/global.json` 中配置：
+
+**SQLite 配置（推荐新手）：**
+```json
+{
+  "database": {
+    "type": "sqlite",
+    "path": "plugins/Speaker-statistics-plugin/data/speech_statistics.db"  // 可选，默认在插件 data 目录
+  }
+}
+```
+
+**PostgreSQL 配置（推荐生产环境）：**
+```json
+{
+  "database": {
+    "type": "postgresql",  // 可选，默认就是 postgresql
+    "host": "localhost",
+    "port": 5432,
+    "database": "speech_statistics",
+    "user": "speech_user",
+    "password": "your_secure_password",
+    "pool": {
+      "max": 20,
+      "min": 5,
+      "idleTimeoutMillis": 30000
+    }
+  }
+}
+```
+
+> 💡 **提示**：
+> - 如果不指定 `type`，默认使用 PostgreSQL（向后兼容）
+> - SQLite 适合小型部署，无需安装数据库服务器
+> - PostgreSQL 适合生产环境，性能更好，支持高并发
 
 ### 配置文件结构
 
@@ -296,10 +366,13 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 | 依赖 | 版本 | 用途 |
 |------|------|------|
 | pg | ^8.11.3 | PostgreSQL 数据库驱动 |
+| better-sqlite3 | ^9.0.0 | SQLite 数据库驱动（可选） |
 | express | ^5.1.0 | Web服务器 |
 | handlebars | ^4.7.8 | 模板引擎 |
 | sharp | ^0.32.6 | 图片处理 |
 | multer | ^2.0.2 | 文件上传 |
+
+> 💡 **可选依赖**：`better-sqlite3` 为可选依赖，仅在使用 SQLite 时需要安装。如果只使用 PostgreSQL，则无需安装。
 
 ### 项目架构
 
@@ -308,7 +381,11 @@ Speaker-statistics-plugin/
 ├── src/
 │   ├── core/                          # 核心模块
 │   │   ├── database/
-│   │   │   └── DatabaseService.js     # 数据库服务（PostgreSQL）
+│   │   │   ├── DatabaseService.js     # 数据库服务（适配器选择器）
+│   │   │   └── adapters/              # 数据库适配器
+│   │   │       ├── BaseAdapter.js     # 适配器基类
+│   │   │       ├── PostgreSQLAdapter.js # PostgreSQL 适配器
+│   │   │       └── SQLiteAdapter.js   # SQLite 适配器
 │   │   ├── utils/                     # 工具类
 │   │   │   ├── PathResolver.js        # 路径解析器
 │   │   │   ├── TimeUtils.js           # 时间工具（UTC+8）

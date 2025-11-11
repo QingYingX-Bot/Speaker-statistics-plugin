@@ -8,6 +8,31 @@
 
 ### ✨ 新增功能
 
+#### 数据库支持扩展
+- 🗄️ **SQLite 数据库支持**：新增 SQLite 数据库适配器，支持双数据库选择
+  - 支持 PostgreSQL（默认，生产环境推荐）
+  - 支持 SQLite（小型部署推荐，无需安装数据库服务器）
+  - 通过配置 `database.type` 选择数据库类型
+  - SQLite 数据库文件默认位置：`plugins/Speaker-statistics-plugin/data/speech_statistics.db`
+  - 自动适配占位符、数据类型、事务等差异
+  - 支持 WAL 模式，提高并发性能
+  - `better-sqlite3` 设为可选依赖，仅在使用 SQLite 时需要安装
+
+#### 数据库架构优化
+- 🏗️ **适配器模式架构**：采用数据库适配器模式，实现数据库抽象层
+  - `BaseAdapter`：定义统一数据库接口
+  - `PostgreSQLAdapter`：PostgreSQL 适配器实现
+  - `SQLiteAdapter`：SQLite 适配器实现
+  - `DatabaseService`：根据配置自动选择适配器
+  - 所有业务代码无需修改，自动适配不同数据库
+
+#### 配置界面增强
+- ⚙️ **Guoba 配置界面更新**：数据库配置界面支持 SQLite
+  - 添加数据库类型选择器（PostgreSQL/SQLite）
+  - 添加 SQLite 数据库路径配置项
+  - PostgreSQL 配置项标记为可选（仅 PostgreSQL 需要）
+  - 配置项说明更清晰，标注适用场景
+
 #### 插件更新功能
 - 🔄 **插件更新命令**：新增 `#水群更新` 和 `#水群强制更新` 命令
   - `#水群更新`：普通更新插件（执行 `git pull`）
@@ -27,6 +52,26 @@
   - 优化自动设置逻辑，仅在没有任何显示成就时才自动设置
 
 ### 🔧 技术优化
+
+#### 数据库架构重构
+- ✅ **适配器模式实现**：
+  - 创建 `BaseAdapter` 基类，定义统一数据库接口
+  - 重构 `DatabaseService` 为适配器选择器
+  - 实现 `PostgreSQLAdapter` 和 `SQLiteAdapter`
+  - 所有业务逻辑方法保持不变，自动适配不同数据库
+- ✅ **SQL 兼容性处理**：
+  - 自动转换占位符（`$1, $2...` ↔ `?`）
+  - 自动映射数据类型（VARCHAR→TEXT, BIGINT→INTEGER, BOOLEAN→INTEGER）
+  - 统一 UPSERT 语法（`ON CONFLICT ... DO UPDATE`）
+  - 适配数据库大小查询（PostgreSQL: `pg_database_size()`, SQLite: `pragma_page_*`）
+- ✅ **连接管理优化**：
+  - PostgreSQL：使用连接池（Pool）
+  - SQLite：使用单连接，支持 better-sqlite3 和 sqlite3 两种驱动
+  - SQLite 自动启用 WAL 模式，提高并发性能
+- ✅ **依赖管理优化**：
+  - `better-sqlite3` 设为可选依赖（`optionalDependencies`）
+  - 仅在使用 SQLite 时需要安装，使用 PostgreSQL 时无需安装
+  - 未安装 SQLite 驱动时给出清晰的错误提示
 
 #### 代码重构
 - ✅ **API响应格式统一**：修复所有API的响应格式，统一使用 `ApiResponse.success()` 和 `ApiResponse.error()`
@@ -58,6 +103,13 @@
 - ✅ 修复自动佩戴成就24小时计时被重置的问题
 - ✅ 修复成就页面数据不显示的问题（API响应格式解析错误）
 - ✅ 修复自动设置成就时重复设置导致计时器重置的问题
+
+### 📝 文档更新
+
+- ✅ 更新 README.md，添加 SQLite 数据库支持说明
+- ✅ 更新安装步骤，说明 SQLite 驱动的可选安装
+- ✅ 更新配置说明，添加 SQLite 配置示例
+- ✅ 更新 Guoba 配置界面，支持数据库类型选择
 
 ---
 
