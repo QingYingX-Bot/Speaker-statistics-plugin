@@ -519,7 +519,7 @@ export default class Achievement {
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
                 const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 removeTimeInfo = `
-                    <div class="mt-2 text-xs text-gray-500">
+                    <div class="text-xs text-blue-600 font-medium">
                         <span class="inline-flex items-center gap-1">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -530,7 +530,7 @@ export default class Achievement {
                 `;
             } else {
                 removeTimeInfo = `
-                    <div class="mt-2 text-xs text-orange-600">
+                    <div class="text-xs text-orange-600 font-medium">
                         <span class="inline-flex items-center gap-1">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -560,6 +560,11 @@ export default class Achievement {
                     <div class="text-2xl sm:text-3xl flex-shrink-0">${emoji}</div>
                     <div class="flex-1 min-w-0">
                         <div class="text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 truncate">${achievement.name || achievement.id}</div>
+                        ${removeTimeInfo ? `
+                            <div class="mb-1.5">
+                                ${removeTimeInfo.replace('mt-2', 'mt-0')}
+                            </div>
+                        ` : ''}
                         <div class="inline-block px-2 py-0.5 rounded text-xs font-medium border ${rarityColor}">
                             ${achievement.rarity || 'Common'}
                         </div>
@@ -581,7 +586,6 @@ export default class Achievement {
                             >
                                 已设置为显示
                             </button>
-                            ${removeTimeInfo}
                         </div>
                     ` : `
                         <button 
