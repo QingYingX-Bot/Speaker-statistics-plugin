@@ -197,12 +197,16 @@ pnpm install
 {
   "database": {
     "type": "sqlite",
-    "path": "plugins/Speaker-statistics-plugin/data/speech_statistics.db"
+    "path": "speech_statistics.db"
   }
 }
 ```
 
-> 💡 **提示**：如果不指定 `path`，默认会在 `plugins/Speaker-statistics-plugin/data/` 目录下创建 `speech_statistics.db` 文件。
+> 💡 **提示**：
+> - 如果只写文件名（如 `"speech_statistics.db"`），会自动放在插件 `data` 目录下
+> - 如果写相对路径（如 `"data/my.db"`），会相对于插件目录
+> - 如果写绝对路径，则使用该路径
+> - 如果不指定 `path`，默认使用 `speech_statistics.db`（在插件 `data` 目录下）
 
 **方式二：使用 PostgreSQL（适合生产环境）**
 
@@ -255,10 +259,16 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 {
   "database": {
     "type": "sqlite",
-    "path": "plugins/Speaker-statistics-plugin/data/speech_statistics.db"  // 可选，默认在插件 data 目录
+    "path": "speech_statistics.db"  // 可选，可直接写文件名，会自动放在插件 data 目录下
   }
 }
 ```
+
+> 💡 **路径说明**：
+> - 只写文件名（如 `"speech_statistics.db"`）：自动放在插件 `data` 目录下
+> - 相对路径（如 `"data/my.db"`）：相对于插件目录
+> - 绝对路径（如 `"/var/db/speech.db"`）：直接使用该路径
+> - 不指定 `path`：默认使用 `speech_statistics.db`（在插件 `data` 目录下）
 
 **PostgreSQL 配置（推荐生产环境）：**
 ```json

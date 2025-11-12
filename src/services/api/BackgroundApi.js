@@ -1,7 +1,6 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import sharp from 'sharp';
 import { PathResolver } from '../../core/utils/PathResolver.js';
 import { AuthService } from '../auth/AuthService.js';
 import { AuthMiddleware } from './middleware/AuthMiddleware.js';
@@ -16,6 +15,25 @@ export class BackgroundApi {
         this.authService = authService;
         this.backgroundsDir = PathResolver.getBackgroundsDir();
         this.authMiddleware = new AuthMiddleware(authService);
+        // sharp 模块状态
+        this.sharp = null;
+        this.sharpError = null;
+        this.sharpInitialized = false;
+    }
+
+    /**
+     * 初始化 sharp 模块
+     */
+    async initSharp() {
+        if (this.sharpInitialized) return; // 已经尝试过加载
+        this.sharpInitialized = true;
+        
+        try {
+            const sharpModule = await import('sharp');
+            this.sharp = sharpModule.default;
+        } catch (error) {
+            this.sharpError = error;
+        }
     }
 
     /**
@@ -102,8 +120,26 @@ export class BackgroundApi {
                 // 确保子目录存在
                 PathResolver.ensureDirectory(outputDir);
 
+                // 确保 sharp 已加载
+                await this.initSharp();
+
+                // 检查 sharp 是否可用
+                if (!this.sharp) {
+                    const errorMsg = this.sharpError?.message || '未知错误';
+                    return ApiResponse.error(
+                        res,
+                        `图片处理模块未正确安装。请执行以下命令重新安装：\n` +
+                        `  pnpm install sharp --force\n` +
+                        `如果使用 Windows，可能需要安装构建工具：\n` +
+                        `  npm install --global windows-build-tools\n` +
+                        `   或者安装 Visual Studio Build Tools\n` +
+                        `\n原始错误：${errorMsg}`,
+                        500
+                    );
+                }
+
                 // 处理并保存图片
-                await sharp(req.file.buffer)
+                await this.sharp(req.file.buffer)
                     .jpeg({
                         quality: 95,
                         progressive: true

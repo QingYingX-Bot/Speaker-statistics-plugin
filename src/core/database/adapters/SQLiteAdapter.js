@@ -36,6 +36,18 @@ export class SQLiteAdapter extends BaseAdapter {
                 this.useBetterSqlite3 = true;
             } catch (error) {
                 importError = error;
+                // 检查是否是 bindings 文件缺失错误
+                const isBindingsError = error.message && (
+                    error.message.includes('bindings file') ||
+                    error.message.includes('Cannot find module') ||
+                    error.message.includes('build/Release') ||
+                    error.message.includes('compiled/')
+                );
+                
+                // 获取 Node.js 版本信息
+                const nodeVersion = process.version;
+                const nodeMajorVersion = parseInt(nodeVersion.split('.')[0].replace('v', ''));
+                
                 // 尝试回退到 sqlite3
                 try {
                     const sqlite3 = await import('sqlite3');
@@ -43,19 +55,55 @@ export class SQLiteAdapter extends BaseAdapter {
                     this.useBetterSqlite3 = false;
                 } catch (sqlite3Error) {
                     // 两个库都不可用，给出清晰的错误提示
-                    throw new Error(
-                        'SQLite 数据库驱动未安装。请执行以下命令安装：\n' +
-                        '  pnpm install better-sqlite3\n' +
-                        '或者：\n' +
-                        '  pnpm install sqlite3\n' +
-                        '\n如果不想使用 SQLite，请在配置中设置 "type": "postgresql"'
-                    );
+                    if (isBindingsError) {
+                        let solutionMsg = 'SQLite 数据库驱动未正确安装。\n' +
+                            'better-sqlite3 安装失败（bindings 文件缺失，可能是 Node.js 版本不匹配）。\n' +
+                            '\n当前 Node.js 版本：' + nodeVersion + '\n' +
+                            '\n请尝试以下解决方案：\n';
+                        
+                        // 如果使用 nvm，添加 nvm 相关提示
+                        if (process.env.NVM_DIR || process.env.NVM_HOME) {
+                            solutionMsg += '1. 如果使用 nvm，请先切换到正确的 Node.js 版本：\n' +
+                                '   nvm use 24  # 或使用其他已安装的版本\n' +
+                                '   然后重新安装 better-sqlite3：\n' +
+                                '   cd plugins/Speaker-statistics-plugin\n' +
+                                '   pnpm install better-sqlite3 --force\n\n';
+                        } else {
+                            solutionMsg += '1. 重新安装 better-sqlite3（确保 Node.js 版本匹配）：\n' +
+                                '   cd plugins/Speaker-statistics-plugin\n' +
+                                '   pnpm install better-sqlite3 --force\n\n';
+                        }
+                        
+                        solutionMsg += '2. 如果使用 Linux，确保已安装构建工具：\n' +
+                            '   sudo apt-get install build-essential python3  # Debian/Ubuntu\n' +
+                            '   或\n' +
+                            '   sudo yum install gcc gcc-c++ make python3  # CentOS/RHEL\n\n' +
+                            '3. 如果使用 Windows，可能需要安装构建工具：\n' +
+                            '   npm install --global windows-build-tools\n' +
+                            '   或者安装 Visual Studio Build Tools\n\n' +
+                            '4. 或者安装 sqlite3（性能较差但更稳定）：\n' +
+                            '   pnpm install sqlite3\n\n' +
+                            '5. 如果不想使用 SQLite，请在配置中设置 "type": "postgresql"\n' +
+                            '\n原始错误：' + error.message.substring(0, 500);
+                        
+                        throw new Error(solutionMsg);
+                    } else {
+                        throw new Error(
+                            'SQLite 数据库驱动未安装。请执行以下命令安装：\n' +
+                            '  pnpm install better-sqlite3\n' +
+                            '或者：\n' +
+                            '  pnpm install sqlite3\n' +
+                            '\n如果不想使用 SQLite，请在配置中设置 "type": "postgresql"\n' +
+                            '\n原始错误：' + error.message
+                        );
+                    }
                 }
             }
 
             // 从配置获取数据库路径
             const dbConfig = globalConfig.getConfig('database') || {};
             let dbPath = dbConfig.path;
+            
             if (!dbPath) {
                 // 如果没有指定路径，默认使用插件 data 目录
                 try {
@@ -65,6 +113,27 @@ export class SQLiteAdapter extends BaseAdapter {
                     const pluginDir = PathResolver.getPluginDir();
                     dbPath = path.join(pluginDir, 'data', 'speech_statistics.db');
                 }
+            } else {
+                // 如果指定了路径，检查是否是相对路径（只包含文件名或相对路径）
+                // 如果路径不包含路径分隔符（/ 或 \），或者不是绝对路径，则视为相对路径
+                const isAbsolute = path.isAbsolute(dbPath);
+                const hasPathSeparator = dbPath.includes(path.sep) || dbPath.includes('/') || dbPath.includes('\\');
+                
+                if (!isAbsolute && !hasPathSeparator) {
+                    // 相对路径（只有文件名），自动拼接插件 data 目录
+                    try {
+                        dbPath = path.join(PathResolver.getDataDir(), dbPath);
+                    } catch (error) {
+                        // 如果 PathResolver 不可用，使用插件目录下的 data 目录
+                        const pluginDir = PathResolver.getPluginDir();
+                        dbPath = path.join(pluginDir, 'data', dbPath);
+                    }
+                } else if (!isAbsolute && hasPathSeparator) {
+                    // 相对路径（包含路径分隔符），相对于插件目录
+                    const pluginDir = PathResolver.getPluginDir();
+                    dbPath = path.resolve(pluginDir, dbPath);
+                }
+                // 如果是绝对路径，直接使用
             }
             
             // 确保目录存在
@@ -99,6 +168,43 @@ export class SQLiteAdapter extends BaseAdapter {
 
             this.initialized = true;
         } catch (error) {
+            // 检查是否是 better-sqlite3 的 bindings 文件缺失错误
+            if (error.message && (
+                error.message.includes('bindings file') ||
+                error.message.includes('Could not locate the bindings')
+            )) {
+                const nodeVersion = process.version;
+                let solutionMsg = `SQLite 数据库初始化失败：better-sqlite3 模块未正确安装。\n` +
+                    `\n当前 Node.js 版本：${nodeVersion}\n` +
+                    `\n请尝试以下解决方案：\n`;
+                
+                // 如果使用 nvm，添加 nvm 相关提示
+                if (process.env.NVM_DIR || process.env.NVM_HOME) {
+                    solutionMsg += `1. 如果使用 nvm，请先切换到正确的 Node.js 版本：\n` +
+                        `   nvm use 24  # 或使用其他已安装的版本\n` +
+                        `   然后重新安装 better-sqlite3：\n` +
+                        `   cd plugins/Speaker-statistics-plugin\n` +
+                        `   pnpm install better-sqlite3 --force\n\n`;
+                } else {
+                    solutionMsg += `1. 重新安装 better-sqlite3（确保 Node.js 版本匹配）：\n` +
+                        `   cd plugins/Speaker-statistics-plugin\n` +
+                        `   pnpm install better-sqlite3 --force\n\n`;
+                }
+                
+                solutionMsg += `2. 如果使用 Linux，确保已安装构建工具：\n` +
+                    `   sudo apt-get install build-essential python3  # Debian/Ubuntu\n` +
+                    `   或\n` +
+                    `   sudo yum install gcc gcc-c++ make python3  # CentOS/RHEL\n\n` +
+                    `3. 如果问题仍然存在，尝试使用 sqlite3：\n` +
+                    `   pnpm install sqlite3\n` +
+                    `   然后修改配置使用 PostgreSQL 或重新安装 better-sqlite3\n\n` +
+                    `4. 如果使用 Windows，可能需要安装构建工具：\n` +
+                    `   npm install --global windows-build-tools\n\n` +
+                    `5. 如果不想使用 SQLite，请在配置中设置 "type": "postgresql"\n` +
+                    `\n原始错误：${error.message.substring(0, 500)}`;
+                
+                throw new Error(solutionMsg);
+            }
             throw new Error(`SQLite 数据库初始化失败: ${error.message}`);
         }
     }

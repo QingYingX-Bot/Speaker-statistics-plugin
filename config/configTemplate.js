@@ -54,8 +54,21 @@ const configTemplate = {
         domain: "localhost"
     },
 
-    // PostgreSQL 数据库配置
+    // 数据库配置
     database: {
+        // 数据库类型：'postgresql' 或 'sqlite'
+        // 如果不指定，默认使用 'postgresql'（向后兼容）
+        type: "postgresql",
+        
+        // SQLite 配置（仅当 type === 'sqlite' 时需要）
+        // 数据库文件路径（可选）
+        // - 如果只写文件名（如 "speech_statistics.db"），会自动放在插件 data 目录下
+        // - 如果写相对路径（如 "data/my.db"），会相对于插件目录
+        // - 如果写绝对路径，则使用该路径
+        // - 如果不指定，默认使用 "speech_statistics.db"（在插件 data 目录下）
+        path: "speech_statistics.db",
+        
+        // PostgreSQL 配置（仅当 type === 'postgresql' 时需要）
         // 数据库主机地址
         host: "localhost",
         // 数据库端口

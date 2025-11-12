@@ -158,11 +158,11 @@ export function getConfigSchemas() {
       field: 'database.path',
       label: 'SQLite 数据库路径',
       helpMessage: '修改后需要重启才能生效（仅 SQLite 需要）',
-      bottomHelpMessage: 'SQLite 数据库文件路径，留空则使用默认路径：plugins/Speaker-statistics-plugin/data/speech_statistics.db',
+      bottomHelpMessage: 'SQLite 数据库文件路径。可直接写文件名（如 speech_statistics.db），会自动放在插件 data 目录下；也可写相对路径或绝对路径。留空则使用默认：speech_statistics.db',
       component: 'Input',
       required: false,
       componentProps: {
-        placeholder: '留空使用默认路径'
+        placeholder: '留空使用默认：speech_statistics.db'
       }
     },
     {

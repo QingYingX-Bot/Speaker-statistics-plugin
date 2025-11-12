@@ -13,6 +13,11 @@
   - 支持 PostgreSQL（默认，生产环境推荐）
   - 支持 SQLite（小型部署推荐，无需安装数据库服务器）
   - 通过配置 `database.type` 选择数据库类型
+  - **SQLite 路径配置优化**：支持直接写文件名，自动拼接插件 data 目录
+    - 只写文件名（如 `"speech_statistics.db"`）：自动放在插件 `data` 目录下
+    - 相对路径（如 `"data/my.db"`）：相对于插件目录
+    - 绝对路径：直接使用该路径
+    - 不指定 `path`：默认使用 `speech_statistics.db`（在插件 `data` 目录下）
   - SQLite 数据库文件默认位置：`plugins/Speaker-statistics-plugin/data/speech_statistics.db`
   - 自动适配占位符、数据类型、事务等差异
   - 支持 WAL 模式，提高并发性能
@@ -29,9 +34,13 @@
 #### 配置界面增强
 - ⚙️ **Guoba 配置界面更新**：数据库配置界面支持 SQLite
   - 添加数据库类型选择器（PostgreSQL/SQLite）
-  - 添加 SQLite 数据库路径配置项
+  - 添加 SQLite 数据库路径配置项（支持直接写文件名）
   - PostgreSQL 配置项标记为可选（仅 PostgreSQL 需要）
   - 配置项说明更清晰，标注适用场景
+- ⚙️ **配置文件模板更新**：
+  - 更新 `config/configTemplate.js`，添加 `database.type` 和 `database.path` 字段说明
+  - 更新 `data/global.json`，添加 `type` 字段（默认 `postgresql`）
+  - SQLite 路径配置支持简化写法（直接写文件名）
 
 #### 插件更新功能
 - 🔄 **插件更新命令**：新增 `#水群更新` 和 `#水群强制更新` 命令
@@ -83,6 +92,15 @@
   - `better-sqlite3` 设为可选依赖（`optionalDependencies`）
   - 仅在使用 SQLite 时需要安装，使用 PostgreSQL 时无需安装
   - 未安装 SQLite 驱动时给出清晰的错误提示
+- ✅ **依赖错误处理优化**：
+  - **sharp 模块错误处理**：动态导入 sharp，避免模块加载时失败
+    - 在需要使用 sharp 时才尝试加载
+    - 加载失败时返回清晰的错误提示和解决方案
+    - 提示安装 Windows 构建工具（Windows Build Tools 或 Visual Studio Build Tools）
+  - **better-sqlite3 bindings 错误处理**：检测 bindings 文件缺失错误
+    - 提供详细的解决方案（重新安装、安装构建工具、回退到 sqlite3）
+    - 自动尝试回退到 sqlite3（如果 better-sqlite3 失败）
+    - 错误提示包含原始错误信息，便于调试
 
 #### 代码重构
 - ✅ **API响应格式统一**：修复所有API的响应格式，统一使用 `ApiResponse.success()` 和 `ApiResponse.error()`
@@ -130,6 +148,9 @@
 - ✅ 修复自动佩戴成就24小时计时被重置的问题
 - ✅ 修复成就页面数据不显示的问题（API响应格式解析错误）
 - ✅ 修复自动设置成就时重复设置导致计时器重置的问题
+- ✅ 修复 sharp 模块在 Windows 上安装失败导致插件无法加载的问题
+- ✅ 修复 better-sqlite3 bindings 文件缺失时错误提示不清晰的问题
+- ✅ 优化依赖安装失败时的错误提示，提供详细的解决方案
 
 ### 📝 文档更新
 
