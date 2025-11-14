@@ -365,6 +365,9 @@ class App {
                                 Toast.show(response.message || '秘钥验证成功', 'success');
                                 await SecretKeyManager.save(this.userId, secretKey);
                                 
+                                // 清除 sessionStorage 中的验证状态，以便下次使用新秘钥验证
+                                sessionStorage.removeItem(`achievement_verified_${this.userId}`);
+                                
                                 window.Modal.hide();
                                 Toast.show('秘钥已更新', 'success');
                                 resolve();

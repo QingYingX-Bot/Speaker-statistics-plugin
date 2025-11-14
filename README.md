@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.1-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -102,6 +102,8 @@
 | 更新插件 | `#水群更新` | 更新插件到最新版本 |
 | 强制更新 | `#水群强制更新` | 强制更新插件（覆盖本地修改） |
 | 切换通知 | `#水群设置开启/关闭通知` | 切换成就解锁通知 |
+| 刷新成就 | `#刷新水群成就` | 刷新当前群组的所有显示成就，卸下错误佩戴的成就 |
+| 刷新全群成就 | `#刷新全群水群成就` | 刷新所有群组的所有显示成就，卸下错误佩戴的成就 |
 
 ---
 

@@ -826,23 +826,42 @@ class AchievementService {
             // 如果没有 auto_display_at 时间，不处理（可能是旧数据）
             if (!displayAchievement.auto_display_at) return;
 
-            // 解析 auto_display_at 字符串为 UTC+8 时区的 Date 对象
-            // auto_display_at 格式为 "YYYY-MM-DD HH:mm:ss"（UTC+8 时区）
-            const autoDisplayAtStr = displayAchievement.auto_display_at;
-            // 将字符串解析为 UTC+8 时区的时间戳
-            // 格式：YYYY-MM-DD HH:mm:ss，表示 UTC+8 时区的时间
-            const [datePart, timePart] = autoDisplayAtStr.split(' ');
-            const [year, month, day] = datePart.split('-').map(Number);
-            const [hour, minute, second] = timePart.split(':').map(Number);
+            // 解析 auto_display_at 为 UTC+8 时区的 Date 对象
+            // auto_display_at 可能是字符串（SQLite）或 Date 对象（PostgreSQL）
+            let autoDisplayAt;
+            const autoDisplayAtValue = displayAchievement.auto_display_at;
             
-            // 创建 UTC+8 时区的 Date 对象
-            // 将 UTC+8 时区的时间转换为 UTC 时间戳
-            // 例如：UTC+8 的 2024-12-19 12:00:00 对应 UTC 的 2024-12-19 04:00:00
-            const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
-            // 先创建 UTC 时间戳（将 UTC+8 时间当作 UTC 时间），然后减去 8 小时偏移量
-            const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
-            // 减去 UTC+8 偏移量，得到正确的 UTC 时间戳
-            const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+            if (autoDisplayAtValue instanceof Date) {
+                // PostgreSQL 返回的是 Date 对象
+                // PostgreSQL 的 TIMESTAMP 类型不存储时区信息，存储的是 UTC+8 时区的本地时间
+                // pg 库会将 TIMESTAMP 转换为 Date 对象，但可能将其视为 UTC 时间
+                // 我们需要将其视为 UTC+8 时区的时间
+                // 由于存储时使用的是 UTC+8 时区的字符串，PostgreSQL 会将其解释为服务器时区的时间
+                // 如果服务器时区是 UTC+8，那么 Date 对象的时间戳已经是正确的
+                // 但为了保险起见，我们使用 Date 对象的时间戳，并假设它已经是 UTC+8 时区的时间
+                autoDisplayAt = autoDisplayAtValue;
+            } else if (typeof autoDisplayAtValue === 'string') {
+                // SQLite 返回的是字符串，需要解析
+                // 格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
+                const [datePart, timePart] = autoDisplayAtValue.split(' ');
+                if (!datePart || !timePart) {
+                    globalConfig.warn(`auto_display_at 格式不正确: ${autoDisplayAtValue}`);
+                    return;
+                }
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hour, minute, second] = timePart.split(':').map(Number);
+                
+                // 创建 UTC+8 时区的 Date 对象
+                // 将 UTC+8 时区的时间转换为 UTC 时间戳
+                const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+                const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                // 减去 UTC+8 偏移量，得到正确的 UTC 时间戳
+                autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+            } else {
+                // 未知类型，记录警告并跳过
+                globalConfig.warn(`auto_display_at 类型不正确: ${typeof autoDisplayAtValue}, 值: ${autoDisplayAtValue}`);
+                return;
+            }
             
             // 获取当前 UTC+8 时区的时间
             const now = TimeUtils.getUTC8Date();

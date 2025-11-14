@@ -175,6 +175,10 @@ class Plugin extends plugin {
         return await this.adminCommands.updatePlugin(e);
     }
 
+    async refreshAchievements(e) {
+        return await this.adminCommands.refreshAchievements(e);
+    }
+
     // 成就相关
     async showUserAchievements(e) {
         return await this.achievementCommands.showUserAchievements(e);
