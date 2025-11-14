@@ -53,13 +53,27 @@ export default class Achievement {
     }
     
     async mounted() {
-        // 验证身份
-        await this.verifyIdentity();
-        
-        await this.loadGroups();
+        // 设置事件监听器（不阻塞）
         this.setupEventListeners();
         this.setupGlobalEventListeners();
-        await this.loadAchievements();
+        
+        // 并行执行：验证身份和加载群列表
+        const [_, groupsLoaded] = await Promise.all([
+            this.verifyIdentity().catch(err => {
+                console.warn('身份验证失败:', err);
+            }),
+            this.loadGroups().catch(err => {
+                console.error('加载群列表失败:', err);
+                return false;
+            })
+        ]);
+        
+        // 群列表加载完成后，加载成就数据
+        if (groupsLoaded !== false) {
+            this.loadAchievements().catch(err => {
+                console.error('加载成就失败:', err);
+            });
+        }
     }
     
     /**
@@ -241,7 +255,7 @@ export default class Achievement {
             this.groups = response.data || [];
             
             const select = document.getElementById('groupSelect');
-            if (!select) return;
+            if (!select) return true;
             
             select.innerHTML = '';
             
@@ -251,7 +265,7 @@ export default class Achievement {
                 option.textContent = '暂无群聊';
                 select.appendChild(option);
                 select.disabled = true;
-                return;
+                return true;
             }
             
             this.groups.forEach(group => {
@@ -273,9 +287,12 @@ export default class Achievement {
                     }
                 }
             }
+            
+            return true;
         } catch (error) {
             console.error('加载群列表失败:', error);
             Toast.show('加载群列表失败', 'error');
+            return false;
         }
     }
     
@@ -293,12 +310,17 @@ export default class Achievement {
         const content = document.getElementById('achievementContent');
         if (!content) return;
         
-        // 使用淡出效果
-        content.style.opacity = '0';
-        content.style.transition = 'opacity 0.2s ease-in-out';
+        // 如果当前没有群ID，不加载
+        if (!this.currentGroupId) {
+            return;
+        }
         
-        // 等待淡出动画完成
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // 使用淡出效果（仅在已有内容时）
+        if (content.innerHTML.trim() && !content.innerHTML.includes('加载中')) {
+            content.style.opacity = '0.6';
+            content.style.transition = 'opacity 0.15s ease-in-out';
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
         
         // 显示加载状态
         content.innerHTML = `

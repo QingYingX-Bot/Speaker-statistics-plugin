@@ -149,8 +149,15 @@ export default class Home {
     
     async loadGroups() {
         try {
-            const response = await api.getUserGroups(this.app.userId);
-            this.groups = response.data || [];
+            // 并行执行：加载群列表和初始化统计数据
+            const [groupsResponse] = await Promise.all([
+                api.getUserGroups(this.app.userId).catch(err => {
+                    console.error('加载群列表失败:', err);
+                    return { success: false, data: [] };
+                })
+            ]);
+            
+            this.groups = groupsResponse.data || [];
             
             const select = document.getElementById('groupSelect');
             if (!select) return;
@@ -169,11 +176,16 @@ export default class Home {
             this.currentGroupId = 'all';
             select.value = 'all';
             
-            // 加载全部群聊的统计数据
+            // 加载全部群聊的统计数据（不阻塞群列表显示）
             if (this.currentGroupId === 'all') {
-                await this.loadAllGroupsStats();
+                // 不等待，让页面先显示
+                this.loadAllGroupsStats().catch(err => {
+                    console.error('加载统计数据失败:', err);
+                });
             } else if (this.groups.length > 0) {
-                await this.loadStats(this.currentGroupId);
+                this.loadStats(this.currentGroupId).catch(err => {
+                    console.error('加载统计数据失败:', err);
+                });
             }
         } catch (error) {
             console.error('加载群列表失败:', error);
@@ -198,6 +210,9 @@ export default class Home {
     
     async loadStats(groupId) {
         try {
+            // 先显示加载状态
+            this.renderStats({ loading: true });
+            
             const response = await api.getUserStats(this.app.userId, groupId);
             this.userData = response.data;
             this.renderStats();
@@ -214,7 +229,10 @@ export default class Home {
         }
         
         try {
-            // 获取所有群聊的统计数据
+            // 先显示加载状态
+            this.renderStats({ loading: true });
+            
+            // 获取所有群聊的统计数据（并行执行，提升速度）
             const allStats = await Promise.all(
                 this.groups.map(async (group) => {
                     try {
@@ -240,27 +258,72 @@ export default class Home {
             // 聚合所有群聊的数据
             const aggregatedData = this.aggregateStats(validStats);
             
-            // 获取全局排名（所有群聊的总排名）
-            try {
-                const rankingResponse = await api.getRanking('total', 'all', { limit: 999999, page: 1 });
-                if (rankingResponse.success && rankingResponse.data) {
-                    // 找到当前用户在排行榜中的位置
-                    const userIndex = rankingResponse.data.findIndex(
-                        user => String(user.user_id || user.userId) === String(this.app.userId)
-                    );
-                    if (userIndex !== -1) {
-                        aggregatedData.rank = userIndex + 1;
-                    }
-                }
-            } catch (error) {
-                console.debug('获取全局排名失败:', error);
-            }
-            
+            // 先显示基础数据（不等待排名）
             this.userData = aggregatedData;
             this.renderStats();
+            
+            // 延迟加载排名（不阻塞页面显示）
+            this.loadUserRankAsync(aggregatedData);
         } catch (error) {
             console.error('加载全部群聊统计数据失败:', error);
             Toast.show('加载统计数据失败', 'error');
+        }
+    }
+    
+    /**
+     * 异步加载用户排名（不阻塞页面显示）
+     */
+    async loadUserRankAsync(aggregatedData) {
+        try {
+            // 使用较小的 limit，分批查找用户排名
+            // 策略：先获取前1000名，如果用户不在其中，再获取更多
+            let found = false;
+            let limit = 1000;
+            let page = 1;
+            let userIndex = -1;
+            
+            while (!found && limit <= 10000) {
+                const rankingResponse = await api.getRanking('total', 'all', { limit, page });
+                if (rankingResponse.success && rankingResponse.data) {
+                    // 找到当前用户在排行榜中的位置
+                    userIndex = rankingResponse.data.findIndex(
+                        user => String(user.user_id || user.userId) === String(this.app.userId)
+                    );
+                    
+                    if (userIndex !== -1) {
+                        // 找到了，计算实际排名
+                        aggregatedData.rank = (page - 1) * limit + userIndex + 1;
+                        found = true;
+                        
+                        // 更新排名显示
+                        const rankEl = document.getElementById('rank');
+                        if (rankEl) {
+                            rankEl.textContent = `#${aggregatedData.rank}`;
+                        }
+                        break;
+                    }
+                    
+                    // 如果当前页数据少于 limit，说明已经到末尾了
+                    if (rankingResponse.data.length < limit) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+                
+                // 如果没找到，增加 limit 继续查找（但限制最大为 10000）
+                limit = Math.min(limit * 2, 10000);
+            }
+            
+            // 如果还是没找到，尝试使用 getUserRankData（但这个方法也可能很慢）
+            if (!found) {
+                console.debug('通过排行榜未找到用户排名，尝试其他方法');
+                // 不继续查找，避免性能问题
+                // 排名显示为 "-"
+            }
+        } catch (error) {
+            console.debug('获取全局排名失败:', error);
+            // 不影响页面显示
         }
     }
     
@@ -355,15 +418,26 @@ export default class Home {
         };
     }
     
-    renderStats() {
+    renderStats(options = {}) {
         const data = this.userData;
-        if (!data) return;
+        if (!data && !options.loading) return;
         
         // 更新统计卡片的辅助函数
         const updateElement = (id, value) => {
             const el = document.getElementById(id);
             if (el) el.textContent = value;
         };
+        
+        if (options.loading) {
+            // 显示加载状态
+            updateElement('totalCount', '...');
+            updateElement('totalWords', '...');
+            updateElement('todayCount', '...');
+            updateElement('activeDays', '...');
+            updateElement('continuousDays', '...');
+            updateElement('rank', '...');
+            return;
+        }
         
         // 计算今日数据
         const today = new Date().toISOString().split('T')[0];
@@ -404,8 +478,10 @@ export default class Home {
         updateElement('weeklyCount', formatNumber(weeklyCount) + ' 条');
         updateElement('monthlyCount', formatNumber(monthlyCount) + ' 条');
         
-        // 计算消息占比
-        this.updateMessagePercentage(totalCount);
+        // 延迟加载消息占比（不阻塞页面显示）
+        setTimeout(() => {
+            this.updateMessagePercentage(totalCount);
+        }, 100);
         
         // 更新今日数据
         updateElement('todayCountDetail', formatNumber(todayCount));

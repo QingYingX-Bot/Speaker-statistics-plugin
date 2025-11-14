@@ -10,10 +10,26 @@ class App {
     }
     
     async init() {
-        // 优先从API获取当前用户信息（从cookie，可能是通过token访问）
+        // 优先从本地存储获取（快速显示），然后从API验证
+        this.userId = Storage.get('userId');
+        
+        // 并行执行：获取API用户信息和初始化路由
         let fromToken = false;
         try {
-            const response = await api.getCurrentUser();
+            // 使用 Promise.race 设置超时，避免长时间等待
+            const response = await Promise.race([
+                api.getCurrentUser(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+            ]).catch(err => {
+                // 超时或失败时，使用本地存储的userId
+                if (err.message === 'timeout') {
+                    console.debug('获取用户信息超时，使用本地存储');
+                } else {
+                    console.debug('从API获取用户信息失败，使用本地存储:', err);
+                }
+                return null;
+            });
+            
             if (response && response.success) {
                 // API返回格式：{ success: true, userId: ..., userName: ... } 或 { success: true, data: { userId, userName } }
                 const userId = response.userId || (response.data && response.data.userId);
@@ -26,18 +42,10 @@ class App {
                     if (userName) {
                         localStorage.setItem(`userName_${this.userId}`, userName);
                     }
-                } else {
-                    // 如果API没有返回userId，尝试从本地存储获取
-                    this.userId = Storage.get('userId');
                 }
-            } else {
-                // 如果API没有返回，尝试从本地存储获取（不再从URL参数获取）
-                this.userId = Storage.get('userId');
             }
         } catch (error) {
-            console.warn('从API获取用户信息失败，尝试其他方式:', error);
-            // API失败时，使用本地存储（不再从URL参数获取）
-            this.userId = Storage.get('userId');
+            console.debug('从API获取用户信息失败，使用本地存储:', error);
         }
         
         if (!this.userId) {
@@ -49,18 +57,21 @@ class App {
         // 保存userId
         Storage.set('userId', this.userId);
         
-        // 更新UI
-        this.updateUserInfo();
-        
-        // 检查秘钥是否存在，如果不存在则弹出设置窗口
-        // 如果是从token访问，显示确认弹窗
-        await this.checkAndPromptSecretKey(fromToken);
-        
-        // 初始化路由
+        // 初始化路由（不等待用户信息更新，提升加载速度）
         this.initRoutes();
         
-        // 启动路由
-        router.init();
+        // 并行执行：更新UI和检查秘钥
+        Promise.all([
+            this.updateUserInfo().catch(err => {
+                console.debug('更新用户信息失败:', err);
+            }),
+            this.checkAndPromptSecretKey(fromToken).catch(err => {
+                console.debug('检查秘钥失败:', err);
+            })
+        ]).then(() => {
+            // 启动路由（在所有初始化完成后）
+            router.init();
+        });
     }
     
     /**
@@ -585,33 +596,105 @@ class App {
     showUserIdInput() {
         const content = document.getElementById('pageContent');
         content.innerHTML = `
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">请输入用户ID</h2>
-                </div>
-                <div class="card-body">
-                    <div class="input-group">
-                        <label class="input-label">用户ID</label>
-                        <input type="text" class="input" id="userIdInput" placeholder="请输入您的QQ号">
+            <div class="bg-white min-h-full" style="min-height: calc(100vh - 56px);">
+                <div class="max-w-2xl mx-auto px-3 sm:px-4 lg:px-8 py-8 sm:py-12 lg:py-16">
+                    <!-- 页面标题 -->
+                    <div class="mb-6 sm:mb-8 text-center">
+                        <h1 class="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 mb-2">请输入用户ID</h1>
+                        <p class="text-xs sm:text-sm text-gray-500">请输入您的QQ号以继续使用</p>
                     </div>
-                    <button class="btn btn-primary" id="confirmUserIdBtn">确认</button>
+                    
+                    <!-- 输入表单卡片 -->
+                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
+                        <div class="space-y-4 sm:space-y-6">
+                            <div>
+                                <label for="userIdInput" class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                                    用户ID
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="userIdInput" 
+                                    class="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm sm:text-base text-gray-900 placeholder-gray-400" 
+                                    placeholder="请输入您的QQ号"
+                                    autocomplete="off"
+                                    autofocus
+                                >
+                                <p class="mt-2 text-xs text-gray-500">
+                                    用户ID用于识别您的身份，请确保输入正确
+                                </p>
+                            </div>
+                            
+                            <div class="pt-2">
+                                <button 
+                                    id="confirmUserIdBtn" 
+                                    class="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm sm:text-base font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                >
+                                    确认
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
         
-        document.getElementById('confirmUserIdBtn').addEventListener('click', async () => {
-            const userId = document.getElementById('userIdInput').value.trim();
-            if (userId) {
+        // 添加事件监听器
+        const confirmBtn = document.getElementById('confirmUserIdBtn');
+        const userIdInput = document.getElementById('userIdInput');
+        
+        const handleConfirm = async () => {
+            const userId = userIdInput.value.trim();
+            if (!userId) {
+                Toast.show('请输入用户ID', 'error');
+                userIdInput.focus();
+                return;
+            }
+            
+            // 验证用户ID格式（应该是数字）
+            if (!/^\d+$/.test(userId)) {
+                Toast.show('用户ID应为数字', 'error');
+                userIdInput.focus();
+                return;
+            }
+            
+            try {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = '验证中...';
+                
                 this.userId = userId;
                 Storage.set('userId', userId);
-                // 不再在URL中设置userId，使用cookie和本地存储
+                
+                // 更新用户信息
                 await this.updateUserInfo();
+                
+                // 初始化路由
                 this.initRoutes();
                 router.init();
-            } else {
-                Toast.show('请输入用户ID', 'error');
+                
+                // 恢复按钮状态
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认';
+            } catch (error) {
+                console.error('设置用户ID失败:', error);
+                Toast.show('设置失败，请重试', 'error');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '确认';
+            }
+        };
+        
+        confirmBtn.addEventListener('click', handleConfirm);
+        
+        // 支持回车键提交
+        userIdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleConfirm();
             }
         });
+        
+        // 自动聚焦输入框
+        setTimeout(() => {
+            userIdInput.focus();
+        }, 100);
     }
     
     // 更新用户信息显示
@@ -738,29 +821,59 @@ class App {
     // 加载页面
     async loadPage(pageName) {
         try {
-            // 每次加载页面时更新用户信息（包括权限），确保权限变化能及时反映
-            await this.updateUserInfo();
-            
-            // 动态加载页面组件
-            const pageModule = await import(`/pages/${pageName}.js`);
             const content = document.getElementById('pageContent');
+            
+            // 显示加载状态（仅在首次加载或切换页面时）
+            if (content && (!content.dataset.loading || content.dataset.loading !== pageName)) {
+                content.dataset.loading = pageName;
+                // 不显示加载动画，直接加载页面（提升体验）
+            }
+            
+            // 并行执行：更新用户信息和加载页面组件
+            const [_, pageModule] = await Promise.all([
+                // 每次加载页面时更新用户信息（包括权限），确保权限变化能及时反映
+                this.updateUserInfo().catch(err => {
+                    console.debug('更新用户信息失败:', err);
+                    // 不影响页面加载
+                }),
+                // 动态加载页面组件
+                import(`/pages/${pageName}.js`)
+            ]);
             
             if (pageModule.default) {
                 const page = new pageModule.default(this);
-                content.innerHTML = await page.render();
-                if (page.mounted) {
-                    page.mounted();
-                }
+                const html = await page.render();
+                
+                // 使用 requestAnimationFrame 优化 DOM 更新
+                requestAnimationFrame(() => {
+                    if (content) {
+                        content.innerHTML = html;
+                        if (page.mounted) {
+                            // 延迟执行 mounted，确保 DOM 已更新
+                            requestAnimationFrame(() => {
+                                page.mounted();
+                            });
+                        }
+                    }
+                });
             }
         } catch (error) {
             console.error(`加载页面 ${pageName} 失败:`, error);
             const content = document.getElementById('pageContent');
-            content.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">❌</div>
-                    <div class="empty-state-text">页面加载失败: ${error.message}</div>
-                </div>
-            `;
+            if (content) {
+                content.innerHTML = `
+                    <div class="bg-white min-h-full flex items-center justify-center">
+                        <div class="text-center px-4">
+                            <div class="text-4xl mb-4">❌</div>
+                            <div class="text-lg font-medium text-gray-900 mb-2">页面加载失败</div>
+                            <div class="text-sm text-gray-500">${error.message || '未知错误'}</div>
+                            <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm">
+                                刷新页面
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
     }
 }

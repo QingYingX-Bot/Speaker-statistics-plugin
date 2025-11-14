@@ -84,9 +84,18 @@ export default class Ranking {
     }
     
     async mounted() {
-        await this.loadGroups();
+        // 并行执行：加载群列表和设置事件监听器
         this.setupEventListeners();
-        await this.loadRanking();
+        
+        // 不等待群列表加载完成，先显示页面
+        this.loadGroups().catch(err => {
+            console.error('加载群列表失败:', err);
+        });
+        
+        // 加载排行榜（不阻塞页面显示）
+        this.loadRanking().catch(err => {
+            console.error('加载排行榜失败:', err);
+        });
     }
     
     async loadGroups() {
