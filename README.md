@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -167,7 +167,10 @@
 
 ```bash
 cd plugins
+# 使用 Gitee（国内推荐）
 git clone https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git Speaker-statistics-plugin
+# 或使用 GitHub
+git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git Speaker-statistics-plugin
 ```
 
 2. **安装依赖**
@@ -455,9 +458,9 @@ Speaker-statistics-plugin/
 
 如有任何问题或建议，欢迎：
 
-- 🐛 [提交 Issue](https://gitee.com/qingyingxbot/Speaker-statistics-plugin/issues)
+- 🐛 [提交 Issue](https://gitee.com/qingyingxbot/Speaker-statistics-plugin/issues) | [GitHub Issues](https://github.com/QingYingX-Bot/Speaker-statistics-plugin/issues)
 - 💬 在 Gitee 讨论区反馈
-- 📝 提交 Pull Request
+- 📝 [提交 Pull Request](https://gitee.com/qingyingxbot/Speaker-statistics-plugin/pulls) | [GitHub Pull Requests](https://github.com/QingYingX-Bot/Speaker-statistics-plugin/pulls)
 - 📧 联系开发者
 
 ---
