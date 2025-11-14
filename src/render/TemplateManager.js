@@ -819,9 +819,21 @@ class TemplateManager {
                     displayStatusHtml = '<span class="display-status manual">✅ 已佩戴（手动设置）</span>';
                 } else if (displayAchievement.autoDisplayAt) {
                     // 自动佩戴，计算剩余时间
-                    const autoDisplayAt = new Date(displayAchievement.autoDisplayAt);
-                    const now = new Date();
-                    const diffMs = now - autoDisplayAt;
+                    // 解析 autoDisplayAt 字符串为 UTC+8 时区的 Date 对象
+                    const autoDisplayAtStr = displayAchievement.autoDisplayAt;
+                    const [datePart, timePart] = autoDisplayAtStr.split(' ');
+                    const [year, month, day] = datePart.split('-').map(Number);
+                    const [hour, minute, second] = timePart.split(':').map(Number);
+                    
+                    // 创建 UTC+8 时区的 Date 对象
+                    const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+                    const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                    const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+                    
+                    // 获取当前 UTC+8 时区的时间
+                    const now = TimeUtils.getUTC8Date();
+                    
+                    const diffMs = now.getTime() - autoDisplayAt.getTime();
                     const diffHours = diffMs / (1000 * 60 * 60);
                     const remainingHours = Math.max(0, 24 - diffHours);
                     const remainingMinutes = Math.floor((remainingHours % 1) * 60);

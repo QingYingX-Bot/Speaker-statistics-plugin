@@ -510,10 +510,26 @@ export default class Achievement {
         // 计算卸下时间（如果是自动佩戴的）
         let removeTimeInfo = '';
         if (isDisplayed && this.displayInfo && !this.displayInfo.isManual && this.displayInfo.autoDisplayAt) {
-            const autoDisplayAt = new Date(this.displayInfo.autoDisplayAt);
-            const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000); // 24小时后
+            // 解析 autoDisplayAt 字符串为 UTC+8 时区的 Date 对象
+            // autoDisplayAt 格式为 "YYYY-MM-DD HH:mm:ss"（UTC+8 时区）
+            const autoDisplayAtStr = this.displayInfo.autoDisplayAt;
+            const [datePart, timePart] = autoDisplayAtStr.split(' ');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute, second] = timePart.split(':').map(Number);
+            
+            // 创建 UTC+8 时区的 Date 对象
+            const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+            const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+            const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+            
+            // 计算24小时后的时间
+            const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000);
+            
+            // 获取当前 UTC+8 时区的时间
             const now = new Date();
-            const diffMs = removeAt - now;
+            const nowUTC8 = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset);
+            
+            const diffMs = removeAt.getTime() - nowUTC8.getTime();
             
             if (diffMs > 0) {
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));

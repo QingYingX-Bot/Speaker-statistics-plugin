@@ -177,11 +177,11 @@ cd Speaker-statistics-plugin
 pnpm install
 ```
 
-> 💡 **提示**：如果使用 SQLite，需要额外安装 SQLite 驱动：
-> ```bash
-> pnpm install better-sqlite3
-> ```
-> 如果只使用 PostgreSQL，则无需安装 SQLite 驱动。
+> 💡 **提示**：
+> - `better-sqlite3` 已包含在依赖中，`pnpm install` 会自动安装
+> - 如果 `better-sqlite3` 安装失败（如 bindings 文件缺失），插件会自动回退到 `sqlite3`
+> - 如果只使用 PostgreSQL，可以忽略 SQLite 相关的安装错误
+> - 如果遇到安装问题，请参考 [数据库安装教程](DATABASE_SETUP.md) 中的常见问题部分
 
 3. **配置数据库**
 

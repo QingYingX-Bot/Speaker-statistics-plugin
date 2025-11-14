@@ -826,10 +826,29 @@ class AchievementService {
             // 如果没有 auto_display_at 时间，不处理（可能是旧数据）
             if (!displayAchievement.auto_display_at) return;
 
+            // 解析 auto_display_at 字符串为 UTC+8 时区的 Date 对象
+            // auto_display_at 格式为 "YYYY-MM-DD HH:mm:ss"（UTC+8 时区）
+            const autoDisplayAtStr = displayAchievement.auto_display_at;
+            // 将字符串解析为 UTC+8 时区的时间戳
+            // 格式：YYYY-MM-DD HH:mm:ss，表示 UTC+8 时区的时间
+            const [datePart, timePart] = autoDisplayAtStr.split(' ');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute, second] = timePart.split(':').map(Number);
+            
+            // 创建 UTC+8 时区的 Date 对象
+            // 将 UTC+8 时区的时间转换为 UTC 时间戳
+            // 例如：UTC+8 的 2024-12-19 12:00:00 对应 UTC 的 2024-12-19 04:00:00
+            const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
+            // 先创建 UTC 时间戳（将 UTC+8 时间当作 UTC 时间），然后减去 8 小时偏移量
+            const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+            // 减去 UTC+8 偏移量，得到正确的 UTC 时间戳
+            const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+            
+            // 获取当前 UTC+8 时区的时间
+            const now = TimeUtils.getUTC8Date();
+            
             // 计算时间差（毫秒）
-            const autoDisplayAt = new Date(displayAchievement.auto_display_at);
-            const now = new Date();
-            const diffMs = now - autoDisplayAt;
+            const diffMs = now.getTime() - autoDisplayAt.getTime();
             const diffHours = diffMs / (1000 * 60 * 60);
 
             // 如果超过24小时，自动卸下
