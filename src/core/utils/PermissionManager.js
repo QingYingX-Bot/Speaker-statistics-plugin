@@ -8,6 +8,7 @@ import { globalConfig } from '../ConfigManager.js';
 class PermissionManager {
     constructor() {
         this.authService = new AuthService();
+        this._lastLogTime = new Map(); // 记录每个用户上次日志时间
     }
 
     /**
@@ -31,8 +32,16 @@ class PermissionManager {
 
             // 检查 key.json 中的角色
             const role = await this.authService.getUserRole(targetUserId);
+            const now = Date.now();
+            const lastLogTime = this._lastLogTime.get(targetUserId) || 0;
+            const timeSinceLastLog = now - lastLogTime;
+            
+            // 同一用户相同权限结果，5秒内只记录一次日志
             if (role === 'admin') {
-                globalConfig.debug(`[权限检查] 用户 ${targetUserId}: key.json 管理员权限`);
+                if (timeSinceLastLog > 5000) {
+                    globalConfig.debug(`[权限检查] 用户 ${targetUserId}: key.json 管理员权限`);
+                    this._lastLogTime.set(targetUserId, now);
+                }
                 return {
                     isAdmin: true,
                     reason: 'key_admin',
@@ -40,7 +49,11 @@ class PermissionManager {
                 };
             }
 
-            globalConfig.debug(`[权限检查] 用户 ${targetUserId}: 权限不足`);
+            // 权限不足时，5秒内只记录一次日志
+            if (timeSinceLastLog > 5000) {
+                globalConfig.debug(`[权限检查] 用户 ${targetUserId}: 权限不足`);
+                this._lastLogTime.set(targetUserId, now);
+            }
             return {
                 isAdmin: false,
                 reason: 'insufficient_permission',

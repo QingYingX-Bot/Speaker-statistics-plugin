@@ -328,11 +328,7 @@ class UserCommands {
                 return e.reply(`❌ ${result.message}`);
             }
             
-            return e.reply([
-                segment.text('📊 你的统计网页链接：\n'),
-                segment.text(result.url),
-                segment.text('\n\n⚠️ 链接24小时内有效，请勿分享给他人')
-            ]);
+            return e.reply(`📊 你的统计网页链接：\n${result.url}\n\n⚠️ 链接24小时内有效，请勿分享给他人`);
         } catch (error) {
             globalConfig.error('生成网页链接失败:', error);
             return e.reply('❌ 生成链接失败，请稍后重试');

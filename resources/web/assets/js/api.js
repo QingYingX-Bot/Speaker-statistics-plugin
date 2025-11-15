@@ -294,6 +294,45 @@ class API {
     }
     
     /**
+     * 获取全局配置
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @returns {Promise} 全局配置
+     */
+    async getGlobalConfig(userId, secretKey) {
+        return this.request(`/api/admin/config?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
+    }
+    
+    /**
+     * 保存全局配置
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @param {Object} config 配置对象
+     * @returns {Promise} 保存结果
+     */
+    async saveGlobalConfig(userId, secretKey, config) {
+        return this.request(`/api/admin/config?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`, {
+            method: 'POST',
+            body: { config }
+        });
+    }
+    
+    /**
+     * 更新单个配置项
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @param {string} key 配置键
+     * @param {any} value 配置值
+     * @returns {Promise} 更新结果
+     */
+    async updateConfigItem(userId, secretKey, key, value) {
+        return this.request(`/api/admin/config/${encodeURIComponent(key)}?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`, {
+            method: 'PUT',
+            body: { value }
+        });
+    }
+    
+    /**
      * 清除群组统计数据
      * @param {string} groupId 群组ID
      * @param {string} userId 用户ID

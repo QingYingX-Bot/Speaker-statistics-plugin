@@ -8,6 +8,7 @@ class App {
         this.secretKey = null;
         this.currentGroupId = null;
         this.isAdmin = false; // 用户权限状态
+        this.navigation = null; // 导航栏组件实例
     }
     
     async init() {
@@ -54,6 +55,9 @@ class App {
         // 保存userId
         Storage.set('userId', this.userId);
         
+        // 初始化导航栏
+        await this.initNavigation();
+        
         // 初始化路由（不等待用户信息更新，提升加载速度）
         this.initRoutes();
         
@@ -62,8 +66,10 @@ class App {
             this.checkUserPermission().catch(() => {}),
             this.checkAndPromptSecretKey(fromToken).catch(() => {})
         ]).then(() => {
+            // 更新导航栏（权限检查完成后）
+            this.renderNavigation();
             // 启动路由（在所有初始化完成后）
-            router.init();
+        router.init();
         });
         
         // updateUserInfo 单独执行，避免重复调用 getCurrentUser
@@ -810,7 +816,7 @@ class App {
                 this.isAdmin = response.data && response.data.isAdmin === true;
                 // 使用统一的方法更新管理链接显示
                 this.updateAdminLinkVisibility();
-            } else {
+                    } else {
                 // 隐藏管理链接（如果获取失败，默认不显示）
                 this.isAdmin = false;
                 this.updateAdminLinkVisibility();
@@ -838,30 +844,162 @@ class App {
                         localStorage.setItem(`userName_${this.userId}`, userName);
                     }
                 }
-                } catch (error) {
+            } catch (error) {
                     // 静默失败，使用用户ID
-                }
+            }
         }
         
         // 更新桌面端和移动端显示
         const displayText = userName || this.userId;
         if (userIdEl) userIdEl.textContent = displayText;
         if (mobileUserIdEl) mobileUserIdEl.textContent = displayText;
+        
+        // 更新左侧导航栏的用户ID显示
+        const leftNavUserId = document.getElementById('leftNavUserId');
+        if (leftNavUserId) {
+            leftNavUserId.textContent = displayText;
+        }
     }
     
-    // 更新导航栏激活状态
-    updateNavbarActive(route) {
-        const navLinks = document.querySelectorAll('.nav-link');
-        navLinks.forEach(link => {
-            const linkRoute = link.getAttribute('data-route');
-            if (linkRoute === route || (route && route.startsWith(linkRoute) && linkRoute !== '/')) {
-                link.classList.add('bg-primary', 'text-white');
-                link.classList.remove('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
+    /**
+     * 初始化导航栏组件
+     */
+    async initNavigation() {
+        try {
+            // 动态导入 Navigation 组件
+            const { Navigation } = await import('/assets/js/components/Navigation.js');
+            this.navigation = new Navigation();
+            
+            // 初始化时设置 body 类名
+            const position = this.navigation.getPosition();
+            if (position === 'left') {
+                document.body.classList.add('nav-left');
             } else {
-                link.classList.remove('bg-primary', 'text-white');
-                link.classList.add('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
+                document.body.classList.remove('nav-left');
             }
+            
+            this.renderNavigation();
+        } catch (error) {
+            console.error('初始化导航栏失败:', error);
+        }
+    }
+
+    /**
+     * 渲染导航栏 - 简化布局逻辑
+     */
+    renderNavigation() {
+        if (!this.navigation) return;
+        
+        const container = document.getElementById('navigationContainer');
+        if (!container) return;
+        
+        const currentRoute = router?.getCurrentRoute() || '/';
+        const position = this.navigation.getPosition();
+        
+        // 渲染导航栏 HTML
+        const navHtml = this.navigation.render(this.userId, this.isAdmin, currentRoute);
+        container.innerHTML = navHtml;
+        
+        // 更新 body 类名以应用正确的布局样式
+        if (position === 'left') {
+            document.body.classList.add('nav-left');
+        } else {
+            document.body.classList.remove('nav-left');
+        }
+        
+        // 初始化导航栏事件
+        this.navigation.init();
+        
+        // 绑定事件监听器
+        this.setupNavigationEvents();
+        
+        // 更新激活状态（确保在 DOM 更新后执行）
+        requestAnimationFrame(() => {
+            this.navigation.updateActive(currentRoute);
         });
+    }
+
+    /**
+     * 设置导航栏事件监听器
+     */
+    setupNavigationEvents() {
+        // 主题切换按钮
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        if (themeToggleBtn && !themeToggleBtn.dataset.listenerBound) {
+            themeToggleBtn.dataset.listenerBound = 'true';
+            themeToggleBtn.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+        
+        // 设置按钮
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn && !settingsBtn.dataset.listenerBound) {
+            settingsBtn.dataset.listenerBound = 'true';
+            settingsBtn.addEventListener('click', () => {
+                router.navigate('/settings');
+            });
+        }
+        
+        // 用户信息按钮
+        const userInfoBtn = document.getElementById('userInfoBtn');
+        if (userInfoBtn && !userInfoBtn.dataset.listenerBound) {
+            userInfoBtn.dataset.listenerBound = 'true';
+            // 可以添加用户信息弹窗
+        }
+        
+        // 导航栏位置切换按钮（如果 Navigation 组件没有绑定，这里作为备用）
+        const navPositionToggleBtn = document.getElementById('navPositionToggleBtn');
+        if (navPositionToggleBtn && !navPositionToggleBtn.dataset.listenerBound) {
+            navPositionToggleBtn.dataset.listenerBound = 'true';
+            navPositionToggleBtn.addEventListener('click', () => {
+                if (this.navigation) {
+                    this.navigation.togglePosition();
+                }
+            });
+        }
+    }
+
+    /**
+     * 更新导航栏位置 - 简化逻辑
+     */
+    updateNavigationPosition(position) {
+        if (!this.navigation) return;
+        
+        this.navigation.setPosition(position);
+        
+        // 重新渲染导航栏（会自动更新 body 类名和激活状态）
+        this.renderNavigation();
+    }
+    
+    /**
+     * 切换主题
+     */
+    toggleTheme() {
+        const isDark = document.documentElement.classList.contains('dark');
+        const favicon = document.querySelector('link[rel="icon"]');
+        
+        if (isDark) {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+            if (favicon) {
+                favicon.href = '/assets/favicon-light.ico';
+            }
+        } else {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+            if (favicon) {
+                favicon.href = '/assets/favicon-dark.ico';
+            }
+        }
+        
+        // 主题切换后，更新导航栏激活状态以刷新样式
+        if (this.navigation) {
+            const currentRoute = router?.getCurrentRoute() || '/';
+            requestAnimationFrame(() => {
+                this.navigation.updateActive(currentRoute);
+            });
+        }
     }
     
     // 初始化路由
@@ -899,7 +1037,7 @@ class App {
                         return;
                     }
                     // 有权限，加载管理页面
-                    this.loadPage('Admin');
+            this.loadPage('Admin');
                 }).catch(() => {
                     router.navigate('/');
                     Toast.show('权限检查失败，请重试', 'error');
@@ -963,11 +1101,12 @@ class App {
                             // 延迟执行 mounted，确保 DOM 已更新
                             requestAnimationFrame(async () => {
                     await page.mounted();
-                    // 初始化自定义下拉框
-                    if (window.initCustomSelects) {
+                    // 初始化自定义下拉框（延迟执行，避免阻塞）
+                    // 注意：Admin 页面有自己的初始化逻辑，这里只处理其他页面
+                    if (window.initCustomSelects && !page.initCustomSelectsForActiveTab) {
                         setTimeout(() => {
                             window.initCustomSelects();
-                        }, 100);
+                        }, 150);
                     }
                             });
                 }

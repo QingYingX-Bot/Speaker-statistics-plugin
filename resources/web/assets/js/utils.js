@@ -711,65 +711,39 @@ class CustomSelect {
     }
     
     init() {
-        // 获取原 select 的宽度和位置信息（在隐藏前获取）
-        const selectRect = this.select.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(this.select);
-        let originalWidth = selectRect.width;
+        // 优化：批量设置样式，减少重排
+        const hasWFull = this.select.classList.contains('w-full');
         
-        // 如果宽度为0，尝试从父元素或样式获取
+        // 快速获取宽度（优先使用 offsetWidth，避免 getBoundingClientRect）
+        let originalWidth = this.select.offsetWidth;
         if (!originalWidth || originalWidth === 0) {
-            originalWidth = parseInt(computedStyle.width) || 
-                          (this.select.parentElement ? this.select.parentElement.offsetWidth : 0) ||
-                          220;
+            const parentElement = this.select.parentElement;
+            originalWidth = parentElement ? parentElement.offsetWidth : 220;
         }
         
-        const originalMinWidth = computedStyle.minWidth;
-        const parentElement = this.select.parentElement;
-        const parentWidth = parentElement ? window.getComputedStyle(parentElement).width : null;
-        
-        // 立即隐藏原生 select，避免闪烁
-        this.select.style.opacity = '0';
-        this.select.style.position = 'absolute';
-        this.select.style.pointerEvents = 'none';
-        this.select.style.width = '0';
-        this.select.style.height = '0';
-        this.select.style.visibility = 'hidden';
-        
-        // 创建自定义下拉框结构
+        // 创建 wrapper
         this.wrapper = document.createElement('div');
         this.wrapper.className = 'custom-select-wrapper relative';
-        
-        // 使用原 select 的宽度，避免宽度变化
-        // 优先使用实际测量的宽度，其次使用父元素宽度，最后使用默认值
-        if (originalWidth > 0) {
-            this.wrapper.style.width = `${originalWidth}px`;
-        } else if (parentWidth && parentWidth !== 'auto') {
-            this.wrapper.style.width = parentWidth;
-            } else {
-                // 默认宽度，根据是否有 w-full 类决定
-                if (this.select.classList.contains('w-full')) {
-                    this.wrapper.style.width = '100%';
-                } else {
-                    this.wrapper.style.width = '220px'; // 统一默认宽度（从160px增加到220px）
-                }
-            }
-        
-        // 保持最小宽度
-        if (originalMinWidth && originalMinWidth !== 'auto' && originalMinWidth !== '0px') {
-            this.wrapper.style.minWidth = originalMinWidth;
-        } else if (this.select.classList.contains('w-full')) {
-            // 如果原 select 是 w-full，保持 wrapper 也是 100%
+        if (hasWFull) {
             this.wrapper.style.width = '100%';
+        } else if (originalWidth > 0) {
+            this.wrapper.style.width = `${originalWidth}px`;
+        } else {
+            this.wrapper.style.width = '220px';
         }
         
+        // 创建 button
         this.button = document.createElement('button');
         this.button.type = 'button';
         this.button.className = 'custom-select-button w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm appearance-none cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 text-left flex items-center justify-between';
         
+        // 创建 buttonText
         this.buttonText = document.createElement('span');
         this.buttonText.className = 'flex-1 text-left truncate';
-        this.updateButtonText();
+        const selectedOption = this.select.options[this.select.selectedIndex];
+        this.buttonText.textContent = selectedOption ? selectedOption.textContent : (this.options.placeholder || '请选择');
         
+        // 创建 buttonIcon（使用 SVG 字符串，避免多次 DOM 操作）
         this.buttonIcon = document.createElement('svg');
         this.buttonIcon.className = 'w-4 h-4 text-gray-400 flex-shrink-0 ml-2 transition-transform';
         this.buttonIcon.setAttribute('fill', 'none');
@@ -777,24 +751,31 @@ class CustomSelect {
         this.buttonIcon.setAttribute('viewBox', '0 0 24 24');
         this.buttonIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
         
+        // 组装 button
         this.button.appendChild(this.buttonText);
         this.button.appendChild(this.buttonIcon);
         
+        // 创建 dropdown
         this.dropdown = document.createElement('div');
         this.dropdown.className = 'custom-select-dropdown absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto hidden';
         
+        // 创建 optionsList
         this.optionsList = document.createElement('div');
         this.optionsList.className = 'py-1';
         this.renderOptions();
         
         this.dropdown.appendChild(this.optionsList);
         
+        // 组装 wrapper
         this.wrapper.appendChild(this.button);
         this.wrapper.appendChild(this.dropdown);
         
-        // 插入到原 select 的位置
+        // 一次性插入到 DOM（减少重排）
         this.select.parentNode.insertBefore(this.wrapper, this.select);
         this.wrapper.appendChild(this.select);
+        
+        // 隐藏原生 select（在 DOM 插入后，避免影响布局计算）
+        this.select.style.cssText = 'opacity:0;position:absolute;pointer-events:none;width:0;height:0;visibility:hidden;';
         
         // 绑定事件
         this.button.addEventListener('click', (e) => {
@@ -802,12 +783,18 @@ class CustomSelect {
             this.toggle();
         });
         
-        // 点击外部关闭
-        document.addEventListener('click', (e) => {
-            if (!this.wrapper.contains(e.target)) {
-                this.close();
-            }
-        });
+        // 点击外部关闭（使用事件委托，避免每个实例都绑定）
+        if (!window._customSelectGlobalClickHandler) {
+            window._customSelectGlobalClickHandler = (e) => {
+                document.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+                    const instance = wrapper.querySelector('select')?._customSelectInstance;
+                    if (instance && !wrapper.contains(e.target)) {
+                        instance.close();
+                    }
+                });
+            };
+            document.addEventListener('click', window._customSelectGlobalClickHandler);
+        }
         
         // 监听原 select 变化
         this.select.addEventListener('change', () => {
@@ -817,12 +804,15 @@ class CustomSelect {
     }
     
     renderOptions() {
-        this.optionsList.innerHTML = '';
+        // 使用 DocumentFragment 批量创建，减少重排
+        const fragment = document.createDocumentFragment();
         const options = Array.from(this.select.options);
+        const selectedValue = this.select.value;
         
-        options.forEach((option, index) => {
+        options.forEach((option) => {
             const item = document.createElement('div');
-            item.className = `custom-select-option px-3 py-2 text-sm cursor-pointer transition-colors text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 ${option.selected ? 'bg-primary/10 text-primary dark:text-primary' : ''}`;
+            const isSelected = option.selected || option.value === selectedValue;
+            item.className = `custom-select-option px-3 py-2 text-sm cursor-pointer transition-colors text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 ${isSelected ? 'bg-primary/10 text-primary dark:text-primary' : ''}`;
             item.textContent = option.textContent;
             item.dataset.value = option.value;
             
@@ -834,8 +824,11 @@ class CustomSelect {
                 this.close();
             });
             
-            this.optionsList.appendChild(item);
+            fragment.appendChild(item);
         });
+        
+        this.optionsList.innerHTML = '';
+        this.optionsList.appendChild(fragment);
     }
     
     updateButtonText() {
@@ -894,25 +887,42 @@ class CustomSelect {
     }
 }
 
-// 初始化所有自定义下拉框
+// 初始化所有自定义下拉框（优化版本，分批初始化避免阻塞）
 function initCustomSelects() {
-    document.querySelectorAll('select.select-custom').forEach(select => {
-        if (!select.dataset.customSelectInitialized) {
-            // 如果 select 还没有渲染完成，等待一下
-            if (select.offsetParent === null && select.offsetWidth === 0) {
-                // 使用 requestAnimationFrame 等待 DOM 渲染
-                requestAnimationFrame(() => {
-                    initCustomSelects();
-                });
-                return;
+    const selects = Array.from(document.querySelectorAll('select.select-custom:not([data-custom-select-initialized])'));
+    if (selects.length === 0) return;
+    
+    // 分批初始化，避免一次性处理太多元素导致卡顿
+    let index = 0;
+    const initNext = () => {
+        if (index >= selects.length) return;
+        
+        const select = selects[index];
+        // 检查元素是否可见且已渲染
+        if (select.offsetParent !== null || select.offsetWidth > 0) {
+            try {
+                select.dataset.customSelectInitialized = 'true';
+                select._customSelectInstance = new CustomSelect(select);
+            } catch (error) {
+                console.warn('初始化下拉框失败:', error);
             }
-            
-            select.dataset.customSelectInitialized = 'true';
-            const customSelect = new CustomSelect(select);
-            // 保存实例到 select 元素上，方便后续更新
-            select._customSelectInstance = customSelect;
         }
-    });
+        
+        index++;
+        // 使用 requestIdleCallback 或 setTimeout 继续下一个
+        if (window.requestIdleCallback) {
+            requestIdleCallback(initNext, { timeout: 50 });
+        } else {
+            setTimeout(initNext, 10);
+        }
+    };
+    
+    // 开始初始化
+    if (window.requestIdleCallback) {
+        requestIdleCallback(initNext, { timeout: 100 });
+    } else {
+        setTimeout(initNext, 50);
+    }
 }
 
 // 更新指定下拉框的选项（当动态添加选项后调用）

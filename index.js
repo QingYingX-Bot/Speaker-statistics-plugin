@@ -38,9 +38,15 @@ try {
 }
 
 try {
+    // 获取数据库类型用于日志显示
+    const { globalConfig } = await import('./src/core/ConfigManager.js');
+    const dbConfig = globalConfig.getConfig('database') || {};
+    const dbType = (dbConfig.type || 'sqlite').toLowerCase();
+    const dbTypeName = dbType === 'sqlite' ? 'SQLite' : 'PostgreSQL';
+    
     logger.info('[发言统计] ---------^_^---------');
     logger.info(`[发言统计] 发言统计插件 v${version} 初始化成功~`);
-    logger.info('[发言统计] 使用PostgreSQL数据库存储');
+    logger.info(`[发言统计] 使用${dbTypeName}数据库存储`);
     logger.info('[发言统计] 支持功能：总榜、日榜、周榜、月榜、个人统计、背景自定义、僵尸群清理');
     logger.info('[发言统计] Web服务器将在插件初始化时自动启动');
 

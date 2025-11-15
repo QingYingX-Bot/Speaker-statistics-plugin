@@ -385,23 +385,156 @@ body {
     align-items: center;
 }
 
+/* ==================== 导航链接样式 - 完全重写 ==================== */
+
+/* 基础样式 */
 .nav-link {
-    padding: 8px 16px;
     text-decoration: none;
-    color: var(--text-primary);
-    border-radius: var(--radius-sm);
-    transition: var(--transition);
-    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    background: transparent;
 }
 
-.nav-link:hover {
-    background: var(--bg-gray);
+/* ==================== 顶部导航栏 ==================== */
+.nav-link-top {
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    gap: 0.5rem;
+}
+
+/* 顶部导航栏 - 非激活状态 */
+.nav-link-top:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent;
+}
+
+.dark .nav-link-top:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-top:not(.active):hover {
+    background: rgb(243 244 246);
     color: var(--primary-color);
 }
 
-.nav-link.active {
-    background: var(--primary-color);
-    color: white;
+.dark .nav-link-top:not(.active):hover {
+    background: rgb(31 41 55);
+    color: var(--primary-color);
+}
+
+.nav-link-top:not(.active) svg {
+    color: rgb(75 85 99);
+}
+
+.dark .nav-link-top:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+/* 顶部导航栏 - 激活状态 */
+.nav-link-top.active {
+    background: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(74, 144, 226, 0.2);
+}
+
+.nav-link-top.active:hover {
+    background: var(--primary-hover) !important;
+    color: white !important;
+}
+
+.nav-link-top.active svg {
+    color: white !important;
+}
+
+/* ==================== 左侧导航栏 ==================== */
+.nav-link-left {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    gap: 0.75rem;
+}
+
+/* 左侧导航栏 - 非激活状态 */
+.nav-link-left:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent !important;
+}
+
+.dark .nav-link-left:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-left:not(.active):hover {
+    background: rgb(243 244 246) !important;
+    color: var(--primary-color);
+}
+
+.dark .nav-link-left:not(.active):hover {
+    background: rgb(31 41 55) !important;
+    color: var(--primary-color);
+}
+
+.nav-link-left:not(.active) svg {
+    color: rgb(75 85 99);
+}
+
+.dark .nav-link-left:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+/* 左侧导航栏 - 激活状态 */
+.nav-link-left.active {
+    background: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+    font-weight: 600;
+}
+
+.nav-link-left.active:hover {
+    background: rgba(74, 144, 226, 0.15) !important;
+    color: var(--primary-color) !important;
+}
+
+.nav-link-left.active svg {
+    color: var(--primary-color) !important;
+}
+
+/* ==================== 移动端导航栏 ==================== */
+.nav-link-mobile {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    gap: 0.75rem;
+}
+
+/* 移动端导航栏 - 非激活状态 */
+.nav-link-mobile:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent !important;
+}
+
+.dark .nav-link-mobile:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-mobile:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+.dark .nav-link-mobile:not(.active) svg {
+    color: rgb(107 114 128);
+}
+
+/* 移动端导航栏 - 激活状态 */
+.nav-link-mobile.active {
+    background: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+}
+
+.nav-link-mobile.active svg {
+    color: var(--primary-color) !important;
 }
 
 .navbar-user {
@@ -435,30 +568,34 @@ body {
     background: var(--bg-gray);
 }
 
-/* 主内容区 - 完全重写布局 */
+/* 主内容区布局 - 简化结构 */
 .main-content {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
     background: var(--bg-gray);
+    overflow: hidden;
 }
 
-.page-container {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
+/* 顶部导航栏模式 */
+body:not(.nav-left) .main-content {
+    padding-top: 64px; /* 导航栏高度 */
+}
+
+/* 左侧导航栏模式 */
+body.nav-left .main-content {
+    padding-left: 256px; /* 左侧导航栏宽度 */
 }
 
 .page-content {
     flex: 1;
-    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 1.5rem;
     background: var(--bg-gray);
     -webkit-overflow-scrolling: touch;
 }
@@ -798,4 +935,22 @@ body {
         right: -8px;
         bottom: -8px;
     }
+}
+
+/* 管理页面导航栏样式优化 */
+.admin-tab-btn {
+    position: relative;
+    margin-bottom: -1px;
+}
+
+.admin-tab-btn.active {
+    z-index: 1;
+}
+
+.admin-tab-btn:not(.active):hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .admin-tab-btn:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }

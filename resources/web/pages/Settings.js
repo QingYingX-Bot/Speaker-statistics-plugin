@@ -90,6 +90,41 @@ export default class Settings {
                             </div>
                         </div>
                         
+                        <!-- 界面设置 -->
+                        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 lg:p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">界面设置</h2>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">自定义界面显示偏好</p>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">导航栏位置</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">选择导航栏显示在顶部或左侧</div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button id="navPositionTop" class="px-4 py-2 text-sm font-medium rounded-lg transition-all border ${
+                                            (localStorage.getItem('navPosition') || 'top') === 'top' 
+                                                ? 'bg-primary text-white border-primary' 
+                                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }">
+                                            顶部
+                                        </button>
+                                        <button id="navPositionLeft" class="px-4 py-2 text-sm font-medium rounded-lg transition-all border ${
+                                            localStorage.getItem('navPosition') === 'left' 
+                                                ? 'bg-primary text-white border-primary' 
+                                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }">
+                                            左侧
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- 数据管理 -->
                         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 lg:p-6">
                             <div class="flex items-center justify-between mb-4">
@@ -330,6 +365,55 @@ export default class Settings {
                 this.resetAll();
             });
         }
+        
+        // 导航栏位置设置
+        const navPositionTop = document.getElementById('navPositionTop');
+        const navPositionLeft = document.getElementById('navPositionLeft');
+        
+        if (navPositionTop) {
+            navPositionTop.addEventListener('click', () => {
+                this.setNavPosition('top');
+            });
+        }
+        
+        if (navPositionLeft) {
+            navPositionLeft.addEventListener('click', () => {
+                this.setNavPosition('left');
+            });
+        }
+    }
+    
+    /**
+     * 设置导航栏位置
+     */
+    setNavPosition(position) {
+        localStorage.setItem('navPosition', position);
+        
+        // 更新按钮状态
+        const navPositionTop = document.getElementById('navPositionTop');
+        const navPositionLeft = document.getElementById('navPositionLeft');
+        
+        if (navPositionTop && navPositionLeft) {
+            if (position === 'top') {
+                navPositionTop.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all border bg-primary text-white border-primary';
+                navPositionLeft.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all border bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+            } else {
+                navPositionTop.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all border bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+                navPositionLeft.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all border bg-primary text-white border-primary';
+            }
+        }
+        
+        // 更新导航栏位置
+        if (window.app && window.app.updateNavigationPosition) {
+            window.app.updateNavigationPosition(position);
+        }
+        
+        Toast.show('导航栏位置已更新，页面将刷新', 'success');
+        
+        // 延迟刷新页面以应用新布局
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     }
     
     async showUserIdInput() {

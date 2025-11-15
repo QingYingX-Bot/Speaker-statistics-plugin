@@ -440,10 +440,18 @@ class AchievementService {
      */
     async saveUserAchievement(groupId, userId, achievementId, achievementData) {
         try {
+            // 确保 progress 是数字
+            let progress = achievementData.progress;
+            if (progress === null || progress === undefined) {
+                progress = 0;
+            } else if (typeof progress !== 'number') {
+                progress = parseInt(progress, 10) || 0;
+            }
+            
             await this.dbService.saveUserAchievement(groupId, userId, achievementId, {
                 unlocked: achievementData.unlocked || false,
                 unlocked_at: achievementData.unlocked_at || null,
-                progress: achievementData.progress || 0
+                progress: progress
             });
         } catch (error) {
             globalConfig.error('保存用户成就数据失败:', error);
@@ -509,10 +517,16 @@ class AchievementService {
                 // 解锁成就（使用 UTC+8 时区）
                 const unlockedAt = TimeUtils.formatDateTimeForDB();
                 
+                // 确保 progress 是数字
+                let progressValue = definition.condition?.value || 1;
+                if (typeof progressValue !== 'number') {
+                    progressValue = parseInt(progressValue, 10) || 1;
+                }
+                
                 const achievementDataToSave = {
                     unlocked: true,
                     unlocked_at: unlockedAt,
-                    progress: definition.condition?.value || 1
+                    progress: progressValue
                 };
 
                 if (isGlobal) {
@@ -530,7 +544,11 @@ class AchievementService {
                 });
             } else if (progressed) {
                 // 进度更新但未解锁
-                const currentProgress = achievementData.achievements[achievementId]?.progress || 0;
+                let currentProgress = achievementData.achievements[achievementId]?.progress || 0;
+                // 确保 progress 是数字
+                if (typeof currentProgress !== 'number') {
+                    currentProgress = parseInt(currentProgress, 10) || 0;
+                }
                 await this.saveUserAchievement(groupId, userId, achievementId, {
                     unlocked: false,
                     unlocked_at: null,

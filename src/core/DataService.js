@@ -661,51 +661,33 @@ class DataService {
                     }));
 
                 case 'daily':
-                    // 日榜
+                    // 日榜：使用批量查询优化性能
                     const todayDate = timeInfo.formattedDate;
-                    const dailyRankings = [];
+                    const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate);
                     
-                    // 获取所有用户的日统计数据
-                    const allUsers = await this.dbService.getAllGroupUsers(groupId);
-                    for (const user of allUsers) {
-                        const dailyStat = await this.dbService.getDailyStats(groupId, user.user_id, todayDate);
-                        if (dailyStat && (dailyStat.message_count > 0 || dailyStat.word_count > 0)) {
-                            dailyRankings.push({
-                                user_id: user.user_id,
-                                nickname: user.nickname,
-                                count: dailyStat.message_count || 0,
-                                period_words: dailyStat.word_count || 0,
-                                last_speaking_time: user.last_speaking_time || null
-                            });
-                        }
-                    }
-                    
-                    // 按发言数排序
-                    return dailyRankings.sort((a, b) => b.count - a.count).slice(0, limit);
+                    return dailyStats.slice(0, limit).map(stat => ({
+                        user_id: stat.user_id,
+                        nickname: stat.nickname || stat.user_id,
+                        count: parseInt(stat.message_count || 0, 10),
+                        period_words: parseInt(stat.word_count || 0, 10),
+                        last_speaking_time: stat.last_speaking_time || null
+                    }));
 
                 case 'weekly':
-                    // 周榜
+                    // 周榜：使用批量查询优化性能
                     const weekKey = timeInfo.weekKey;
-                    const weeklyRankings = [];
+                    const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey);
                     
-                    const weeklyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    for (const user of weeklyUsers) {
-                        const weeklyStat = await this.dbService.getWeeklyStats(groupId, user.user_id, weekKey);
-                        if (weeklyStat && (weeklyStat.message_count > 0 || weeklyStat.word_count > 0)) {
-                            weeklyRankings.push({
-                                user_id: user.user_id,
-                                nickname: user.nickname,
-                                count: weeklyStat.message_count || 0,
-                                period_words: weeklyStat.word_count || 0,
-                                last_speaking_time: user.last_speaking_time || null
-                            });
-                        }
-                    }
-                    
-                    return weeklyRankings.sort((a, b) => b.count - a.count).slice(0, limit);
+                    return weeklyStats.slice(0, limit).map(stat => ({
+                        user_id: stat.user_id,
+                        nickname: stat.nickname || stat.user_id,
+                        count: parseInt(stat.message_count || 0, 10),
+                        period_words: parseInt(stat.word_count || 0, 10),
+                        last_speaking_time: stat.last_speaking_time || null
+                    }));
 
                 case 'monthly':
-                    // 月榜：当前群聊本月的数据
+                    // 月榜：使用批量查询优化性能
                     if (!groupId) {
                         // 如果没有群ID，返回空数组
                         return [];
@@ -713,48 +695,28 @@ class DataService {
                     const monthKey = options.monthKey || timeInfo.monthKey;
                     // 确保月份键格式正确：YYYY-MM
                     const validMonthKey = monthKey.match(/^\d{4}-\d{2}$/) ? monthKey : timeInfo.monthKey;
-                    const monthlyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    const monthlyRankings = [];
+                    const monthlyStats = await this.dbService.getMonthlyStatsByGroupAndMonth(groupId, validMonthKey);
                     
-                    for (const user of monthlyUsers) {
-                        // 查询当前群聊、当前用户、当前月份的统计数据
-                        const monthlyStat = await this.dbService.getMonthlyStats(groupId, user.user_id, validMonthKey);
-                        // 确保转换为数字类型进行比较
-                        const messageCount = parseInt(monthlyStat?.message_count || 0, 10);
-                        const wordCount = parseInt(monthlyStat?.word_count || 0, 10);
-                        if (monthlyStat && (messageCount > 0 || wordCount > 0)) {
-                            monthlyRankings.push({
-                                user_id: user.user_id,
-                                nickname: user.nickname,
-                                count: messageCount,
-                                period_words: wordCount,
-                                last_speaking_time: user.last_speaking_time || null
-                            });
-                        }
-                    }
-                    
-                    return monthlyRankings.sort((a, b) => b.count - a.count).slice(0, limit);
+                    return monthlyStats.slice(0, limit).map(stat => ({
+                        user_id: stat.user_id,
+                        nickname: stat.nickname || stat.user_id,
+                        count: parseInt(stat.message_count || 0, 10),
+                        period_words: parseInt(stat.word_count || 0, 10),
+                        last_speaking_time: stat.last_speaking_time || null
+                    }));
 
                 case 'yearly':
-                    // 年榜
+                    // 年榜：使用批量查询优化性能
                     const yearKey = timeInfo.yearKey;
-                    const yearlyRankings = [];
+                    const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey);
                     
-                    const yearlyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    for (const user of yearlyUsers) {
-                        const yearlyStat = await this.dbService.getYearlyStats(groupId, user.user_id, yearKey);
-                        if (yearlyStat && (yearlyStat.message_count > 0 || yearlyStat.word_count > 0)) {
-                            yearlyRankings.push({
-                                user_id: user.user_id,
-                                nickname: user.nickname,
-                                count: yearlyStat.message_count || 0,
-                                period_words: yearlyStat.word_count || 0,
-                                last_speaking_time: user.last_speaking_time || null
-                            });
-                        }
-                    }
-                    
-                    return yearlyRankings.sort((a, b) => b.count - a.count).slice(0, limit);
+                    return yearlyStats.slice(0, limit).map(stat => ({
+                        user_id: stat.user_id,
+                        nickname: stat.nickname || stat.user_id,
+                        count: parseInt(stat.message_count || 0, 10),
+                        period_words: parseInt(stat.word_count || 0, 10),
+                        last_speaking_time: stat.last_speaking_time || null
+                    }));
 
                 default:
                     return [];
@@ -802,16 +764,16 @@ class DataService {
                             rank: userIndex + 1
                         };
                     } else {
-                        // 查询单个群聊
+                        // 查询单个群聊：使用 getTopUsers 优化性能（已排序）
                         const userStats = await this.dbService.getUserStats(groupId, userId);
                         if (!userStats || !userStats.total_count || userStats.total_count === 0) {
                             return null;
                         }
                         
-                        // 获取所有用户并排序以计算排名
-                        const allUsers = await this.dbService.getAllGroupUsers(groupId);
-                        const sortedUsers = allUsers.sort((a, b) => (b.total_count || 0) - (a.total_count || 0));
-                        const userIndex = sortedUsers.findIndex(u => String(u.user_id) === String(userId));
+                        // 获取所有用户（已按 total_count DESC 排序）以计算排名
+                        // 使用较大的 limit 确保包含所有用户
+                        const allUsers = await this.dbService.getTopUsers(groupId, 999999, 'total_count');
+                        const userIndex = allUsers.findIndex(u => String(u.user_id) === String(userId));
                         
                         return {
                             user_id: userStats.user_id,
@@ -826,147 +788,115 @@ class DataService {
                     }
 
                 case 'daily':
-                    // 日榜
+                    // 日榜：使用批量查询优化性能
                     if (!groupId) return null;
                     const todayDate = timeInfo.formattedDate;
-                    const dailyStat = await this.dbService.getDailyStats(groupId, userId, todayDate);
-                    if (!dailyStat || (dailyStat.message_count === 0 && dailyStat.word_count === 0)) {
+                    const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate);
+                    
+                    // 查找用户数据
+                    const userDailyStat = dailyStats.find(s => String(s.user_id) === String(userId));
+                    if (!userDailyStat) {
                         return null;
                     }
                     
-                    // 获取所有用户的日统计数据并排序
-                    const allDailyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    const dailyRankings = [];
-                    for (const user of allDailyUsers) {
-                        const stat = await this.dbService.getDailyStats(groupId, user.user_id, todayDate);
-                        if (stat && (stat.message_count > 0 || stat.word_count > 0)) {
-                            dailyRankings.push({
-                                user_id: user.user_id,
-                                count: parseInt(stat.message_count || 0, 10)
-                            });
-                        }
-                    }
-                    dailyRankings.sort((a, b) => b.count - a.count);
-                    const dailyUserIndex = dailyRankings.findIndex(u => String(u.user_id) === String(userId));
+                    // 计算排名（数据已按 count DESC 排序）
+                    const dailyUserIndex = dailyStats.findIndex(s => String(s.user_id) === String(userId));
                     
+                    // 获取用户基本信息
                     const userStats = await this.dbService.getUserStats(groupId, userId);
                     return {
                         user_id: userId,
-                        nickname: userStats?.nickname || '未知',
-                        count: parseInt(dailyStat.message_count || 0, 10),
-                        period_words: parseInt(dailyStat.word_count || 0, 10),
+                        nickname: userDailyStat.nickname || userStats?.nickname || '未知',
+                        count: parseInt(userDailyStat.message_count || 0, 10),
+                        period_words: parseInt(userDailyStat.word_count || 0, 10),
                         active_days: userStats?.active_days || 0,
                         continuous_days: userStats?.continuous_days || 0,
-                        last_speaking_time: userStats?.last_speaking_time || null,
+                        last_speaking_time: userDailyStat.last_speaking_time || userStats?.last_speaking_time || null,
                         rank: dailyUserIndex !== -1 ? dailyUserIndex + 1 : null
                     };
 
                 case 'weekly':
-                    // 周榜
+                    // 周榜：使用批量查询优化性能
                     if (!groupId) return null;
                     const weekKey = timeInfo.weekKey;
-                    const weeklyStat = await this.dbService.getWeeklyStats(groupId, userId, weekKey);
-                    if (!weeklyStat || (weeklyStat.message_count === 0 && weeklyStat.word_count === 0)) {
+                    const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey);
+                    
+                    // 查找用户数据
+                    const userWeeklyStat = weeklyStats.find(s => String(s.user_id) === String(userId));
+                    if (!userWeeklyStat) {
                         return null;
                     }
                     
-                    // 获取所有用户的周统计数据并排序
-                    const allWeeklyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    const weeklyRankings = [];
-                    for (const user of allWeeklyUsers) {
-                        const stat = await this.dbService.getWeeklyStats(groupId, user.user_id, weekKey);
-                        if (stat && (stat.message_count > 0 || stat.word_count > 0)) {
-                            weeklyRankings.push({
-                                user_id: user.user_id,
-                                count: parseInt(stat.message_count || 0, 10)
-                            });
-                        }
-                    }
-                    weeklyRankings.sort((a, b) => b.count - a.count);
-                    const weeklyUserIndex = weeklyRankings.findIndex(u => String(u.user_id) === String(userId));
+                    // 计算排名（数据已按 count DESC 排序）
+                    const weeklyUserIndex = weeklyStats.findIndex(s => String(s.user_id) === String(userId));
                     
+                    // 获取用户基本信息
                     const weeklyUserStats = await this.dbService.getUserStats(groupId, userId);
                     return {
                         user_id: userId,
-                        nickname: weeklyUserStats?.nickname || '未知',
-                        count: parseInt(weeklyStat.message_count || 0, 10),
-                        period_words: parseInt(weeklyStat.word_count || 0, 10),
+                        nickname: userWeeklyStat.nickname || weeklyUserStats?.nickname || '未知',
+                        count: parseInt(userWeeklyStat.message_count || 0, 10),
+                        period_words: parseInt(userWeeklyStat.word_count || 0, 10),
                         active_days: weeklyUserStats?.active_days || 0,
                         continuous_days: weeklyUserStats?.continuous_days || 0,
-                        last_speaking_time: weeklyUserStats?.last_speaking_time || null,
+                        last_speaking_time: userWeeklyStat.last_speaking_time || weeklyUserStats?.last_speaking_time || null,
                         rank: weeklyUserIndex !== -1 ? weeklyUserIndex + 1 : null
                     };
 
                 case 'monthly':
-                    // 月榜
+                    // 月榜：使用批量查询优化性能
                     if (!groupId) return null;
                     const monthKey = options.monthKey || timeInfo.monthKey;
                     const validMonthKey = monthKey.match(/^\d{4}-\d{2}$/) ? monthKey : timeInfo.monthKey;
-                    const monthlyStat = await this.dbService.getMonthlyStats(groupId, userId, validMonthKey);
-                    if (!monthlyStat || (monthlyStat.message_count === 0 && monthlyStat.word_count === 0)) {
+                    const monthlyStats = await this.dbService.getMonthlyStatsByGroupAndMonth(groupId, validMonthKey);
+                    
+                    // 查找用户数据
+                    const userMonthlyStat = monthlyStats.find(s => String(s.user_id) === String(userId));
+                    if (!userMonthlyStat) {
                         return null;
                     }
                     
-                    // 获取所有用户的月统计数据并排序
-                    const allMonthlyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    const monthlyRankings = [];
-                    for (const user of allMonthlyUsers) {
-                        const stat = await this.dbService.getMonthlyStats(groupId, user.user_id, validMonthKey);
-                        if (stat && (stat.message_count > 0 || stat.word_count > 0)) {
-                            monthlyRankings.push({
-                                user_id: user.user_id,
-                                count: parseInt(stat.message_count || 0, 10)
-                            });
-                        }
-                    }
-                    monthlyRankings.sort((a, b) => b.count - a.count);
-                    const monthlyUserIndex = monthlyRankings.findIndex(u => String(u.user_id) === String(userId));
+                    // 计算排名（数据已按 count DESC 排序）
+                    const monthlyUserIndex = monthlyStats.findIndex(s => String(s.user_id) === String(userId));
                     
+                    // 获取用户基本信息
                     const monthlyUserStats = await this.dbService.getUserStats(groupId, userId);
                     return {
                         user_id: userId,
-                        nickname: monthlyUserStats?.nickname || '未知',
-                        count: parseInt(monthlyStat.message_count || 0, 10),
-                        period_words: parseInt(monthlyStat.word_count || 0, 10),
+                        nickname: userMonthlyStat.nickname || monthlyUserStats?.nickname || '未知',
+                        count: parseInt(userMonthlyStat.message_count || 0, 10),
+                        period_words: parseInt(userMonthlyStat.word_count || 0, 10),
                         active_days: monthlyUserStats?.active_days || 0,
                         continuous_days: monthlyUserStats?.continuous_days || 0,
-                        last_speaking_time: monthlyUserStats?.last_speaking_time || null,
+                        last_speaking_time: userMonthlyStat.last_speaking_time || monthlyUserStats?.last_speaking_time || null,
                         rank: monthlyUserIndex !== -1 ? monthlyUserIndex + 1 : null
                     };
 
                 case 'yearly':
-                    // 年榜
+                    // 年榜：使用批量查询优化性能
                     if (!groupId) return null;
                     const yearKey = timeInfo.yearKey;
-                    const yearlyStat = await this.dbService.getYearlyStats(groupId, userId, yearKey);
-                    if (!yearlyStat || (yearlyStat.message_count === 0 && yearlyStat.word_count === 0)) {
+                    const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey);
+                    
+                    // 查找用户数据
+                    const userYearlyStat = yearlyStats.find(s => String(s.user_id) === String(userId));
+                    if (!userYearlyStat) {
                         return null;
                     }
                     
-                    // 获取所有用户的年统计数据并排序
-                    const allYearlyUsers = await this.dbService.getAllGroupUsers(groupId);
-                    const yearlyRankings = [];
-                    for (const user of allYearlyUsers) {
-                        const stat = await this.dbService.getYearlyStats(groupId, user.user_id, yearKey);
-                        if (stat && (stat.message_count > 0 || stat.word_count > 0)) {
-                            yearlyRankings.push({
-                                user_id: user.user_id,
-                                count: parseInt(stat.message_count || 0, 10)
-                            });
-                        }
-                    }
-                    yearlyRankings.sort((a, b) => b.count - a.count);
-                    const yearlyUserIndex = yearlyRankings.findIndex(u => String(u.user_id) === String(userId));
+                    // 计算排名（数据已按 count DESC 排序）
+                    const yearlyUserIndex = yearlyStats.findIndex(s => String(s.user_id) === String(userId));
                     
+                    // 获取用户基本信息
                     const yearlyUserStats = await this.dbService.getUserStats(groupId, userId);
                     return {
                         user_id: userId,
-                        nickname: yearlyUserStats?.nickname || '未知',
-                        count: parseInt(yearlyStat.message_count || 0, 10),
-                        period_words: parseInt(yearlyStat.word_count || 0, 10),
+                        nickname: userYearlyStat.nickname || yearlyUserStats?.nickname || '未知',
+                        count: parseInt(userYearlyStat.message_count || 0, 10),
+                        period_words: parseInt(userYearlyStat.word_count || 0, 10),
                         active_days: yearlyUserStats?.active_days || 0,
                         continuous_days: yearlyUserStats?.continuous_days || 0,
-                        last_speaking_time: yearlyUserStats?.last_speaking_time || null,
+                        last_speaking_time: userYearlyStat.last_speaking_time || yearlyUserStats?.last_speaking_time || null,
                         rank: yearlyUserIndex !== -1 ? yearlyUserIndex + 1 : null
                     };
 
@@ -1031,21 +961,31 @@ class DataService {
                     let groupMessages = 0;
                     let groupWords = 0;
 
+                    // 优化：批量查询今日和本月统计数据，避免 N+1 查询
+                    const [dailyStatsList, monthlyStatsList] = await Promise.all([
+                        this.dbService.getDailyStatsByGroupAndDate(groupId, todayKey),
+                        this.dbService.getMonthlyStatsByGroupAndMonth(groupId, monthKey)
+                    ]);
+                    
+                    // 创建统计数据的 Map 以便快速查找
+                    const dailyStatsMap = new Map(dailyStatsList.map(s => [s.user_id, s]));
+                    const monthlyStatsMap = new Map(monthlyStatsList.map(s => [s.user_id, s]));
+
                     for (const user of users) {
                         const msgCount = parseInt(user.total_count || 0, 10);
                         const wordCount = parseInt(user.total_words || 0, 10);
                         groupMessages += msgCount;
                         groupWords += wordCount;
 
-                        // 检查今日活跃
-                        const dailyStats = await this.dbService.getDailyStats(groupId, user.user_id, todayKey);
-                        if (dailyStats && parseInt(dailyStats.message_count || 0, 10) > 0) {
+                        // 检查今日活跃（从批量查询结果中获取）
+                        const dailyStat = dailyStatsMap.get(user.user_id);
+                        if (dailyStat && parseInt(dailyStat.message_count || 0, 10) > 0) {
                             todayActiveSet.add(`${groupId}_${user.user_id}`);
                         }
 
-                        // 检查本月活跃
-                        const monthlyStats = await this.dbService.getMonthlyStats(groupId, user.user_id, monthKey);
-                        if (monthlyStats && parseInt(monthlyStats.message_count || 0, 10) > 0) {
+                        // 检查本月活跃（从批量查询结果中获取）
+                        const monthlyStat = monthlyStatsMap.get(user.user_id);
+                        if (monthlyStat && parseInt(monthlyStat.message_count || 0, 10) > 0) {
                             monthActive.add(`${groupId}_${user.user_id}`);
                         }
                     }
@@ -1053,20 +993,9 @@ class DataService {
                     totalMessages += groupMessages;
                     totalWords += groupWords;
 
-                    // 计算群组的今日和本月活跃
-                    let groupTodayActive = 0;
-                    let groupMonthActive = 0;
-                    for (const user of users) {
-                        const dailyStats = await this.dbService.getDailyStats(groupId, user.user_id, todayKey);
-                        if (dailyStats && parseInt(dailyStats.message_count || 0, 10) > 0) {
-                            groupTodayActive++;
-                        }
-
-                        const monthlyStats = await this.dbService.getMonthlyStats(groupId, user.user_id, monthKey);
-                        if (monthlyStats && parseInt(monthlyStats.message_count || 0, 10) > 0) {
-                            groupMonthActive++;
-                        }
-                    }
+                    // 计算群组的今日和本月活跃（使用已查询的数据）
+                    const groupTodayActive = dailyStatsList.length;
+                    const groupMonthActive = monthlyStatsList.length;
 
                     // 获取群名称（优先从数据库，其次从Bot获取）
                     const groupInfo = await this.dbService.getGroupInfo(groupId);

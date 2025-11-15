@@ -146,8 +146,13 @@ export class SQLiteAdapter extends BaseAdapter {
             if (this.useBetterSqlite3) {
                 // better-sqlite3 是同步的
                 this.db = new Database(dbPath);
-                // 启用 WAL 模式（提高并发性能）
-                this.db.pragma('journal_mode = WAL');
+                // 优化并发性能设置
+                this.db.pragma('journal_mode = WAL'); // 启用 WAL 模式（提高并发性能）
+                this.db.pragma('synchronous = NORMAL'); // 平衡性能和安全性
+                this.db.pragma('cache_size = -64000'); // 设置缓存大小为 64MB（负值表示 KB）
+                this.db.pragma('temp_store = MEMORY'); // 临时表存储在内存中
+                this.db.pragma('mmap_size = 268435456'); // 启用内存映射（256MB）
+                this.db.pragma('busy_timeout = 5000'); // 设置忙等待超时为 5 秒
             } else {
                 // sqlite3 是异步的，需要 Promise 包装
                 this.db = await new Promise((resolve, reject) => {
@@ -156,8 +161,13 @@ export class SQLiteAdapter extends BaseAdapter {
                         else resolve(db);
                     });
                 });
-                // 启用 WAL 模式
+                // 优化并发性能设置
                 await this.run('PRAGMA journal_mode = WAL');
+                await this.run('PRAGMA synchronous = NORMAL');
+                await this.run('PRAGMA cache_size = -64000');
+                await this.run('PRAGMA temp_store = MEMORY');
+                await this.run('PRAGMA mmap_size = 268435456');
+                await this.run('PRAGMA busy_timeout = 5000');
             }
 
             globalConfig.debug(`[SQLite适配器] 成功连接到 SQLite: ${dbPath}`);
@@ -225,6 +235,55 @@ export class SQLiteAdapter extends BaseAdapter {
     }
 
     /**
+     * 转换参数为 SQLite 支持的类型
+     * @param {any} value 参数值
+     * @returns {number|string|bigint|Buffer|null} 转换后的值
+     */
+    convertParam(value) {
+        // null 或 undefined 转换为 null
+        if (value === null || value === undefined) {
+            return null;
+        }
+        
+        // 布尔值转换为整数（SQLite 使用 INTEGER 存储布尔值）
+        if (typeof value === 'boolean') {
+            return value ? 1 : 0;
+        }
+        
+        // Date 对象转换为 ISO 字符串
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        
+        // 数字、字符串、bigint、Buffer 直接返回
+        if (typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint' || Buffer.isBuffer(value)) {
+            return value;
+        }
+        
+        // 对象或数组：尝试转换为 JSON 字符串（如果字段支持）
+        if (typeof value === 'object') {
+            // 检查是否是空对象或空数组
+            if (Array.isArray(value) && value.length === 0) {
+                return null;
+            }
+            if (!Array.isArray(value) && Object.keys(value).length === 0) {
+                return null;
+            }
+            // 对于非空对象/数组，转换为 JSON 字符串
+            try {
+                return JSON.stringify(value);
+            } catch (e) {
+                globalConfig.error('[SQLite适配器] 无法序列化对象:', value, e);
+                return null;
+            }
+        }
+        
+        // 其他类型（函数等）转换为 null 并记录警告
+        globalConfig.error(`[SQLite适配器] 不支持的参数类型: ${typeof value}, 值: ${value}`);
+        return null;
+    }
+
+    /**
      * 执行 SQL 语句（无返回值）
      * @param {string} sql SQL 语句
      * @param {...any} params 参数
@@ -237,11 +296,13 @@ export class SQLiteAdapter extends BaseAdapter {
 
         try {
             const convertedSql = this.convertPlaceholders(sql);
+            // 转换所有参数为 SQLite 支持的类型
+            const convertedParams = params.map(param => this.convertParam(param));
             
             if (this.useBetterSqlite3) {
                 // better-sqlite3 同步 API
                 const stmt = this.db.prepare(convertedSql);
-                const result = stmt.run(...params);
+                const result = stmt.run(...convertedParams);
                 return {
                     lastID: result.lastInsertRowid || null,
                     changes: result.changes || 0
@@ -249,7 +310,7 @@ export class SQLiteAdapter extends BaseAdapter {
             } else {
                 // sqlite3 异步 API
                 return new Promise((resolve, reject) => {
-                    this.db.run(convertedSql, params, function(err) {
+                    this.db.run(convertedSql, convertedParams, function(err) {
                         if (err) {
                             reject(err);
                         } else {
@@ -263,6 +324,7 @@ export class SQLiteAdapter extends BaseAdapter {
             }
         } catch (error) {
             globalConfig.error(`[SQLite适配器] 执行 SQL 失败: ${sql}`, error);
+            globalConfig.error(`[SQLite适配器] 参数:`, params);
             throw error;
         }
     }
@@ -280,15 +342,17 @@ export class SQLiteAdapter extends BaseAdapter {
 
         try {
             const convertedSql = this.convertPlaceholders(sql);
+            // 转换所有参数为 SQLite 支持的类型
+            const convertedParams = params.map(param => this.convertParam(param));
             
             if (this.useBetterSqlite3) {
                 // better-sqlite3 同步 API
                 const stmt = this.db.prepare(convertedSql);
-                return stmt.get(...params) || null;
+                return stmt.get(...convertedParams) || null;
             } else {
                 // sqlite3 异步 API
                 return new Promise((resolve, reject) => {
-                    this.db.get(convertedSql, params, (err, row) => {
+                    this.db.get(convertedSql, convertedParams, (err, row) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -316,15 +380,17 @@ export class SQLiteAdapter extends BaseAdapter {
 
         try {
             const convertedSql = this.convertPlaceholders(sql);
+            // 转换所有参数为 SQLite 支持的类型
+            const convertedParams = params.map(param => this.convertParam(param));
             
             if (this.useBetterSqlite3) {
                 // better-sqlite3 同步 API
                 const stmt = this.db.prepare(convertedSql);
-                return stmt.all(...params) || [];
+                return stmt.all(...convertedParams) || [];
             } else {
                 // sqlite3 异步 API
                 return new Promise((resolve, reject) => {
-                    this.db.all(convertedSql, params, (err, rows) => {
+                    this.db.all(convertedSql, convertedParams, (err, rows) => {
                         if (err) {
                             reject(err);
                         } else {
@@ -529,11 +595,23 @@ export class SQLiteAdapter extends BaseAdapter {
         // 检查并添加新字段（数据库迁移）
         try {
             // SQLite 不支持直接检查列是否存在，需要捕获错误
+            // SQLite 错误格式: "SqliteError: duplicate column name: is_manual"
             try {
                 await this.run(`ALTER TABLE user_display_achievements ADD COLUMN is_manual INTEGER DEFAULT 0`);
             } catch (error) {
-                // 列已存在，忽略错误
-                if (!error.message.includes('duplicate column')) {
+                // 列已存在，忽略错误（检查错误消息和错误代码）
+                // better-sqlite3 错误格式: "SqliteError: duplicate column name: is_manual" (code: 'SQLITE_ERROR')
+                // sqlite3 错误格式: "Error: SQLITE_ERROR: duplicate column name: is_manual"
+                const errorMsg = (error.message || String(error) || '').toLowerCase();
+                const errorCode = (error.code || '').toString();
+                const isDuplicateColumn = errorMsg.includes('duplicate column') || 
+                                         errorMsg.includes('duplicate column name') ||
+                                         (errorCode === 'SQLITE_ERROR' && errorMsg.includes('duplicate'));
+                
+                if (isDuplicateColumn) {
+                    // 列已存在，静默忽略（这是正常的，因为新表已经包含这些列）
+                } else {
+                    // 其他错误，重新抛出
                     throw error;
                 }
             }
@@ -541,13 +619,28 @@ export class SQLiteAdapter extends BaseAdapter {
             try {
                 await this.run(`ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TEXT`);
             } catch (error) {
-                // 列已存在，忽略错误
-                if (!error.message.includes('duplicate column')) {
+                // 列已存在，忽略错误（检查错误消息和错误代码）
+                // better-sqlite3 错误格式: "SqliteError: duplicate column name: auto_display_at" (code: 'SQLITE_ERROR')
+                // sqlite3 错误格式: "Error: SQLITE_ERROR: duplicate column name: auto_display_at"
+                const errorMsg = (error.message || String(error) || '').toLowerCase();
+                const errorCode = (error.code || '').toString();
+                const isDuplicateColumn = errorMsg.includes('duplicate column') || 
+                                         errorMsg.includes('duplicate column name') ||
+                                         (errorCode === 'SQLITE_ERROR' && errorMsg.includes('duplicate'));
+                
+                if (isDuplicateColumn) {
+                    // 列已存在，静默忽略（这是正常的，因为新表已经包含这些列）
+                } else {
+                    // 其他错误，重新抛出
                     throw error;
                 }
             }
         } catch (error) {
-            globalConfig.debug('[SQLite适配器] 数据库迁移失败（可能字段已存在）:', error.message);
+            // 只有非重复列错误才记录
+            const errorMsg = error.message || '';
+            if (!errorMsg.includes('duplicate column') && !errorMsg.includes('duplicate column name')) {
+                globalConfig.error('[SQLite适配器] 数据库迁移失败:', error.message);
+            }
         }
 
         // 群组信息表
@@ -570,11 +663,22 @@ export class SQLiteAdapter extends BaseAdapter {
         await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_group ON user_stats(group_id)`);
         await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_user ON user_stats(user_id)`);
         await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_user ON user_stats(group_id, user_id)`);
+        // 排序字段索引（优化排行榜查询性能）
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_count ON user_stats(total_count DESC)`);
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_words ON user_stats(total_words DESC)`);
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_active_days ON user_stats(active_days DESC)`);
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_continuous_days ON user_stats(continuous_days DESC)`);
+        // 复合索引：优化总榜查询（按用户ID聚合后排序）
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_user_total_count ON user_stats(user_id, total_count DESC)`);
 
         // 日统计表索引
         await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_user_date ON daily_stats(group_id, user_id, date_key)`);
         await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date_key)`);
         await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_date ON daily_stats(group_id, date_key)`);
+        // 用户ID索引（优化总榜 active_days 计算）
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_id ON daily_stats(user_id)`);
+        // 日期和用户ID复合索引（优化活跃天数统计）
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date_key)`);
 
         // 周统计表索引
         await this.run(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_user_week ON weekly_stats(group_id, user_id, week_key)`);

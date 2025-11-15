@@ -25,7 +25,7 @@ class DatabaseService {
         try {
             // 从配置获取数据库连接信息
             const dbConfig = globalConfig.getConfig('database') || {};
-            const dbType = (dbConfig.type || 'postgresql').toLowerCase();
+            const dbType = (dbConfig.type || 'sqlite').toLowerCase();
             
             // 根据配置选择适配器
             if (dbType === 'sqlite') {
@@ -145,6 +145,14 @@ class DatabaseService {
     async saveUserStats(groupId, userId, stats) {
         const now = this.getCurrentTime();
         
+        // 确保 last_speaking_time 是字符串或 null
+        let lastSpeakingTime = stats.last_speaking_time || null;
+        if (lastSpeakingTime instanceof Date) {
+            lastSpeakingTime = lastSpeakingTime.toISOString();
+        } else if (lastSpeakingTime && typeof lastSpeakingTime !== 'string') {
+            lastSpeakingTime = String(lastSpeakingTime);
+        }
+        
         // 使用 PostgreSQL 的 INSERT ... ON CONFLICT ... DO UPDATE 语法（UPSERT）
         // 这样可以避免并发时的主键冲突问题
         await this.run(`
@@ -169,7 +177,7 @@ class DatabaseService {
             stats.total_words || 0,
             stats.active_days || 0,
             stats.continuous_days || 0,
-            stats.last_speaking_time || null,
+            lastSpeakingTime,
             now,
             now
         );
@@ -192,7 +200,14 @@ class DatabaseService {
 
         for (const [key, value] of Object.entries(updates)) {
             setParts.push(`${key} = $${paramIndex++}`);
-            values.push(value);
+            // 转换 Date 对象为字符串
+            let convertedValue = value;
+            if (value instanceof Date) {
+                convertedValue = value.toISOString();
+            } else if (value === null || value === undefined) {
+                convertedValue = null;
+            }
+            values.push(convertedValue);
         }
 
         setParts.push(`updated_at = $${paramIndex++}`);
@@ -278,26 +293,38 @@ class DatabaseService {
             orderBy = 'total_count';
         }
         // 按用户ID聚合所有群聊的数据，取总和
+        // 优化：使用子查询预计算 active_days，减少 JOIN 开销
         // 注意：active_days 需要从 daily_stats 统计不重复日期，不能简单求和
         return await this.all(
-            `SELECT 
-                us.user_id,
-                MAX(us.nickname) as nickname,
-                SUM(us.${orderBy}) as ${orderBy},
-                SUM(us.total_words) as total_words,
-                COALESCE(ds_stats.active_days, 0) as active_days,
-                MAX(us.continuous_days) as continuous_days,
-                MAX(us.last_speaking_time) as last_speaking_time
-            FROM user_stats us
-            LEFT JOIN (
+            `WITH user_aggregated AS (
+                SELECT 
+                    user_id,
+                    MAX(nickname) as nickname,
+                    SUM(${orderBy}) as ${orderBy},
+                    SUM(total_words) as total_words,
+                    MAX(continuous_days) as continuous_days,
+                    MAX(last_speaking_time) as last_speaking_time
+                FROM user_stats
+                GROUP BY user_id
+            ),
+            active_days_stats AS (
                 SELECT 
                     user_id,
                     COUNT(DISTINCT date_key) as active_days
                 FROM daily_stats
                 GROUP BY user_id
-            ) ds_stats ON us.user_id = ds_stats.user_id
-            GROUP BY us.user_id, ds_stats.active_days
-            ORDER BY SUM(us.${orderBy}) DESC 
+            )
+            SELECT 
+                ua.user_id,
+                ua.nickname,
+                ua.${orderBy},
+                ua.total_words,
+                COALESCE(ads.active_days, 0) as active_days,
+                ua.continuous_days,
+                ua.last_speaking_time
+            FROM user_aggregated ua
+            LEFT JOIN active_days_stats ads ON ua.user_id = ads.user_id
+            ORDER BY ua.${orderBy} DESC 
             LIMIT $1`,
             limit
         );
@@ -377,6 +404,25 @@ class DatabaseService {
         );
     }
 
+    /**
+     * 批量获取日统计（优化性能，避免 N+1 查询）
+     * @param {string} groupId 群号
+     * @param {string} dateKey 日期键（格式：YYYY-MM-DD）
+     * @returns {Promise<Array>} 日统计数据列表（已排序）
+     */
+    async getDailyStatsByGroupAndDate(groupId, dateKey) {
+        return await this.all(
+            `SELECT ds.*, us.nickname, us.last_speaking_time 
+             FROM daily_stats ds
+             LEFT JOIN user_stats us ON ds.group_id = us.group_id AND ds.user_id = us.user_id
+             WHERE ds.group_id = $1 AND ds.date_key = $2 
+             AND (ds.message_count > 0 OR ds.word_count > 0)
+             ORDER BY ds.message_count DESC`,
+            groupId,
+            dateKey
+        );
+    }
+
     // ========== 周统计相关方法 ==========
 
     /**
@@ -431,6 +477,25 @@ class DatabaseService {
         );
 
         return true;
+    }
+
+    /**
+     * 批量获取周统计（优化性能，避免 N+1 查询）
+     * @param {string} groupId 群号
+     * @param {string} weekKey 周键（格式：YYYY-WW）
+     * @returns {Promise<Array>} 周统计数据列表（已排序）
+     */
+    async getWeeklyStatsByGroupAndWeek(groupId, weekKey) {
+        return await this.all(
+            `SELECT ws.*, us.nickname, us.last_speaking_time 
+             FROM weekly_stats ws
+             LEFT JOIN user_stats us ON ws.group_id = us.group_id AND ws.user_id = us.user_id
+             WHERE ws.group_id = $1 AND ws.week_key = $2 
+             AND (ws.message_count > 0 OR ws.word_count > 0)
+             ORDER BY ws.message_count DESC`,
+            groupId,
+            weekKey
+        );
     }
 
     // ========== 月统计相关方法 ==========
@@ -494,6 +559,25 @@ class DatabaseService {
         return true;
     }
 
+    /**
+     * 批量获取月统计（优化性能，避免 N+1 查询）
+     * @param {string} groupId 群号
+     * @param {string} monthKey 月键（格式：YYYY-MM）
+     * @returns {Promise<Array>} 月统计数据列表（已排序）
+     */
+    async getMonthlyStatsByGroupAndMonth(groupId, monthKey) {
+        return await this.all(
+            `SELECT ms.*, us.nickname, us.last_speaking_time 
+             FROM monthly_stats ms
+             LEFT JOIN user_stats us ON ms.group_id = us.group_id AND ms.user_id = us.user_id
+             WHERE ms.group_id = $1 AND ms.month_key = $2 
+             AND (ms.message_count > 0 OR ms.word_count > 0)
+             ORDER BY ms.message_count DESC`,
+            groupId,
+            monthKey
+        );
+    }
+
     // ========== 年统计相关方法 ==========
 
     /**
@@ -550,6 +634,25 @@ class DatabaseService {
         return true;
     }
 
+    /**
+     * 批量获取年统计（优化性能，避免 N+1 查询）
+     * @param {string} groupId 群号
+     * @param {string} yearKey 年键（格式：YYYY）
+     * @returns {Promise<Array>} 年统计数据列表（已排序）
+     */
+    async getYearlyStatsByGroupAndYear(groupId, yearKey) {
+        return await this.all(
+            `SELECT ys.*, us.nickname, us.last_speaking_time 
+             FROM yearly_stats ys
+             LEFT JOIN user_stats us ON ys.group_id = us.group_id AND ys.user_id = us.user_id
+             WHERE ys.group_id = $1 AND ys.year_key = $2 
+             AND (ys.message_count > 0 OR ys.word_count > 0)
+             ORDER BY ys.message_count DESC`,
+            groupId,
+            yearKey
+        );
+    }
+
     // ========== 成就相关方法 ==========
 
     /**
@@ -579,6 +682,28 @@ class DatabaseService {
     async saveUserAchievement(groupId, userId, achievementId, achievementData) {
         const now = this.getCurrentTime();
         
+        // 确保所有参数都是正确的类型
+        const unlocked = achievementData.unlocked ? 1 : 0; // SQLite 使用 INTEGER 存储布尔值
+        let unlockedAt = achievementData.unlocked_at || null;
+        // 如果是 Date 对象，转换为字符串
+        if (unlockedAt instanceof Date) {
+            unlockedAt = unlockedAt.toISOString();
+        } else if (unlockedAt && typeof unlockedAt !== 'string') {
+            unlockedAt = String(unlockedAt);
+        }
+        
+        // 确保 progress 是数字
+        let progress = achievementData.progress;
+        if (progress === null || progress === undefined) {
+            progress = 0;
+        } else if (typeof progress === 'object') {
+            // 如果是对象或数组，记录警告并使用 0
+            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress);
+            progress = 0;
+        } else {
+            progress = parseInt(progress, 10) || 0;
+        }
+        
         await this.run(`
             INSERT INTO achievements (
                 group_id, user_id, achievement_id, unlocked, unlocked_at, progress, created_at, updated_at
@@ -593,9 +718,9 @@ class DatabaseService {
             groupId,
             userId,
             achievementId,
-            achievementData.unlocked ? true : false,
-            achievementData.unlocked_at || null,
-            achievementData.progress || 0,
+            unlocked,
+            unlockedAt,
+            progress,
             now,
             now
         );
@@ -717,6 +842,28 @@ class DatabaseService {
             return false;
         }
 
+        // 确保所有参数都是正确的类型
+        const unlocked = achievementData.unlocked ? 1 : 0; // SQLite 使用 INTEGER 存储布尔值
+        let unlockedAt = achievementData.unlocked_at || null;
+        // 如果是 Date 对象，转换为字符串
+        if (unlockedAt instanceof Date) {
+            unlockedAt = unlockedAt.toISOString();
+        } else if (unlockedAt && typeof unlockedAt !== 'string') {
+            unlockedAt = String(unlockedAt);
+        }
+        
+        // 确保 progress 是数字
+        let progress = achievementData.progress;
+        if (progress === null || progress === undefined) {
+            progress = 0;
+        } else if (typeof progress === 'object') {
+            // 如果是对象或数组，记录警告并使用 0
+            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress);
+            progress = 0;
+        } else {
+            progress = parseInt(progress, 10) || 0;
+        }
+
         // 使用事务或批量插入
         for (const groupId of groups) {
             await this.run(`
@@ -733,9 +880,9 @@ class DatabaseService {
                 groupId,
                 userId,
                 achievementId,
-                achievementData.unlocked ? true : false,
-                achievementData.unlocked_at || null,
-                achievementData.progress || 0,
+                unlocked,
+                unlockedAt,
+                progress,
                 now,
                 now
             );
@@ -754,6 +901,8 @@ class DatabaseService {
     async setDisplayAchievement(groupId, userId, achievementData) {
         const now = this.getCurrentTime();
         const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false;
+        // SQLite 使用 INTEGER 存储布尔值
+        const isManualInt = isManual ? 1 : 0;
         
         // 获取自动佩戴时间
         // 如果提供了 autoDisplayAt，使用提供的值（通常是解锁时间）
@@ -764,9 +913,15 @@ class DatabaseService {
             autoDisplayAt = null;
         } else if (!autoDisplayAt) {
             // 自动设置但未提供时间，使用当前时间
-                autoDisplayAt = now;
-            }
-        // 如果提供了 autoDisplayAt，直接使用（通常是解锁时间）
+            autoDisplayAt = now;
+        }
+        
+        // 确保 autoDisplayAt 是字符串或 null
+        if (autoDisplayAt instanceof Date) {
+            autoDisplayAt = autoDisplayAt.toISOString();
+        } else if (autoDisplayAt && typeof autoDisplayAt !== 'string') {
+            autoDisplayAt = String(autoDisplayAt);
+        }
         
         await this.run(`
             INSERT INTO user_display_achievements (
@@ -786,7 +941,7 @@ class DatabaseService {
             achievementData.id,
             achievementData.name,
             achievementData.rarity || 'common',
-            isManual,
+            isManualInt,
             autoDisplayAt,
             now,
             now

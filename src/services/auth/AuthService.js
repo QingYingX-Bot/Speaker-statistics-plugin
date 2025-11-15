@@ -213,13 +213,11 @@ class AuthService {
             
             // 如果文件为空，返回 null
             if (Object.keys(keyData).length === 0) {
-                globalConfig.debug(`[权限检查] 用户 ${userId}: key.json 文件为空，返回 null`);
                 return null;
             }
             
             // admin 用户始终是管理员
             if (userId === 'admin') {
-                globalConfig.debug(`[权限检查] 用户 ${userId}: admin 用户，返回 'admin'`);
                 return 'admin';
             }
             
@@ -228,16 +226,12 @@ class AuthService {
                 const userRole = keyData[userId].role;
                 // 如果配置了 role 字段，使用配置的角色
                 if (userRole === 'admin') {
-                    globalConfig.debug(`[权限检查] 用户 ${userId}: 在 key.json 中找到，role='${userRole}'，返回 'admin'`);
                     return 'admin';
                 }
                 // 默认在 key.json 中的用户是普通用户
-                const finalRole = userRole || 'user';
-                globalConfig.debug(`[权限检查] 用户 ${userId}: 在 key.json 中找到，role='${finalRole}'，返回 'user'`);
-                return 'user';
+                return userRole || 'user';
             }
             
-            globalConfig.debug(`[权限检查] 用户 ${userId}: 不在 key.json 中，返回 null`);
             return null;
         } catch (error) {
             globalConfig.error('获取用户权限失败:', error);
@@ -253,25 +247,19 @@ class AuthService {
      */
     async checkAdminPermission(userId, secretKey = null) {
         try {
-            globalConfig.debug(`[权限检查] 开始检查用户 ${userId} 的管理员权限${secretKey ? '（需要验证秘钥）' : ''}`);
-            
             // 验证秘钥（如果提供）
             if (secretKey) {
                 const validation = await this.validateSecretKey(userId, secretKey);
                 if (!validation.valid) {
-                    globalConfig.debug(`[权限检查] 用户 ${userId}: 秘钥验证失败`);
                     return {
                         isAdmin: false,
                         message: '秘钥验证失败'
                     };
                 }
-                globalConfig.debug(`[权限检查] 用户 ${userId}: 秘钥验证成功`);
             }
 
             const role = await this.getUserRole(userId);
             const isAdmin = role === 'admin';
-
-            globalConfig.debug(`[权限检查] 用户 ${userId}: 最终角色='${role || 'none'}'，isAdmin=${isAdmin}`);
 
             return {
                 isAdmin,

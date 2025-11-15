@@ -41,8 +41,10 @@ class Router {
         const route = this.getCurrentRoute();
         const handler = this.routes[route] || this.routes['/'];
         
-        // 更新导航栏激活状态
-        this.updateNavActive(route);
+        // 更新导航栏激活状态（通过 app.navigation）
+        if (window.app && window.app.navigation) {
+            window.app.navigation.updateActive(route);
+        }
         
         // 显示加载状态
         const content = document.getElementById('pageContent');
@@ -60,35 +62,6 @@ class Router {
             console.error('路由处理失败:', error);
             content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">加载失败: ${error.message}</div></div>`;
         }
-    }
-    
-    // 更新导航栏激活状态
-    updateNavActive(route) {
-        // 更新桌面端导航
-        const navLinks = document.querySelectorAll('.nav-link');
-        navLinks.forEach(link => {
-            const linkRoute = link.getAttribute('data-route');
-            if (linkRoute === route || (route.startsWith(linkRoute) && linkRoute !== '/')) {
-                link.classList.add('bg-primary', 'text-white');
-                link.classList.remove('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
-            } else {
-                link.classList.remove('bg-primary', 'text-white');
-                link.classList.add('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
-            }
-        });
-        
-        // 更新移动端导航
-        const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
-        mobileNavLinks.forEach(link => {
-            const linkRoute = link.getAttribute('data-route');
-            if (linkRoute === route || (route.startsWith(linkRoute) && linkRoute !== '/')) {
-                link.classList.add('bg-primary', 'text-white');
-                link.classList.remove('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
-            } else {
-                link.classList.remove('bg-primary', 'text-white');
-                link.classList.add('text-gray-700', 'hover:text-primary', 'hover:bg-gray-50');
-            }
-        });
     }
 }
 

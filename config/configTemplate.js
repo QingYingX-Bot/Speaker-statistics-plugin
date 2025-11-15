@@ -57,8 +57,8 @@ const configTemplate = {
     // 数据库配置
     database: {
         // 数据库类型：'postgresql' 或 'sqlite'
-        // 如果不指定，默认使用 'postgresql'（向后兼容）
-        type: "postgresql",
+        // 如果不指定，默认使用 'sqlite'
+        type: "sqlite",
         
         // SQLite 配置（仅当 type === 'sqlite' 时需要）
         // 数据库文件路径（可选）

@@ -365,11 +365,22 @@ export class PostgreSQLAdapter extends BaseAdapter {
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group ON user_stats(group_id);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_user ON user_stats(user_id);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_user ON user_stats(group_id, user_id);`);
+        // 排序字段索引（优化排行榜查询性能）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_count ON user_stats(total_count DESC);`);
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_words ON user_stats(total_words DESC);`);
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_active_days ON user_stats(active_days DESC);`);
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_continuous_days ON user_stats(continuous_days DESC);`);
+        // 复合索引：优化总榜查询（按用户ID聚合后排序）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_user_total_count ON user_stats(user_id, total_count DESC);`);
 
         // 日统计表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_user_date ON daily_stats(group_id, user_id, date_key);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date_key);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_date ON daily_stats(group_id, date_key);`);
+        // 用户ID索引（优化总榜 active_days 计算）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_id ON daily_stats(user_id);`);
+        // 日期和用户ID复合索引（优化活跃天数统计）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date_key);`);
 
         // 周统计表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_user_week ON weekly_stats(group_id, user_id, week_key);`);
