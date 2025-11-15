@@ -113,6 +113,23 @@ class DatabaseService {
         return await this.adapter.createIndexes();
     }
 
+    /**
+     * 获取数据库类型
+     * @returns {string} 'postgresql' 或 'sqlite'
+     */
+    getDatabaseType() {
+        if (!this.adapter) {
+            return 'sqlite'; // 默认返回 sqlite
+        }
+        // 检查适配器类型
+        const adapterName = this.adapter.constructor.name;
+        if (adapterName === 'PostgreSQLAdapter') {
+            return 'postgresql';
+        } else if (adapterName === 'SQLiteAdapter') {
+            return 'sqlite';
+        }
+        return 'sqlite'; // 默认返回 sqlite
+    }
 
     /**
      * 获取当前时间字符串

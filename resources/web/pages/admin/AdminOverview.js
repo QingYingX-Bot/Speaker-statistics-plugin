@@ -6,8 +6,8 @@ export class AdminOverview {
         this.admin = admin;
         this.messageTrendChart = null;
         this.groupActivityChart = null;
-        this.userMessageChart = null;
-        this.newUserTrendChart = null;
+        this.messageDensityChart = null;
+        this.groupGrowthChart = null;
         this.chartResizeHandler = null;
     }
     
@@ -106,23 +106,23 @@ export class AdminOverview {
             }
         }
         
-        // 初始化用户消息分布图
-        const userMessageEl = document.getElementById('userMessageChart');
-        if (userMessageEl && !this.userMessageChart) {
+        // 初始化消息密度散点图
+        const messageDensityEl = document.getElementById('messageDensityChart');
+        if (messageDensityEl && !this.messageDensityChart) {
             try {
-                this.userMessageChart = echarts.init(userMessageEl);
+                this.messageDensityChart = echarts.init(messageDensityEl);
             } catch (error) {
-                console.error('初始化用户消息分布图失败:', error);
+                console.error('初始化消息密度散点图失败:', error);
             }
         }
         
-        // 初始化新增用户趋势图
-        const newUserTrendEl = document.getElementById('newUserTrendChart');
-        if (newUserTrendEl && !this.newUserTrendChart) {
+        // 初始化群组增长趋势图
+        const groupGrowthEl = document.getElementById('groupGrowthChart');
+        if (groupGrowthEl && !this.groupGrowthChart) {
             try {
-                this.newUserTrendChart = echarts.init(newUserTrendEl);
+                this.groupGrowthChart = echarts.init(groupGrowthEl);
             } catch (error) {
-                console.error('初始化新增用户趋势图失败:', error);
+                console.error('初始化群组增长趋势图失败:', error);
             }
         }
         
@@ -132,8 +132,8 @@ export class AdminOverview {
                 try {
                     if (this.messageTrendChart) this.messageTrendChart.resize();
                     if (this.groupActivityChart) this.groupActivityChart.resize();
-                    if (this.userMessageChart) this.userMessageChart.resize();
-                    if (this.newUserTrendChart) this.newUserTrendChart.resize();
+                    if (this.messageDensityChart) this.messageDensityChart.resize();
+                    if (this.groupGrowthChart) this.groupGrowthChart.resize();
                 } catch (error) {
                     console.warn('调整图表大小失败:', error);
                 }
@@ -221,144 +221,402 @@ export class AdminOverview {
                 }))
                 : [{ value: 0, name: '暂无数据' }];
             
+            // 计算总数和百分比
+            const total = data.reduce((sum, item) => sum + item.value, 0);
+            const dataWithPercent = data.map(item => ({
+                ...item,
+                percent: total > 0 ? ((item.value / total) * 100).toFixed(1) : 0
+            }));
+            
+            // 定义更丰富的颜色方案
+            const colors = [
+                '#4A90E2', '#10B981', '#F59E0B', '#EF4444', '#06B6D4',
+                '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'
+            ];
+            
             this.groupActivityChart.setOption({
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
+                color: colors,
                 tooltip: {
                     trigger: 'item',
                     backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                     borderColor: gridColor,
-                    textStyle: { color: textColor },
-                    formatter: '{b}: {c} ({d}%)'
+                    borderWidth: 1,
+                    padding: [12, 16],
+                    textStyle: { 
+                        color: textColor,
+                        fontSize: 13
+                    },
+                    formatter: (params) => {
+                        const value = params.value;
+                        const percent = params.percent;
+                        return `
+                            <div style="font-weight: 600; margin-bottom: 4px;">${params.name}</div>
+                            <div style="color: ${params.color}; margin: 4px 0;">
+                                消息数: <strong>${formatNumber(value)}</strong>
+                            </div>
+                            <div style="color: ${textColor}; opacity: 0.8;">
+                                占比: <strong>${percent}%</strong>
+                            </div>
+                        `;
+                    }
                 },
                 legend: {
                     orient: 'vertical',
                     left: 'left',
-                    textStyle: { color: textColor }
+                    top: 'middle',
+                    itemGap: 12,
+                    itemWidth: 14,
+                    itemHeight: 14,
+                    textStyle: { 
+                        color: textColor,
+                        fontSize: 12,
+                        rich: {
+                            name: {
+                                width: 140,
+                                overflow: 'truncate',
+                                ellipsis: '...'
+                            },
+                            value: {
+                                width: 60,
+                                align: 'right',
+                                color: isDark ? '#9CA3AF' : '#6B7280',
+                                fontWeight: 600
+                            },
+                            percent: {
+                                width: 50,
+                                align: 'right',
+                                color: isDark ? '#6B7280' : '#9CA3AF',
+                                fontSize: 11
+                            }
+                        }
+                    },
+                    formatter: (name) => {
+                        const item = dataWithPercent.find(d => d.name === name);
+                        if (!item) return name;
+                        const displayName = name.length > 16 ? name.substring(0, 16) + '...' : name;
+                        return `{name|${displayName}} {value|${formatNumber(item.value)}} {percent|${item.percent}%}`;
+                    }
                 },
                 series: [{
                     name: '消息数',
                     type: 'pie',
-                    radius: ['40%', '70%'],
-                    avoidLabelOverlap: false,
+                    radius: ['45%', '75%'],
+                    center: ['60%', '50%'],
+                    avoidLabelOverlap: true,
                     itemStyle: {
-                        borderRadius: 10,
-                        borderColor: isDark ? '#1F2937' : '#FFFFFF',
-                        borderWidth: 2
+                        borderRadius: 8,
+                        borderWidth: 0,
+                        shadowBlur: 10,
+                        shadowColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     label: {
-                        show: false,
-                        position: 'center'
-                    },
-                    emphasis: {
-                        label: {
-                            show: true,
-                            fontSize: '16',
-                            fontWeight: 'bold'
+                        show: true,
+                        position: 'outside',
+                        formatter: (params) => {
+                            if (params.percent < 3) return ''; // 小于3%的不显示标签
+                            const name = params.name.length > 8 ? params.name.substring(0, 8) + '...' : params.name;
+                            // 使用内联样式设置颜色
+                            return `{name|${name}}\n{value|${formatNumber(params.value)}}\n{percent|${params.percent}%}`;
+                        },
+                        rich: {
+                            name: {
+                                fontSize: 11,
+                                color: textColor,
+                                fontWeight: 500,
+                                lineHeight: 16
+                            },
+                            value: {
+                                fontSize: 12,
+                                color: isDark ? '#9CA3AF' : '#6B7280',
+                                fontWeight: 600,
+                                lineHeight: 16
+                            },
+                            percent: {
+                                fontSize: 10,
+                                color: isDark ? '#6B7280' : '#9CA3AF',
+                                lineHeight: 16
+                            }
                         }
                     },
                     labelLine: {
-                        show: false
+                        show: true,
+                        length: 15,
+                        length2: 10,
+                        lineStyle: {
+                            color: isDark ? '#4B5563' : '#D1D5DB',
+                            width: 1
+                        }
                     },
-                    data: data
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 20,
+                            shadowOffsetX: 0,
+                            shadowOffsetY: 0,
+                            shadowColor: 'rgba(0, 0, 0, 0.3)'
+                        },
+                        label: {
+                            fontSize: 13,
+                            fontWeight: 600
+                        }
+                    },
+                    data: dataWithPercent
+                }, {
+                    // 中心总计显示
+                    name: '总计',
+                    type: 'pie',
+                    radius: ['0%', '35%'],
+                    center: ['60%', '50%'],
+                    itemStyle: {
+                        color: 'transparent'
+                    },
+                    label: {
+                        show: true,
+                        position: 'center',
+                        formatter: () => {
+                            return `{total|总计}\n{value|${formatNumber(total)}}\n{count|${data.length}个群组}`;
+                        },
+                        rich: {
+                            total: {
+                                fontSize: 14,
+                                color: isDark ? '#9CA3AF' : '#6B7280',
+                                fontWeight: 500,
+                                lineHeight: 20
+                            },
+                            value: {
+                                fontSize: 20,
+                                color: textColor,
+                                fontWeight: 700,
+                                lineHeight: 28
+                            },
+                            count: {
+                                fontSize: 12,
+                                color: isDark ? '#6B7280' : '#9CA3AF',
+                                lineHeight: 18
+                            }
+                        }
+                    },
+                    data: [{ value: total, name: '' }]
                 }]
             });
         }
         
-        // 更新用户消息分布图（柱状图）
-        if (this.userMessageChart) {
-            // 使用真实数据
-            const ranges = ['0-100', '101-500', '501-1000', '1001-5000', '5000+'];
-            const counts = this.admin.overview.userMessageDistribution || [0, 0, 0, 0, 0];
+        // 更新消息密度散点图
+        if (this.messageDensityChart) {
+            const allGroupStats = this.admin.overview.allGroupStats || [];
             
-            this.userMessageChart.setOption({
+            // 准备散点图数据：X轴=用户数，Y轴=消息数，气泡大小=平均消息/用户
+            const scatterData = allGroupStats.map(group => {
+                const avgMessagesPerUser = group.user_count > 0 
+                    ? Math.round(group.message_count / group.user_count) 
+                    : 0;
+                return {
+                    value: [group.user_count, group.message_count, avgMessagesPerUser],
+                    name: group.group_name || `群组 ${group.group_id}`,
+                    groupId: group.group_id,
+                    userCount: group.user_count,
+                    messageCount: group.message_count,
+                    avgMessagesPerUser: avgMessagesPerUser
+                };
+            });
+            
+            // 计算气泡大小范围
+            const maxAvg = Math.max(...scatterData.map(item => item.avgMessagesPerUser), 1);
+            
+            this.messageDensityChart.setOption({
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 tooltip: {
-                    trigger: 'axis',
+                    trigger: 'item',
+                    formatter: (params) => {
+                        const data = params.data;
+                        return `
+                            <div style="font-weight: 600; margin-bottom: 4px;">${data.name}</div>
+                            <div style="margin: 2px 0;">用户数: <strong>${formatNumber(data.userCount)}</strong></div>
+                            <div style="margin: 2px 0;">消息数: <strong>${formatNumber(data.messageCount)}</strong></div>
+                            <div style="margin: 2px 0;">平均消息/用户: <strong>${formatNumber(data.avgMessagesPerUser)}</strong></div>
+                        `;
+                    },
                     backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                     borderColor: gridColor,
                     textStyle: { color: textColor }
                 },
                 grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    containLabel: true
+                    left: '10%',
+                    right: '8%',
+                    bottom: '10%',
+                    top: '10%',
+                    containLabel: false
                 },
                 xAxis: {
-                    type: 'category',
-                    data: ranges,
+                    type: 'value',
+                    name: '用户数',
+                    nameLocation: 'middle',
+                    nameGap: 30,
+                    nameTextStyle: {
+                        color: textColor,
+                        fontSize: 12
+                    },
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor }
+                    axisLabel: { 
+                        color: textColor,
+                        formatter: (value) => {
+                            if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+                            return value;
+                        }
+                    },
+                    splitLine: { 
+                        lineStyle: { color: gridColor, opacity: 0.1 },
+                        show: true
+                    }
                 },
                 yAxis: {
                     type: 'value',
+                    name: '消息数',
+                    nameLocation: 'middle',
+                    nameGap: 50,
+                    nameTextStyle: {
+                        color: textColor,
+                        fontSize: 12
+                    },
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor },
-                    splitLine: { lineStyle: { color: gridColor, opacity: 0.1 } }
+                    axisLabel: { 
+                        color: textColor,
+                        formatter: (value) => {
+                            if (value >= 10000) return (value / 10000).toFixed(1) + '万';
+                            if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+                            return value;
+                        }
+                    },
+                    splitLine: { 
+                        lineStyle: { color: gridColor, opacity: 0.1 },
+                        show: true
+                    }
                 },
                 series: [{
-                    name: '用户数',
-                    type: 'bar',
-                    data: counts,
+                    name: '群组',
+                    type: 'scatter',
+                    data: scatterData,
+                    symbolSize: (data) => {
+                        // 气泡大小根据平均消息/用户计算（20-60px）
+                        const size = 20 + (data[2] / maxAvg) * 40;
+                        return Math.max(20, Math.min(60, size));
+                    },
                     itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: '#4A90E2' },
-                            { offset: 1, color: '#357ABD' }
-                        ])
+                        color: (params) => {
+                            // 根据平均消息/用户设置颜色
+                            const avg = params.data.avgMessagesPerUser;
+                            const ratio = avg / maxAvg;
+                            if (ratio >= 0.7) return '#EF4444'; // 红色：高活跃度
+                            if (ratio >= 0.4) return '#F59E0B'; // 橙色：中等活跃度
+                            if (ratio >= 0.2) return '#10B981'; // 绿色：正常活跃度
+                            return '#4A90E2'; // 蓝色：低活跃度
+                        },
+                        opacity: 0.7,
+                        borderColor: isDark ? '#1F2937' : '#FFFFFF',
+                        borderWidth: 1
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            opacity: 1,
+                            borderWidth: 2,
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(0, 0, 0, 0.3)'
+                        },
+                        scale: true
+                    },
+                    label: {
+                        show: false
                     }
                 }]
             });
         }
         
-        // 更新新增用户趋势图
-        if (this.newUserTrendChart) {
-            // 使用 dailyStats 的日期
-            const dailyStats = this.admin.overview.dailyStats || [];
-            const dates = dailyStats.length > 0
-                ? dailyStats.map(item => item.date)
-                : Array.from({ length: 7 }, (_, i) => {
-                    const date = new Date();
-                    date.setDate(date.getDate() - (6 - i));
-                    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
-                });
+        // 更新群组增长趋势图
+        if (this.groupGrowthChart) {
+            const groupGrowthStats = this.admin.overview.groupGrowthStats || [];
+            const dates = groupGrowthStats.map(item => item.date);
+            const counts = groupGrowthStats.map(item => item.count);
             
-            // 使用真实数据
-            const newUsers = this.admin.overview.dailyNewUsers || Array(7).fill(0);
+            // 计算最大值，用于Y轴范围
+            const maxCount = Math.max(...counts, 1);
             
-            this.newUserTrendChart.setOption({
+            this.groupGrowthChart.setOption({
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 tooltip: {
                     trigger: 'axis',
+                    axisPointer: { type: 'line' },
                     backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
                     borderColor: gridColor,
-                    textStyle: { color: textColor }
+                    textStyle: { color: textColor },
+                    formatter: (params) => {
+                        const param = params[0];
+                        return `${param.axisValue}<br/>新增群组: <strong>${formatNumber(param.value)}</strong>`;
+                    }
                 },
                 grid: {
                     left: '3%',
                     right: '4%',
                     bottom: '3%',
+                    top: '10%',
                     containLabel: true
                 },
                 xAxis: {
                     type: 'category',
                     data: dates,
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor }
+                    axisLabel: { 
+                        color: textColor,
+                        fontSize: 11
+                    },
+                    boundaryGap: false
                 },
                 yAxis: {
                     type: 'value',
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor },
-                    splitLine: { lineStyle: { color: gridColor, opacity: 0.1 } }
+                    axisLabel: { 
+                        color: textColor,
+                        formatter: (value) => {
+                            return value;
+                        }
+                    },
+                    splitLine: { 
+                        lineStyle: { color: gridColor, opacity: 0.1 },
+                        show: true
+                    },
+                    minInterval: 1
                 },
                 series: [{
-                    name: '新增用户',
-                    type: 'bar',
-                    data: newUsers,
-                    itemStyle: { color: '#10B981' }
+                    name: '新增群组',
+                    type: 'line',
+                    data: counts,
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    lineStyle: {
+                        color: '#F59E0B',
+                        width: 2
+                    },
+                    itemStyle: {
+                        color: '#F59E0B',
+                        borderColor: isDark ? '#1F2937' : '#FFFFFF',
+                        borderWidth: 2
+                    },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
+                            { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+                        ])
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(245, 158, 11, 0.5)',
+                            scale: true
+                        }
+                    }
                 }]
             });
         }

@@ -390,6 +390,16 @@ class API {
         return this.request(`/api/admin/overview?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
     }
     
+    /**
+     * 获取词云数据
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @returns {Promise} 词云数据
+     */
+    async getWordCloud(userId, secretKey) {
+        return this.request(`/api/admin/wordcloud?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
+    }
+    
     // ========== 验证码API ==========
     
     /**

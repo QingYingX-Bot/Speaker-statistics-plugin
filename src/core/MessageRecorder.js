@@ -21,7 +21,8 @@ class MessageRecorder {
         this.isProcessingAchievements = false; // 是否正在处理成就检查（严格的单例锁）
         this.processingPromise = null; // 正在处理的 Promise（用于确保真正的单例）
         this.processedLogTimes = new Set(); // 已处理的日志时间戳集合（用于去重，包括消息统计和成就解锁）
-        this.recentMessageTexts = new Map(); // 最新消息文本缓存
+        this.recentMessageTexts = new Map(); // 最新消息文本缓存（1分钟内，用于成就检查）
+        this.historicalMessageTexts = []; // 历史消息文本列表（24小时内，用于词云分析）
         this.processedMessages = new Set(); // 已处理的消息ID集合（用于去重）
         this.recordMessageLock = false; // 记录消息的锁（防止并发处理）
         this.messageQueue = []; // 消息队列（用于处理并发情况下的消息）
@@ -271,26 +272,51 @@ class MessageRecorder {
     }
 
     /**
-     * 保存最新消息文本（用于成就检查）
+     * 保存最新消息文本（用于成就检查和词云分析）
      * @param {string} groupId 群号
      * @param {string} userId 用户ID
      * @param {string} text 消息文本
      */
     saveRecentMessageText(groupId, userId, text) {
         const key = `recent_text_${groupId}_${userId}`;
-        // 可以存储在内存或数据库中，这里简化处理
-        // 实际使用时可以从数据库读取用户数据的最新消息字段
-        if (this.recentMessageTexts) {
-            this.recentMessageTexts.set(key, {
-                text: text,
-                timestamp: Date.now()
-            });
-        } else {
+        const now = Date.now();
+        
+        // 确保 recentMessageTexts 存在
+        if (!this.recentMessageTexts) {
             this.recentMessageTexts = new Map();
-            this.recentMessageTexts.set(key, {
-                text: text,
-                timestamp: Date.now()
-            });
+        }
+        
+        // 保存最新消息（用于成就检查，只保留1分钟）
+        this.recentMessageTexts.set(key, {
+            text: text,
+            timestamp: now
+        });
+        
+        // 同时保存到历史消息列表（用于词云分析，保留24小时）
+        if (!this.historicalMessageTexts) {
+            this.historicalMessageTexts = [];
+        }
+        
+        // 添加新消息到历史列表
+        this.historicalMessageTexts.push({
+            text: text,
+            timestamp: now,
+            groupId: groupId,
+            userId: userId
+        });
+        
+        // 清理24小时前的消息（保持内存占用合理）
+        const oneDayAgo = now - 24 * 60 * 60 * 1000;
+        this.historicalMessageTexts = this.historicalMessageTexts.filter(
+            msg => msg.timestamp >= oneDayAgo
+        );
+        
+        // 限制历史消息数量（最多保留10000条，防止内存溢出）
+        if (this.historicalMessageTexts.length > 10000) {
+            // 保留最新的10000条
+            this.historicalMessageTexts = this.historicalMessageTexts
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, 10000);
         }
     }
 
@@ -310,6 +336,24 @@ class MessageRecorder {
             }
         }
         return '';
+    }
+    
+    /**
+     * 获取历史消息文本（用于词云分析）
+     * @param {number} hours 获取最近多少小时的消息（默认24小时）
+     * @returns {Array<string>} 消息文本数组
+     */
+    getHistoricalMessageTexts(hours = 24) {
+        if (!this.historicalMessageTexts || this.historicalMessageTexts.length === 0) {
+            return [];
+        }
+        
+        const now = Date.now();
+        const timeLimit = now - hours * 60 * 60 * 1000;
+        
+        return this.historicalMessageTexts
+            .filter(msg => msg.timestamp >= timeLimit && msg.text && msg.text.trim().length > 0)
+            .map(msg => msg.text.trim());
     }
 
     /**

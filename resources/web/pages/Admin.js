@@ -130,18 +130,20 @@ export default class Admin {
                                     <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">数据概览</h2>
                                     </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-                                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-lg transition-all duration-200">
-                                        <div class="flex items-center justify-between mb-3">
-                                            <p class="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">总群数</p>
-                                            <div class="w-10 h-10 bg-blue-500/20 dark:bg-blue-500/30 rounded-lg flex items-center justify-center">
-                                                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <!-- 总群数 -->
+                                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-4 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-xs font-medium text-blue-600 dark:text-blue-400">总群数</p>
+                                            <div class="w-8 h-8 bg-blue-500/20 dark:bg-blue-500/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                         </svg>
                                     </div>
                                 </div>
-                                        <p id="totalGroups" class="text-3xl font-bold text-blue-900 dark:text-blue-100">-</p>
+                                        <p id="totalGroups" class="text-2xl font-bold text-blue-900 dark:text-blue-100">-</p>
                             </div>
                             
+                                    <!-- 总用户数 -->
                                     <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-4 border border-green-200 dark:border-green-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-green-600 dark:text-green-400">总用户数</p>
@@ -154,6 +156,7 @@ export default class Admin {
                                         <p id="totalUsers" class="text-2xl font-bold text-green-900 dark:text-green-100">-</p>
                             </div>
                             
+                                    <!-- 总消息数 -->
                                     <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-4 border border-purple-200 dark:border-purple-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-purple-600 dark:text-purple-400">总消息数</p>
@@ -166,6 +169,7 @@ export default class Admin {
                                         <p id="totalMessages" class="text-2xl font-bold text-purple-900 dark:text-purple-100">-</p>
                             </div>
                                     
+                                    <!-- 今日消息 -->
                                     <div class="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-xl p-4 border border-orange-200 dark:border-orange-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-orange-600 dark:text-orange-400">今日消息</p>
@@ -178,6 +182,7 @@ export default class Admin {
                                         <p id="todayMessages" class="text-2xl font-bold text-orange-900 dark:text-orange-100">-</p>
                         </div>
 
+                                    <!-- 活跃群数 -->
                                     <div class="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/30 dark:to-pink-800/30 rounded-xl p-4 border border-pink-200 dark:border-pink-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-pink-600 dark:text-pink-400">活跃群数</p>
@@ -190,6 +195,7 @@ export default class Admin {
                                         <p id="activeGroups" class="text-2xl font-bold text-pink-900 dark:text-pink-100">-</p>
                             </div>
 
+                                    <!-- 今日新增用户 -->
                                     <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/30 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-indigo-600 dark:text-indigo-400">今日新增用户</p>
@@ -202,6 +208,7 @@ export default class Admin {
                                         <p id="todayNewUsers" class="text-2xl font-bold text-indigo-900 dark:text-indigo-100">-</p>
                                 </div>
 
+                                    <!-- 平均消息/群 -->
                                     <div class="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/30 rounded-xl p-4 border border-teal-200 dark:border-teal-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-teal-600 dark:text-teal-400">平均消息/群</p>
@@ -214,6 +221,7 @@ export default class Admin {
                                         <p id="avgMessagesPerGroup" class="text-2xl font-bold text-teal-900 dark:text-teal-100">-</p>
                                         </div>
                                         
+                                    <!-- 平均消息/用户 -->
                                     <div class="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/30 dark:to-cyan-800/30 rounded-xl p-4 border border-cyan-200 dark:border-cyan-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div class="flex items-center justify-between mb-2">
                                             <p class="text-xs font-medium text-cyan-600 dark:text-cyan-400">平均消息/用户</p>
@@ -229,36 +237,74 @@ export default class Admin {
                                                 </div>
                                                 
                             <!-- 图表区域 -->
-                                                    <div class="mb-6">
-                                <div class="flex items-center justify-between mb-6">
+                            <div class="space-y-6">
+                                <div class="flex items-center justify-between">
                                     <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">数据图表</h2>
                                                             </div>
+                                
+                                <!-- 第一行图表 -->
                                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                     <!-- 消息趋势图 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">消息趋势（近7天）</h3>
-                                        <div id="messageTrendChart" style="width: 100%; height: 300px;"></div>
-                                                            </div>
+                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">消息趋势（近7天）</h3>
+                                            <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                                                <span>消息数</span>
+                                            </div>
+                                        </div>
+                                        <div id="messageTrendChart" style="width: 100%; height: 360px;"></div>
+                                    </div>
                                     
                                     <!-- 群组活跃度分布 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">群组活跃度分布</h3>
-                                        <div id="groupActivityChart" style="width: 100%; height: 300px;"></div>
-                                                            </div>
+                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">群组活跃度分布</h3>
+                                                <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">Top 10</span>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                                                <span>消息数</span>
+                                            </div>
+                                        </div>
+                                        <div id="groupActivityChart" style="width: 100%; height: 360px;"></div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                <!-- 第二行图表 -->
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <!-- 消息密度散点图 -->
+                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">消息密度分布</h3>
+                                                <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">所有群组</span>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                <div class="w-2 h-2 rounded-full bg-purple-500"></div>
+                                                <span>群组</span>
+                                            </div>
+                                        </div>
+                                        <div id="messageDensityChart" style="width: 100%; height: 360px;"></div>
+                                    </div>
                                     
-                                    <!-- 用户消息分布 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">用户消息分布</h3>
-                                        <div id="userMessageChart" style="width: 100%; height: 300px;"></div>
-                                                            </div>
-                                    
-                                    <!-- 每日新增用户趋势 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">每日新增用户（近7天）</h3>
-                                        <div id="newUserTrendChart" style="width: 100%; height: 300px;"></div>
+                                    <!-- 群组增长趋势 -->
+                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-all duration-300">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">群组增长趋势</h3>
+                                                <span class="px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full">近7天</span>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+                                                <span>新增群组</span>
+                                            </div>
+                                        </div>
+                                        <div id="groupGrowthChart" style="width: 100%; height: 360px;"></div>
                                     </div>
                                 </div>
-                                                            </div>
+                            </div>
                                                         </div>
                                                     </div>
                                                     
