@@ -14,54 +14,54 @@ export default class Admin {
     
     async render() {
         return `
-            <div class="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+            <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
                 <div class="max-w-7xl mx-auto">
                     <!-- 页面标题 -->
                     <div class="mb-6 sm:mb-8">
-                        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">⚙️ 管理面板</h1>
-                        <p class="text-sm sm:text-base text-gray-600">管理员专用功能</p>
+                        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">⚙️ 管理面板</h1>
+                        <p class="text-sm sm:text-base text-gray-600 dark:text-gray-400">管理员专用功能</p>
                     </div>
 
                     <!-- 管理内容 -->
                     <div id="adminContent">
                         <!-- 统计概览 -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm text-gray-600 mb-1">总群数</p>
-                                        <p id="totalGroups" class="text-2xl sm:text-3xl font-bold text-gray-900">-</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">总群数</p>
+                                        <p id="totalGroups" class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">-</p>
                                     </div>
-                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                         </svg>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm text-gray-600 mb-1">总用户数</p>
-                                        <p id="totalUsers" class="text-2xl sm:text-3xl font-bold text-gray-900">-</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">总用户数</p>
+                                        <p id="totalUsers" class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">-</p>
                                     </div>
-                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                                         </svg>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-sm text-gray-600 mb-1">总消息数</p>
-                                        <p id="totalMessages" class="text-2xl sm:text-3xl font-bold text-gray-900">-</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">总消息数</p>
+                                        <p id="totalMessages" class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">-</p>
                                     </div>
-                                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                                         </svg>
                                     </div>
@@ -70,8 +70,8 @@ export default class Admin {
                         </div>
 
                         <!-- 标签页导航 -->
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-                            <div class="border-b border-gray-200">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                            <div class="border-b border-gray-200 dark:border-gray-700">
                                 <nav class="flex -mb-px">
                                     <button 
                                         id="tabOverview" 
@@ -81,13 +81,13 @@ export default class Admin {
                                     </button>
                                     <button 
                                         id="tabGroups" 
-                                        class="tab-btn px-4 sm:px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300"
+                                        class="tab-btn px-4 sm:px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                                     >
                                         群管理
                                     </button>
                                     <button 
                                         id="tabUsers" 
-                                        class="tab-btn px-4 sm:px-6 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300"
+                                        class="tab-btn px-4 sm:px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600"
                                     >
                                         用户管理
                                     </button>
@@ -412,25 +412,25 @@ export default class Admin {
         return new Promise((resolve) => {
             window.Modal.show('管理员身份验证', `
                 <div class="space-y-4">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <div class="flex items-start gap-3">
-                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-blue-800 mb-2">需要管理员权限</p>
-                                <p class="text-xs text-blue-700">请输入您的管理员秘钥以访问管理功能</p>
+                                <p class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">需要管理员权限</p>
+                                <p class="text-xs text-blue-700 dark:text-blue-400">请输入您的管理员秘钥以访问管理功能</p>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">管理员秘钥</label>
-                        <input type="password" id="adminSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入管理员秘钥">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">管理员秘钥</label>
+                        <input type="password" id="adminSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入管理员秘钥">
                     </div>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmAdminBtn">确认验证</button>
-                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
+                <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
             `);
             
             setTimeout(() => {
@@ -588,8 +588,6 @@ export default class Admin {
             const response = await api.getAdminOverview(this.app.userId, this.secretKey);
             if (response.success && response.data) {
                 this.overview = response.data;
-                console.log('概览数据:', this.overview);
-                console.log('热门群聊数据:', this.overview.topGroups);
                 this.updateOverview();
             }
         } catch (error) {
@@ -612,7 +610,7 @@ export default class Admin {
         
         if (topGroupsListEl && this.overview.topGroups) {
             if (this.overview.topGroups.length === 0) {
-                topGroupsListEl.innerHTML = '<p class="text-gray-500 text-center py-8">暂无数据</p>';
+                topGroupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">暂无数据</p>';
             } else {
                 topGroupsListEl.innerHTML = this.overview.topGroups.map((group, index) => `
                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -655,7 +653,7 @@ export default class Admin {
         if (!groupsListEl) return;
         
         if (this.groups.length === 0) {
-            groupsListEl.innerHTML = '<p class="text-gray-500 text-center py-8">暂无群聊</p>';
+            groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">暂无群聊</p>';
             return;
         }
         
@@ -764,7 +762,6 @@ export default class Admin {
         
         try {
             const response = await api.getRanking('total', groupId, { limit: 10, page: 1 });
-            console.debug('群排名数据:', response);
             
             if (response.success && response.data) {
                 this.groupRanking = response.data;
@@ -773,14 +770,14 @@ export default class Admin {
                 console.warn('获取群排名失败:', response);
                 const rankingListEl = document.getElementById('groupRankingList');
                 if (rankingListEl) {
-                    rankingListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无排名数据</p>';
+                    rankingListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">暂无排名数据</p>';
                 }
             }
         } catch (error) {
             console.error('加载群排名失败:', error);
             const rankingListEl = document.getElementById('groupRankingList');
             if (rankingListEl) {
-                rankingListEl.innerHTML = '<p class="text-gray-500 text-center py-4">加载失败</p>';
+                rankingListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">加载失败</p>';
             }
         }
     }
@@ -790,7 +787,7 @@ export default class Admin {
         if (!rankingListEl || !this.groupRanking) return;
         
         if (this.groupRanking.length === 0) {
-            rankingListEl.innerHTML = '<p class="text-gray-500 text-center py-4">暂无排名数据</p>';
+            rankingListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">暂无排名数据</p>';
             return;
         }
         
@@ -846,7 +843,7 @@ export default class Admin {
         
         if (usersListEl) {
             if (this.users.length === 0) {
-                usersListEl.innerHTML = '<p class="text-gray-500 text-center py-8">暂无用户</p>';
+                usersListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">暂无用户</p>';
             } else {
                 usersListEl.innerHTML = this.users.map(user => {
                     const isSelected = this.selectedUserId === user.userId;
@@ -922,19 +919,12 @@ export default class Admin {
                 const groupsWithStats = await Promise.all(groups.map(async (group) => {
                     try {
                         const statsResponse = await api.getUserStats(userId, group.group_id);
-                        console.debug(`群 ${group.group_id} 统计数据:`, statsResponse);
                         
                         if (statsResponse.success && statsResponse.data) {
                             const stats = statsResponse.data;
                             // 确保数据字段正确映射 - 检查所有可能的字段名
                             const totalCount = stats.total_count || stats.count || stats.message_count || stats.total || 0;
                             const totalWords = stats.total_words || stats.period_words || stats.word_count || stats.total_number_of_words || 0;
-                            
-                            console.debug(`群 ${group.group_id} 解析后的数据:`, {
-                                total_count: totalCount,
-                                total_words: totalWords,
-                                rank: stats.rank
-                            });
                             
                             return {
                                 ...group,
@@ -1106,7 +1096,7 @@ export default class Admin {
                 if (groupsCountEl) {
                     groupsCountEl.textContent = '';
                 }
-                groupsListEl.innerHTML = '<p class="text-gray-500 text-center py-8">该用户不在任何群中</p>';
+                groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-8">该用户不在任何群中</p>';
             }
         }
     }
@@ -1143,11 +1133,11 @@ export default class Admin {
         const confirmed = await new Promise((resolve) => {
             window.Modal.show('确认修改权限', `
                 <div class="space-y-3">
-                    <p class="text-gray-700">确定要将用户 <strong class="text-primary">${userName}</strong> 的权限修改为 <strong class="text-primary">${roleText}</strong> 吗？</p>
+                    <p class="text-gray-700 dark:text-gray-300">确定要将用户 <strong class="text-primary">${userName}</strong> 的权限修改为 <strong class="text-primary">${roleText}</strong> 吗？</p>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-medium" id="confirmUpdateRoleBtn">确认修改</button>
-                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium" onclick="Modal.hide()">取消</button>
+                <button class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium" onclick="Modal.hide()">取消</button>
             `);
             
             setTimeout(() => {
@@ -1202,12 +1192,12 @@ export default class Admin {
         const confirmed = await new Promise((resolve) => {
             window.Modal.show('确认清除', `
                 <div class="space-y-3">
-                    <p class="text-gray-700">确定要清除用户 <strong class="text-red-600">${userName}</strong> 的所有统计数据吗？</p>
-                    <p class="text-sm text-red-600 font-medium">⚠️ 此操作不可恢复！</p>
+                    <p class="text-gray-700 dark:text-gray-300">确定要清除用户 <strong class="text-red-600 dark:text-red-400">${userName}</strong> 的所有统计数据吗？</p>
+                    <p class="text-sm text-red-600 dark:text-red-400 font-medium">⚠️ 此操作不可恢复！</p>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium" id="confirmClearUserBtn">确认清除</button>
-                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium" onclick="Modal.hide()">取消</button>
+                <button class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium" onclick="Modal.hide()">取消</button>
             `);
             
             setTimeout(() => {
@@ -1259,14 +1249,14 @@ export default class Admin {
         const confirmed = await new Promise((resolve) => {
             window.Modal.show('确认清除', `
                 <div class="space-y-3">
-                    <p class="text-gray-700">确定要清除群 <strong class="text-red-600">${groupName}</strong> 的所有统计数据吗？</p>
-                    <p class="text-sm text-red-600 font-medium">⚠️ 此操作不可恢复！</p>
+                    <p class="text-gray-700 dark:text-gray-300">确定要清除群 <strong class="text-red-600 dark:text-red-400">${groupName}</strong> 的所有统计数据吗？</p>
+                    <p class="text-sm text-red-600 dark:text-red-400 font-medium">⚠️ 此操作不可恢复！</p>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium" id="confirmClearBtn">
                     确认清除
                 </button>
-                <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium" onclick="window.Modal.hide()">
+                <button class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium" onclick="window.Modal.hide()">
                     取消
                 </button>
             `);

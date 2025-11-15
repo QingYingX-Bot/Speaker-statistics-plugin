@@ -23,10 +23,31 @@
     --transition: all 0.3s ease;
 }
 
+/* 深色模式变量 */
+.dark {
+    --primary-color: #5BA3F5;
+    --primary-hover: #4A90E2;
+    --secondary-color: #1f2937;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --border-color: #374151;
+    --bg-white: #111827;
+    --bg-gray: #1f2937;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
 /* 全局滚动条美化 - 统一管理，只显示一个滚动条 */
 html {
-    overflow-y: scroll; /* 强制显示滚动条（常驻） */
+    height: 100%;
+    overflow: hidden;
     scroll-behavior: smooth;
+}
+
+/* 全局滚动条深色模式适配 */
+.dark html {
+    scrollbar-color: #4b5563 #1f2937;
 }
 
 body {
@@ -34,59 +55,101 @@ body {
     background: var(--bg-gray);
     color: var(--text-primary);
     line-height: 1.6;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    height: 100%;
     margin: 0;
     padding: 0;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 
-/* 美化滚动条 - 只美化body的滚动条（避免重复） */
-/* Webkit浏览器 (Chrome, Safari, Edge) */
-body::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+/* 自定义下拉框样式 */
+.custom-select-wrapper {
+    position: relative;
 }
 
-body::-webkit-scrollbar-track {
-    background: #f5f5f5;
-    border-radius: 5px;
-    border: 1px solid #e0e0e0;
+.custom-select-button {
+    user-select: none;
 }
 
-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #b8b8b8 0%, #a0a0a0 100%);
-    border-radius: 5px;
-    border: 1px solid #909090;
-    transition: background 0.2s ease;
-}
-
-body::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #a8a8a8 0%, #909090 100%);
-}
-
-body::-webkit-scrollbar-thumb:active {
-    background: linear-gradient(180deg, #909090 0%, #787878 100%);
-}
-
-/* Firefox */
-body {
+.custom-select-dropdown {
+    /* Firefox 滚动条 */
     scrollbar-width: thin;
-    scrollbar-color: #a0a0a0 #f5f5f5;
+    scrollbar-color: #9ca3af #f3f4f6;
 }
 
-/* 隐藏html的滚动条，只显示body的 */
-html::-webkit-scrollbar {
-    width: 0;
-    display: none;
+.dark .custom-select-dropdown {
+    scrollbar-color: #6b7280 #374151;
 }
 
-/* 美化下拉选择框 */
+/* Webkit 浏览器滚动条美化 */
+.custom-select-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 4px;
+    margin: 4px 0;
+}
+
+.dark .custom-select-dropdown::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.dark .custom-select-dropdown::-webkit-scrollbar-thumb {
+    background: #6b7280;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+    background-clip: padding-box;
+}
+
+.dark .custom-select-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+    background-clip: padding-box;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-thumb:active {
+    background: #4b5563;
+    background-clip: padding-box;
+}
+
+.dark .custom-select-dropdown::-webkit-scrollbar-thumb:active {
+    background: #d1d5db;
+    background-clip: padding-box;
+}
+
+.custom-select-option {
+    user-select: none;
+}
+
+/* 保留原 select-custom 样式以兼容性 */
 .select-custom {
     background-image: none;
     padding-right: 2.5rem;
     transition: all 0.2s ease;
+    /* 立即隐藏，避免闪烁 - 但保持布局空间 */
+    visibility: hidden;
+    position: absolute;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    opacity: 0;
 }
 
 .select-custom::-ms-expand {
@@ -95,7 +158,6 @@ html::-webkit-scrollbar {
 
 .select-custom:focus {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
-    transform: translateY(-1px);
 }
 
 .select-custom:active {
@@ -113,7 +175,6 @@ html::-webkit-scrollbar {
     background-color: #f3f4f6;
 }
 
-/* 移除选中项的特殊背景，让浏览器使用默认样式 */
 .select-custom option:checked,
 .select-custom option[selected] {
     background-color: white;
@@ -121,26 +182,14 @@ html::-webkit-scrollbar {
     font-weight: 500;
 }
 
-/* 下拉菜单打开时焦点项的样式 */
 .select-custom option:focus {
     background-color: #f3f4f6;
     color: #1f2937;
 }
 
-/* IE/Edge 特殊处理 */
 .select-custom::-ms-value {
     background-color: transparent;
     color: inherit;
-}
-
-/* 其他内部元素的滚动条美化 */
-.page-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.page-content::-webkit-scrollbar-track {
-    background: #f8f8f8;
-    border-radius: 4px;
 }
 
 /* 自定义滚动条样式 - 用于群聊列表等 */
@@ -155,6 +204,11 @@ html::-webkit-scrollbar {
     margin: 4px 0;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+    border-color: #374151;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, #4A90E2 0%, #357ABD 50%, #2E6DA4 100%);
     border-radius: 10px;
@@ -163,14 +217,29 @@ html::-webkit-scrollbar {
     transition: all 0.3s ease;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #5BA3F5 0%, #4A90E2 50%, #357ABD 100%);
+    border-color: #1f2937;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #357ABD 0%, #2E6DA4 50%, #1e4d7a 100%);
     box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.2);
     transform: scaleX(1.1);
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #4A90E2 0%, #357ABD 50%, #2E6DA4 100%);
+    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:active {
     background: linear-gradient(180deg, #2E6DA4 0%, #1e4d7a 50%, #0d2d4a 100%);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #357ABD 0%, #2E6DA4 50%, #1e4d7a 100%);
 }
 
 /* Firefox 自定义滚动条 */
@@ -179,13 +248,39 @@ html::-webkit-scrollbar {
     scrollbar-color: #4A90E2 #f8f9fa;
 }
 
+.dark .custom-scrollbar {
+    scrollbar-color: #5BA3F5 #1f2937;
+}
+
+/* 页面内容滚动条样式 */
+.page-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.page-content::-webkit-scrollbar-track {
+    background: #f8f8f8;
+    border-radius: 4px;
+}
+
+.dark .page-content::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
 .page-content::-webkit-scrollbar-thumb {
     background: #c0c0c0;
     border-radius: 4px;
 }
 
+.dark .page-content::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
 .page-content::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
+}
+
+.dark .page-content::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
 }
 
 .page-content {
@@ -193,30 +288,59 @@ html::-webkit-scrollbar {
     scrollbar-color: #c0c0c0 #f8f8f8;
 }
 
-/* 成就页面内容区域 - 移除滚动条，使用页面滚动 */
-.achievement-content-scroll {
-    overflow: visible;
+.dark .page-content {
+    scrollbar-color: #4b5563 #1f2937;
 }
 
-/* 背景设置页面 - Fabric.js 画布样式优化 */
-#canvasWrapper .canvas-container {
-    position: relative !important;
-    display: inline-block !important;
-    margin: 0 auto !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+/* 全局 overflow 滚动条样式 - 用于所有使用 overflow-x-auto 和 overflow-y-auto 的元素 */
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
 }
 
-#canvasWrapper .upper-canvas {
-    background: transparent !important;
+.overflow-x-auto::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 4px;
 }
 
-#canvasWrapper canvas {
-    display: block !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 8px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+.dark .overflow-x-auto::-webkit-scrollbar-track,
+.dark .overflow-y-auto::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 4px;
+}
+
+.dark .overflow-x-auto::-webkit-scrollbar-thumb,
+.dark .overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.dark .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Firefox 滚动条 */
+.overflow-x-auto,
+.overflow-y-auto {
+    scrollbar-width: thin;
+    scrollbar-color: #c0c0c0 #f5f5f5;
+}
+
+.dark .overflow-x-auto,
+.dark .overflow-y-auto {
+    scrollbar-color: #4b5563 #1f2937;
 }
 
 /* 导航栏 */
@@ -224,10 +348,13 @@ html::-webkit-scrollbar {
     background: var(--bg-white);
     border-bottom: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 1000;
     padding: 0 20px;
+    height: 64px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
 }
 
 .navbar-container {
@@ -308,29 +435,32 @@ html::-webkit-scrollbar {
     background: var(--bg-gray);
 }
 
-/* 主内容区 - 现代简约风格 */
+/* 主内容区 - 完全重写布局 */
 .main-content {
-    padding: 0;
-    height: calc(100vh - 64px);
-    background: transparent;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-gray);
 }
 
 .page-container {
-    max-width: 100%;
-    margin: 0;
-    height: 100%;
-    overflow: hidden; /* 防止出现滚动条 */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .page-content {
-    background: transparent;
-    border-radius: 0;
-    padding: 0;
-    box-shadow: none;
-    height: 100%;
-    overflow-y: scroll; /* 强制显示滚动条（常驻） */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     overflow-x: hidden;
+    background: var(--bg-gray);
+    -webkit-overflow-scrolling: touch;
 }
 
 .page-header {
@@ -429,6 +559,10 @@ html::-webkit-scrollbar {
     transition: opacity 0.2s ease-in-out;
 }
 
+.dark #modalOverlay {
+    background: rgba(0, 0, 0, 0.6);
+}
+
 #modalOverlay[style*="display: flex"] {
     opacity: 1;
 }
@@ -443,6 +577,12 @@ html::-webkit-scrollbar {
     max-height: 90vh;
     overflow: hidden;
     position: relative;
+    transition: background-color 0.3s ease;
+}
+
+.dark #modalOverlay > div {
+    background: #1f2937;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
 
 /* 模态框滚动条美化 */
@@ -455,18 +595,34 @@ html::-webkit-scrollbar {
     border-radius: 3px;
 }
 
+.dark #modalOverlay #modalBody::-webkit-scrollbar-track {
+    background: #374151;
+}
+
 #modalOverlay #modalBody::-webkit-scrollbar-thumb {
     background: #c0c0c0;
     border-radius: 3px;
+}
+
+.dark #modalOverlay #modalBody::-webkit-scrollbar-thumb {
+    background: #6b7280;
 }
 
 #modalOverlay #modalBody::-webkit-scrollbar-thumb:hover {
     background: #a0a0a0;
 }
 
+.dark #modalOverlay #modalBody::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
 #modalOverlay #modalBody {
     scrollbar-width: thin;
     scrollbar-color: #c0c0c0 #f5f5f5;
+}
+
+.dark #modalOverlay #modalBody {
+    scrollbar-color: #6b7280 #374151;
 }
 
 /* 移动端菜单样式优化 */
@@ -530,6 +686,45 @@ html::-webkit-scrollbar {
     .overflow-x-auto {
         -webkit-overflow-scrolling: touch;
     }
+    
+    /* 移动端滚动条适配 */
+    .overflow-x-auto::-webkit-scrollbar,
+    .overflow-y-auto::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar-track,
+    .overflow-y-auto::-webkit-scrollbar-track {
+        background: #f5f5f5;
+        border-radius: 3px;
+    }
+    
+    .dark .overflow-x-auto::-webkit-scrollbar-track,
+    .dark .overflow-y-auto::-webkit-scrollbar-track {
+        background: #1f2937;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar-thumb,
+    .overflow-y-auto::-webkit-scrollbar-thumb {
+        background: #c0c0c0;
+        border-radius: 3px;
+    }
+    
+    .dark .overflow-x-auto::-webkit-scrollbar-thumb,
+    .dark .overflow-y-auto::-webkit-scrollbar-thumb {
+        background: #4b5563;
+    }
+    
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    
+    .dark .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+    .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+        background: #6b7280;
+    }
 }
 
 @media (max-width: 768px) {
@@ -543,5 +738,64 @@ html::-webkit-scrollbar {
         flex-wrap: wrap;
         width: 100%;
         margin-top: 10px;
+    }
+}
+
+/* Cropper.js 深色模式适配 */
+.dark .cropper-container {
+    background-color: #1f2937;
+}
+
+.dark .cropper-view-box {
+    outline-color: rgba(59, 130, 246, 0.5);
+}
+
+.dark .cropper-face {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.dark .cropper-line {
+    background-color: rgba(59, 130, 246, 0.5);
+}
+
+.dark .cropper-point,
+.dark .cropper-point.point-se,
+.dark .cropper-point.point-sw,
+.dark .cropper-point.point-nw,
+.dark .cropper-point.point-ne,
+.dark .cropper-point.point-e,
+.dark .cropper-point.point-w,
+.dark .cropper-point.point-s,
+.dark .cropper-point.point-n {
+    background-color: #3b82f6;
+}
+
+/* Cropper.js 移动端优化 */
+@media (max-width: 768px) {
+    .cropper-container {
+        touch-action: none;
+    }
+    
+    .cropper-point {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    
+    .cropper-line {
+        width: 2px !important;
+    }
+    
+    .cropper-view-box {
+        outline-width: 2px !important;
+    }
+    
+    /* 移动端增加控制点触摸区域 */
+    .cropper-point::before {
+        content: '';
+        position: absolute;
+        top: -8px;
+        left: -8px;
+        right: -8px;
+        bottom: -8px;
     }
 }

@@ -7,6 +7,7 @@ class App {
         this.userId = null;
         this.secretKey = null;
         this.currentGroupId = null;
+        this.isAdmin = false; // 用户权限状态
     }
     
     async init() {
@@ -17,16 +18,12 @@ class App {
         let fromToken = false;
         try {
             // 使用 Promise.race 设置超时，避免长时间等待
+            // 如果本地存储有 userId，传递给 API
             const response = await Promise.race([
-                api.getCurrentUser(),
+                api.getCurrentUser(this.userId), // 传递本地存储的 userId
                 new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
             ]).catch(err => {
                 // 超时或失败时，使用本地存储的userId
-                if (err.message === 'timeout') {
-                    console.debug('获取用户信息超时，使用本地存储');
-                } else {
-                    console.debug('从API获取用户信息失败，使用本地存储:', err);
-                }
                 return null;
             });
             
@@ -45,7 +42,7 @@ class App {
                 }
             }
         } catch (error) {
-            console.debug('从API获取用户信息失败，使用本地存储:', error);
+            // 静默失败，使用本地存储
         }
         
         if (!this.userId) {
@@ -60,18 +57,17 @@ class App {
         // 初始化路由（不等待用户信息更新，提升加载速度）
         this.initRoutes();
         
-        // 并行执行：更新UI和检查秘钥
+        // 并行执行：更新UI、检查权限和检查秘钥
         Promise.all([
-            this.updateUserInfo().catch(err => {
-                console.debug('更新用户信息失败:', err);
-            }),
-            this.checkAndPromptSecretKey(fromToken).catch(err => {
-                console.debug('检查秘钥失败:', err);
-            })
+            this.checkUserPermission().catch(() => {}),
+            this.checkAndPromptSecretKey(fromToken).catch(() => {})
         ]).then(() => {
             // 启动路由（在所有初始化完成后）
             router.init();
         });
+        
+        // updateUserInfo 单独执行，避免重复调用 getCurrentUser
+        this.updateUserInfo().catch(() => {});
     }
     
     /**
@@ -81,7 +77,6 @@ class App {
     async checkAndPromptSecretKey(fromToken = false) {
         // 防止重复调用
         if (this._checkingSecretKey) {
-            console.log('正在检查秘钥，跳过重复调用');
             return;
         }
         
@@ -109,10 +104,29 @@ class App {
             // 先检查秘钥是否存在
             const hasSecretKey = await SecretKeyManager.checkExists(this.userId);
             if (!hasSecretKey) {
-                console.log('秘钥不存在，弹出设置窗口');
                 await SecretKeyManager.prompt(this.userId);
                 this._checkingSecretKey = false;
                 return;
+            }
+            
+            // 检查是否刚刚更新了秘钥（1分钟内跳过验证，因为服务器可能需要时间同步）
+            const updateTimestamp = sessionStorage.getItem(`secret_key_updated_${this.userId}`);
+            if (updateTimestamp) {
+                const updateTime = parseInt(updateTimestamp, 10);
+                const now = Date.now();
+                const timeDiff = now - updateTime;
+                const oneMinute = 1 * 60 * 1000; // 1分钟
+                
+                if (timeDiff < oneMinute) {
+                    // 1分钟内，跳过验证（避免服务器同步延迟导致的误报）
+                    // 清除验证状态，确保使用新秘钥
+                    sessionStorage.removeItem(`achievement_verified_${this.userId}`);
+                    this._checkingSecretKey = false;
+                    return;
+                } else {
+                    // 超过1分钟，清除标记，正常验证
+                    sessionStorage.removeItem(`secret_key_updated_${this.userId}`);
+                }
             }
             
             // 如果存在，验证本地秘钥是否与服务器匹配
@@ -120,9 +134,17 @@ class App {
             const validation = await SecretKeyManager.validateLocalKey(this.userId, userName);
             
             if (!validation.matched) {
-                console.log('本地秘钥与服务器不匹配，要求用户修改');
                 // 显示警告并要求修改秘钥
+                // 注意：用户修改完成后，showKeyMismatchWarning 会调用 SecretKeyManager.save 更新本地存储
+                // 并在内部设置 secret_key_updated 时间戳
                 await this.showKeyMismatchWarning(validation.message, userName);
+            } else {
+                // 验证成功，清除更新标记（如果存在），因为已经验证成功，不需要再跳过验证
+                if (updateTimestamp) {
+                    sessionStorage.removeItem(`secret_key_updated_${this.userId}`);
+                }
+                // 清除验证状态，确保后续使用正确的秘钥
+                sessionStorage.removeItem(`achievement_verified_${this.userId}`);
             }
         } catch (error) {
             console.error('检查秘钥存在性失败:', error);
@@ -287,33 +309,33 @@ class App {
             // 第一步：输入正确秘钥验证
             window.Modal.show('秘钥不匹配', `
                 <div class="space-y-4">
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                         <div class="flex items-start gap-3">
-                            <svg class="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-yellow-800 mb-2">提示</p>
-                                <p class="text-xs text-yellow-700 whitespace-pre-line mb-3">${displayMessage}</p>
-                                <div class="mt-3 pt-3 border-t border-yellow-200">
-                                    <p class="text-xs text-yellow-600 mb-1">当前用户ID:</p>
-                                    <p class="text-xl font-bold text-yellow-800">${this.userId}</p>
+                                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-2">提示</p>
+                                <p class="text-xs text-yellow-700 dark:text-yellow-400 whitespace-pre-line mb-3">${displayMessage}</p>
+                                <div class="mt-3 pt-3 border-t border-yellow-200 dark:border-yellow-800">
+                                    <p class="text-xs text-yellow-600 dark:text-yellow-500 mb-1">当前用户ID:</p>
+                                    <p class="text-xl font-bold text-yellow-800 dark:text-yellow-300">${this.userId}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">请输入正确的秘钥</label>
-                        <input type="password" id="correctSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入正确的秘钥">
-                        <div class="mt-2 text-xs text-gray-500">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">请输入正确的秘钥</label>
+                        <input type="password" id="correctSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入正确的秘钥">
+                        <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             如果输入正确，将自动保存；如果输入错误，将要求重新设置
                         </div>
                     </div>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="verifyCorrectKeyBtn">验证秘钥</button>
-                <button class="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium border border-orange-300" id="notMyAccountBtn">这不是我账号</button>
-                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
+                <button class="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors text-sm font-medium border border-orange-300 dark:border-orange-800" id="notMyAccountBtn">这不是我账号</button>
+                <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
             `);
             
             setTimeout(() => {
@@ -363,10 +385,16 @@ class App {
                             if (response.success && response.data?.valid) {
                                 // 验证成功，保存秘钥
                                 Toast.show(response.message || '秘钥验证成功', 'success');
+                                
                                 await SecretKeyManager.save(this.userId, secretKey);
                                 
-                                // 清除 sessionStorage 中的验证状态，以便下次使用新秘钥验证
+                                // 清除所有相关的 sessionStorage 验证状态
                                 sessionStorage.removeItem(`achievement_verified_${this.userId}`);
+                                sessionStorage.removeItem(`token_verified_${this.userId}`);
+                                
+                                // 标记秘钥已更新（使用时间戳），避免立即重新验证（服务器可能需要一点时间同步）
+                                const updateTimestamp = Date.now();
+                                sessionStorage.setItem(`secret_key_updated_${this.userId}`, updateTimestamp.toString());
                                 
                                 window.Modal.hide();
                                 Toast.show('秘钥已更新', 'success');
@@ -420,41 +448,41 @@ class App {
         return new Promise((resolve) => {
             window.Modal.show('重新设置秘钥', `
                 <div class="space-y-4">
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                         <div class="flex items-start gap-3">
-                            <svg class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-red-600 dark:text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-red-800 mb-2">需要重新设置</p>
-                                <p class="text-xs text-red-700 mb-3">秘钥验证失败，请通过验证码重新设置秘钥</p>
-                                <div class="mt-3 pt-3 border-t border-red-200">
-                                    <p class="text-xs text-red-600 mb-1">当前用户ID:</p>
-                                    <p class="text-xl font-bold text-red-800">${this.userId}</p>
+                                <p class="text-sm font-medium text-red-800 dark:text-red-300 mb-2">需要重新设置</p>
+                                <p class="text-xs text-red-700 dark:text-red-400 mb-3">秘钥验证失败，请通过验证码重新设置秘钥</p>
+                                <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                                    <p class="text-xs text-red-600 dark:text-red-500 mb-1">当前用户ID:</p>
+                                    <p class="text-xl font-bold text-red-800 dark:text-red-300">${this.userId}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">验证码</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                         <div class="flex gap-2">
-                            <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入6位验证码" maxlength="6">
-                            <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
+                            <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入6位验证码" maxlength="6">
+                            <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
                         </div>
-                        <div class="mt-1 text-xs text-gray-500" id="codeHint">验证码将发送到您的QQ</div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400" id="codeHint">验证码将发送到您的QQ</div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">新秘钥</label>
-                        <input type="password" id="secretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入新秘钥">
-                        <div class="mt-2 text-xs text-gray-500">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">新秘钥</label>
+                        <input type="password" id="secretKeyInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入新秘钥">
+                        <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             秘钥用于验证您的身份，请妥善保管
                         </div>
                     </div>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmUpdateBtn">确认修改</button>
-                <button class="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium border border-orange-300" id="notMyAccountBtn">这不是我账号</button>
-                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
+                <button class="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors text-sm font-medium border border-orange-300 dark:border-orange-800" id="notMyAccountBtn">这不是我账号</button>
+                <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
             `);
             
             setTimeout(() => {
@@ -506,7 +534,7 @@ class App {
                             sendCodeBtn.disabled = false;
                             sendCodeBtn.textContent = '发送验证码';
                             codeHint.textContent = '验证码将发送到您的QQ';
-                            codeHint.className = 'mt-1 text-xs text-gray-500';
+                            codeHint.className = 'mt-1 text-xs text-gray-500 dark:text-gray-400';
                         }
                     }, 1000);
                 };
@@ -520,7 +548,7 @@ class App {
                         
                         Toast.show('验证码已发送，请查看QQ消息', 'success');
                         codeHint.textContent = '验证码已发送，请查看QQ消息（有效期1分钟）';
-                        codeHint.className = 'mt-1 text-xs text-green-600';
+                        codeHint.className = 'mt-1 text-xs text-green-600 dark:text-green-400';
                         
                         startCountdown();
                     } catch (error) {
@@ -561,6 +589,14 @@ class App {
                             
                             await SecretKeyManager.save(this.userId, key);
                             
+                            // 清除所有相关的 sessionStorage 验证状态
+                            sessionStorage.removeItem(`achievement_verified_${this.userId}`);
+                            sessionStorage.removeItem(`token_verified_${this.userId}`);
+                            
+                            // 标记秘钥已更新（使用时间戳），避免立即重新验证（服务器可能需要一点时间同步）
+                            const updateTimestamp = Date.now();
+                            sessionStorage.setItem(`secret_key_updated_${this.userId}`, updateTimestamp.toString());
+                            
                             // 清理定时器
                             if (countdownTimer) {
                                 clearInterval(countdownTimer);
@@ -599,38 +635,38 @@ class App {
     showUserIdInput() {
         const content = document.getElementById('pageContent');
         content.innerHTML = `
-            <div class="bg-white min-h-full" style="min-height: calc(100vh - 56px);">
+            <div class="bg-white dark:bg-gray-900 min-h-full" style="min-height: calc(100vh - 56px);">
                 <div class="max-w-2xl mx-auto px-3 sm:px-4 lg:px-8 py-8 sm:py-12 lg:py-16">
                     <!-- 页面标题 -->
                     <div class="mb-6 sm:mb-8 text-center">
-                        <h1 class="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 mb-2">请输入用户ID</h1>
-                        <p class="text-xs sm:text-sm text-gray-500">请输入您的QQ号以继续使用</p>
-                    </div>
+                        <h1 class="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-gray-100 mb-2">请输入用户ID</h1>
+                        <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">请输入您的QQ号以继续使用</p>
+                </div>
                     
                     <!-- 输入表单卡片 -->
-                    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 sm:p-6 lg:p-8">
                         <div class="space-y-4 sm:space-y-6">
                             <div>
-                                <label for="userIdInput" class="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                                <label for="userIdInput" class="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     用户ID
                                 </label>
                                 <input 
                                     type="text" 
                                     id="userIdInput" 
-                                    class="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm sm:text-base text-gray-900 placeholder-gray-400" 
+                                    class="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm sm:text-base text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-700 placeholder-gray-400 dark:placeholder-gray-500" 
                                     placeholder="请输入您的QQ号"
                                     autocomplete="off"
                                     autofocus
                                 >
-                                <p class="mt-2 text-xs text-gray-500">
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                     用户ID用于识别您的身份，请确保输入正确
                                 </p>
-                            </div>
+                    </div>
                             
                             <div class="pt-2">
                                 <button 
                                     id="confirmUserIdBtn" 
-                                    class="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm sm:text-base font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                    class="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm sm:text-base font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                                 >
                                     确认
                                 </button>
@@ -700,6 +736,50 @@ class App {
         }, 100);
     }
     
+    /**
+     * 检查用户权限（管理员）
+     */
+    async checkUserPermission() {
+        if (!this.userId) {
+            this.isAdmin = false;
+            return;
+        }
+        
+        try {
+            const response = await api.getCurrentUser(this.userId);
+            
+            if (response && response.success && response.data) {
+                this.isAdmin = response.data.isAdmin === true;
+                // 更新导航栏显示
+                this.updateAdminLinkVisibility();
+            } else {
+                this.isAdmin = false;
+            }
+        } catch (error) {
+            this.isAdmin = false;
+        }
+    }
+    
+    /**
+     * 更新管理链接的显示/隐藏状态
+     */
+    updateAdminLinkVisibility() {
+        const adminLink = document.getElementById('adminLink');
+        const mobileAdminLink = document.getElementById('mobileAdminLink');
+        
+        if (adminLink) {
+            adminLink.style.display = this.isAdmin ? 'block' : 'none';
+        }
+        
+        if (mobileAdminLink) {
+            if (this.isAdmin) {
+                mobileAdminLink.classList.remove('hidden');
+            } else {
+                mobileAdminLink.classList.add('hidden');
+            }
+        }
+    }
+    
     // 更新用户信息显示
     async updateUserInfo() {
         const userIdEl = document.getElementById('userId');
@@ -718,7 +798,8 @@ class App {
         
         // 从API获取用户信息（包括权限）
         try {
-            const response = await api.getCurrentUser();
+            const response = await api.getCurrentUser(this.userId);
+            
             if (response && response.success) {
                 // 更新用户名
                 if (response.data && response.data.userName) {
@@ -726,23 +807,18 @@ class App {
                 }
                 
                 // 检查并显示/隐藏管理链接
-                const isAdmin = response.data && response.data.isAdmin === true;
-                if (adminLink) {
-                    adminLink.style.display = isAdmin ? 'block' : 'none';
-                }
-                if (mobileAdminLink) {
-                    if (isAdmin) {
-                        mobileAdminLink.classList.remove('hidden');
-                    } else {
-                        mobileAdminLink.classList.add('hidden');
-                    }
-                }
+                this.isAdmin = response.data && response.data.isAdmin === true;
+                // 使用统一的方法更新管理链接显示
+                this.updateAdminLinkVisibility();
+            } else {
+                // 隐藏管理链接（如果获取失败，默认不显示）
+                this.isAdmin = false;
+                this.updateAdminLinkVisibility();
             }
         } catch (error) {
-            console.debug('获取用户信息失败:', error);
             // 隐藏管理链接（如果获取失败，默认不显示）
-            if (adminLink) adminLink.style.display = 'none';
-            if (mobileAdminLink) mobileAdminLink.classList.add('hidden');
+            this.isAdmin = false;
+            this.updateAdminLinkVisibility();
         }
         
         // 尝试从localStorage获取用户名（作为后备）
@@ -762,9 +838,9 @@ class App {
                         localStorage.setItem(`userName_${this.userId}`, userName);
                     }
                 }
-            } catch (error) {
-                console.debug('获取用户名失败，使用用户ID:', error);
-            }
+                } catch (error) {
+                    // 静默失败，使用用户ID
+                }
         }
         
         // 更新桌面端和移动端显示
@@ -810,9 +886,28 @@ class App {
             this.loadPage('Background');
         });
         
-        // 管理页面
+        // 管理页面（需要权限检查）
         router.register('/admin', () => {
-            this.loadPage('Admin');
+            // 检查权限
+            if (!this.isAdmin) {
+                // 重新检查权限（可能权限状态未更新）
+                this.checkUserPermission().then(() => {
+                    if (!this.isAdmin) {
+                        // 无权限，显示提示并跳转到首页
+                        Toast.show('您没有管理员权限，无法访问管理页面', 'error', 3000);
+                        router.navigate('/');
+                        return;
+                    }
+                    // 有权限，加载管理页面
+                    this.loadPage('Admin');
+                }).catch(() => {
+                    router.navigate('/');
+                    Toast.show('权限检查失败，请重试', 'error');
+                });
+            } else {
+                // 有权限，直接加载
+                this.loadPage('Admin');
+            }
         });
         
         // 设置页面
@@ -824,6 +919,20 @@ class App {
     // 加载页面
     async loadPage(pageName) {
         try {
+            // 如果是管理页面，再次检查权限
+            if (pageName === 'Admin') {
+                // 如果权限状态未知，先检查权限
+                if (this.isAdmin === undefined || this.isAdmin === null) {
+                    await this.checkUserPermission();
+                }
+                
+                if (!this.isAdmin) {
+                    Toast.show('您没有管理员权限，无法访问管理页面', 'error', 3000);
+                    router.navigate('/');
+                    return;
+                }
+            }
+            
             const content = document.getElementById('pageContent');
             
             // 显示加载状态（仅在首次加载或切换页面时）
@@ -834,12 +943,11 @@ class App {
             
             // 并行执行：更新用户信息和加载页面组件
             const [_, pageModule] = await Promise.all([
-                // 每次加载页面时更新用户信息（包括权限），确保权限变化能及时反映
-                this.updateUserInfo().catch(err => {
-                    console.debug('更新用户信息失败:', err);
+            // 每次加载页面时更新用户信息（包括权限），确保权限变化能及时反映
+                this.updateUserInfo().catch(() => {
                     // 不影响页面加载
                 }),
-                // 动态加载页面组件
+            // 动态加载页面组件
                 import(`/pages/${pageName}.js`)
             ]);
             
@@ -851,12 +959,18 @@ class App {
                 requestAnimationFrame(() => {
                     if (content) {
                         content.innerHTML = html;
-                        if (page.mounted) {
+                if (page.mounted) {
                             // 延迟执行 mounted，确保 DOM 已更新
-                            requestAnimationFrame(() => {
-                                page.mounted();
+                            requestAnimationFrame(async () => {
+                    await page.mounted();
+                    // 初始化自定义下拉框
+                    if (window.initCustomSelects) {
+                        setTimeout(() => {
+                            window.initCustomSelects();
+                        }, 100);
+                    }
                             });
-                        }
+                }
                     }
                 });
             }
@@ -864,7 +978,7 @@ class App {
             console.error(`加载页面 ${pageName} 失败:`, error);
             const content = document.getElementById('pageContent');
             if (content) {
-                content.innerHTML = `
+            content.innerHTML = `
                     <div class="bg-white min-h-full flex items-center justify-center">
                         <div class="text-center px-4">
                             <div class="text-4xl mb-4">❌</div>
@@ -874,8 +988,8 @@ class App {
                                 刷新页面
                             </button>
                         </div>
-                    </div>
-                `;
+                </div>
+            `;
             }
         }
     }
@@ -898,7 +1012,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('visibilitychange', async () => {
         if (!document.hidden && app.userId) {
             // 页面重新可见时，更新用户信息以检测权限变化
-            console.debug('页面重新可见，更新用户信息');
             await app.updateUserInfo();
         }
     });
@@ -906,7 +1019,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 监听窗口焦点变化，当窗口重新获得焦点时更新用户信息
     window.addEventListener('focus', async () => {
         if (app.userId) {
-            console.debug('窗口重新获得焦点，更新用户信息');
             await app.updateUserInfo();
         }
     });
@@ -960,6 +1072,90 @@ document.addEventListener('DOMContentLoaded', async () => {
                 toggleMenu(false);
             }
         });
+    }
+    
+    // 主题切换功能
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const favicon = document.getElementById('favicon');
+    
+    // 初始化主题
+    const initTheme = () => {
+        // 检查本地存储的主题设置
+        const savedTheme = localStorage.getItem('theme');
+        
+        // 如果没有保存的主题，自动跟随系统偏好
+        if (!savedTheme) {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) {
+                document.documentElement.classList.add('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-dark.ico';
+                }
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-light.ico';
+                }
+            }
+        } else {
+            // 如果有保存的主题，使用保存的主题
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-dark.ico';
+                }
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-light.ico';
+                }
+            }
+        }
+    };
+    
+    // 切换主题
+    const toggleTheme = () => {
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        if (isDark) {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+            if (favicon) {
+                favicon.href = '/assets/favicon-light.ico';
+            }
+        } else {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+            if (favicon) {
+                favicon.href = '/assets/favicon-dark.ico';
+            }
+        }
+    };
+    
+    // 监听系统主题变化
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // 只有在用户没有手动设置主题时才跟随系统
+        if (!localStorage.getItem('theme')) {
+            if (e.matches) {
+                document.documentElement.classList.add('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-dark.ico';
+                }
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (favicon) {
+                    favicon.href = '/assets/favicon-light.ico';
+                }
+            }
+        }
+    });
+    
+    // 初始化主题
+    initTheme();
+    
+    // 绑定主题切换按钮
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', toggleTheme);
     }
     
     // 初始化应用（app 已在上面创建）

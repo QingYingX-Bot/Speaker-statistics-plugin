@@ -11,6 +11,10 @@ import { AchievementUtils } from './utils/AchievementUtils.js';
  * 负责成就的定义、检查、解锁和管理（使用数据库存储）
  */
 class AchievementService {
+    // 静态变量：全局监听状态，确保所有实例共享
+    static watchingStarted = false;
+    static achievementWatchers = new Map();
+    
     constructor(dataService) {
         this.dataService = dataService;
         this.dbService = getDatabaseService();
@@ -29,8 +33,7 @@ class AchievementService {
         this.rarities = null;
         this.definitionsLoaded = false;
 
-        // 文件监听相关
-        this.achievementWatchers = new Map();
+        // 文件监听相关（使用静态变量）
         this.reloadTimeout = null;
         this.startWatchingAchievements();
     }
@@ -151,28 +154,34 @@ class AchievementService {
      * 开始监听成就配置文件变化
      */
     startWatchingAchievements() {
+        // 如果已经启动过监听（使用静态变量，所有实例共享），不再重复启动
+        if (AchievementService.watchingStarted) {
+            return;
+        }
+        
         try {
             // 监听系统默认成就文件（config/achievements.json）
             const defaultAchievementsPath = path.join(this.configDir, 'achievements.json');
-            if (fs.existsSync(defaultAchievementsPath)) {
+            if (fs.existsSync(defaultAchievementsPath) && !AchievementService.achievementWatchers.has(defaultAchievementsPath)) {
                 const watcher = fs.watch(defaultAchievementsPath, (eventType) => {
                     if (eventType === 'change') {
                         this.handleAchievementFileChange();
                     }
                 });
-                this.achievementWatchers.set(defaultAchievementsPath, watcher);
+                AchievementService.achievementWatchers.set(defaultAchievementsPath, watcher);
             }
 
             // 监听用户自定义成就目录（data/achievements/）
-            if (fs.existsSync(this.achievementsDir)) {
+            if (fs.existsSync(this.achievementsDir) && !AchievementService.achievementWatchers.has(this.achievementsDir)) {
                 const watcher = fs.watch(this.achievementsDir, { recursive: true }, (eventType, filename) => {
                     if (eventType === 'change' && filename && filename.endsWith('.json')) {
                         this.handleAchievementFileChange();
                     }
                 });
-                this.achievementWatchers.set(this.achievementsDir, watcher);
+                AchievementService.achievementWatchers.set(this.achievementsDir, watcher);
             }
 
+            AchievementService.watchingStarted = true;
             if (globalConfig.getConfig('global.debugLog')) {
                 globalConfig.debug('已启动成就配置文件监听');
             }
@@ -201,14 +210,15 @@ class AchievementService {
      * 停止监听成就配置文件
      */
     stopWatchingAchievements() {
-        for (const [path, watcher] of this.achievementWatchers) {
+        for (const [path, watcher] of AchievementService.achievementWatchers) {
             try {
                 watcher.close();
             } catch (error) {
                 globalConfig.error(`关闭成就文件监听失败 (${path}):`, error);
             }
         }
-        this.achievementWatchers.clear();
+        AchievementService.achievementWatchers.clear();
+        AchievementService.watchingStarted = false;
         if (this.reloadTimeout) {
             clearTimeout(this.reloadTimeout);
         }
@@ -304,14 +314,63 @@ class AchievementService {
             let displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
             
             // 如果没有显示成就，自动选择史诗级及以上成就（按稀有度降序，24小时时限）
+            // 注意：只选择未过期的成就（解锁时间+24小时）
             if (!displayAchievement) {
+                const now = TimeUtils.getUTC8Date();
                 // 使用 achievements 对象而不是 allAchievements 数组，以确保包含全局成就（特殊成就或节日成就）
                 const epicOrHigher = Object.entries(achievements)
                     .filter(([achievementId, achievementData]) => {
                         if (!achievementData.unlocked) return false;
                         const definition = allDefinitions[achievementId];
                         if (!definition) return false;
-                        return AchievementUtils.isRarityOrHigher(definition.rarity, 'epic');
+                        if (!AchievementUtils.isRarityOrHigher(definition.rarity, 'epic')) return false;
+                        
+                        // 检查成就是否过期（解锁时间+24小时）
+                        const unlockedAt = achievementData.unlocked_at;
+                        if (!unlockedAt) return false;
+                        
+                        // 解析解锁时间
+                        let unlockedAtDate;
+                        if (unlockedAt instanceof Date) {
+                            unlockedAtDate = unlockedAt;
+                        } else if (typeof unlockedAt === 'string') {
+                            if (unlockedAt.includes('T')) {
+                                // ISO 8601 格式
+                                unlockedAtDate = new Date(unlockedAt);
+                                if (unlockedAt.endsWith('Z')) {
+                                    const utc8Offset = 8 * 60 * 60 * 1000;
+                                    unlockedAtDate = new Date(unlockedAtDate.getTime() + utc8Offset);
+                                }
+                            } else {
+                                // 普通格式：YYYY-MM-DD HH:mm:ss
+                                const [datePart, timePart] = unlockedAt.split(' ');
+                                if (datePart && timePart) {
+                                    const [year, month, day] = datePart.split('-').map(Number);
+                                    const [hour, minute, second] = timePart.split(':').map(Number);
+                                    const utc8Offset = 8 * 60 * 60 * 1000;
+                                    const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                                    unlockedAtDate = new Date(utcTimestamp - utc8Offset);
+                                } else {
+                                    return false;
+                                }
+                            }
+                        } else {
+                            return false;
+                        }
+                        
+                        if (!unlockedAtDate || isNaN(unlockedAtDate.getTime())) {
+                            return false;
+                        }
+                        
+                        // 计算卸下时间：解锁时间 + 24小时
+                        const removeAt = new Date(unlockedAtDate.getTime() + 24 * 60 * 60 * 1000);
+                        
+                        // 如果当前时间 >= 卸下时间，说明已过期，不自动佩戴
+                        if (now.getTime() >= removeAt.getTime()) {
+                            return false;
+                        }
+                        
+                        return true;
                     })
                     .map(([achievementId, achievementData]) => ({
                         achievement_id: achievementId,
@@ -330,20 +389,23 @@ class AchievementService {
                 if (epicOrHigher.length > 0) {
                     const topAchievement = epicOrHigher[0];
                     const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id];
+                    // 使用解锁时间作为 auto_display_at（24小时从解锁时间开始计算）
+                    const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTimeForDB();
+                    
                     displayAchievement = {
                         achievement_id: topAchievement.achievement_id,
                         achievement_name: definition?.name || topAchievement.achievement_id,
                         rarity: definition?.rarity || 'common',
                         is_manual: false,
-                        auto_display_at: TimeUtils.formatDateTimeForDB()
+                        auto_display_at: unlockedAt
                     };
-                    // 自动设置为显示成就（24小时时限）
+                    // 自动设置为显示成就（24小时时限，从解锁时间开始计算）
                     await this.dbService.setDisplayAchievement(groupId, userId, {
                         id: topAchievement.achievement_id,
                         name: definition?.name || topAchievement.achievement_id,
                         rarity: definition?.rarity || 'common',
                         isManual: false,
-                        autoDisplayAt: TimeUtils.formatDateTimeForDB()
+                        autoDisplayAt: unlockedAt  // 使用解锁时间，而不是当前时间
                     });
                 }
             }
@@ -793,15 +855,30 @@ class AchievementService {
 
     /**
      * 设置用户显示成就
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @param {string} achievementName 成就名称
+     * @param {string} rarity 稀有度
+     * @param {boolean} isManual 是否手动设置（默认true）
+     * @param {string|null} autoDisplayAt 自动佩戴时间（UTC+8时区字符串，格式：YYYY-MM-DD HH:mm:ss）。如果为null且isManual=false，使用当前时间
+     * @returns {Promise<boolean>}
      */
-    async setDisplayAchievement(groupId, userId, achievementId, achievementName, rarity, isManual = true) {
+    async setDisplayAchievement(groupId, userId, achievementId, achievementName, rarity, isManual = true, autoDisplayAt = null) {
         try {
+            // 如果是自动佩戴且未提供autoDisplayAt，使用当前时间
+            // 如果提供了autoDisplayAt，使用提供的值（通常是解锁时间）
+            let displayAt = autoDisplayAt;
+            if (!isManual && !displayAt) {
+                displayAt = TimeUtils.formatDateTimeForDB();
+            }
+            
             await this.dbService.setDisplayAchievement(groupId, userId, {
                 id: achievementId,
                 name: achievementName,
                 rarity: rarity,
                 isManual: isManual,
-                autoDisplayAt: isManual ? null : TimeUtils.formatDateTimeForDB()
+                autoDisplayAt: displayAt
             });
             return true;
         } catch (error) {
@@ -821,13 +898,15 @@ class AchievementService {
             if (!displayAchievement) return;
 
             // 如果是手动设置的，不自动卸下
-            if (displayAchievement.is_manual === true) return;
+            if (displayAchievement.is_manual === true || displayAchievement.is_manual === 1) return;
 
             // 如果没有 auto_display_at 时间，不处理（可能是旧数据）
             if (!displayAchievement.auto_display_at) return;
 
             // 解析 auto_display_at 为 UTC+8 时区的 Date 对象
-            // auto_display_at 可能是字符串（SQLite）或 Date 对象（PostgreSQL）
+            // auto_display_at 存储的是成就解锁时间（UTC+8时区的字符串格式：YYYY-MM-DD HH:mm:ss）
+            // 需要计算：解锁时间 + 24小时 = 卸下时间
+            // 如果当前时间 >= 卸下时间，则自动卸下
             let autoDisplayAt;
             const autoDisplayAtValue = displayAchievement.auto_display_at;
             
@@ -838,48 +917,75 @@ class AchievementService {
                 // 我们需要将其视为 UTC+8 时区的时间
                 // 由于存储时使用的是 UTC+8 时区的字符串，PostgreSQL 会将其解释为服务器时区的时间
                 // 如果服务器时区是 UTC+8，那么 Date 对象的时间戳已经是正确的
-                // 但为了保险起见，我们使用 Date 对象的时间戳，并假设它已经是 UTC+8 时区的时间
+                // 但为了保险起见，我们假设 Date 对象已经是 UTC+8 时区的时间
                 autoDisplayAt = autoDisplayAtValue;
             } else if (typeof autoDisplayAtValue === 'string') {
-                // SQLite 返回的是字符串，需要解析
-                // 格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
-                const [datePart, timePart] = autoDisplayAtValue.split(' ');
-                if (!datePart || !timePart) {
-                    globalConfig.warn(`auto_display_at 格式不正确: ${autoDisplayAtValue}`);
-                    return;
+                // 可能是 ISO 8601 格式（PostgreSQL JSON序列化）或普通格式（SQLite）
+                if (autoDisplayAtValue.includes('T')) {
+                    // ISO 8601 格式：可能是 "2025-11-14T15:52:22.000Z" 或 "2025-11-14T15:52:22"
+                    autoDisplayAt = new Date(autoDisplayAtValue);
+                    if (isNaN(autoDisplayAt.getTime())) {
+                        globalConfig.warn(`auto_display_at ISO 格式解析失败: ${autoDisplayAtValue}`);
+                        return;
+                    }
+                    // 如果带 Z，说明是 UTC 时间，需要加8小时转换为 UTC+8
+                    if (autoDisplayAtValue.endsWith('Z')) {
+                        const utc8Offset = 8 * 60 * 60 * 1000;
+                        autoDisplayAt = new Date(autoDisplayAt.getTime() + utc8Offset);
+                    }
+                } else {
+                    // 普通格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
+                    const [datePart, timePart] = autoDisplayAtValue.split(' ');
+                    if (!datePart || !timePart) {
+                        globalConfig.warn(`auto_display_at 格式不正确: ${autoDisplayAtValue}`);
+                        return;
+                    }
+                    const [year, month, day] = datePart.split('-').map(Number);
+                    const [hour, minute, second] = timePart.split(':').map(Number);
+                    
+                    // 创建 UTC+8 时区的 Date 对象
+                    const utc8Offset = 8 * 60 * 60 * 1000;
+                    const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                    autoDisplayAt = new Date(utcTimestamp - utc8Offset);
                 }
-                const [year, month, day] = datePart.split('-').map(Number);
-                const [hour, minute, second] = timePart.split(':').map(Number);
-                
-                // 创建 UTC+8 时区的 Date 对象
-                // 将 UTC+8 时区的时间转换为 UTC 时间戳
-                const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
-                const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
-                // 减去 UTC+8 偏移量，得到正确的 UTC 时间戳
-                autoDisplayAt = new Date(utcTimestamp - utc8Offset);
             } else {
                 // 未知类型，记录警告并跳过
                 globalConfig.warn(`auto_display_at 类型不正确: ${typeof autoDisplayAtValue}, 值: ${autoDisplayAtValue}`);
                 return;
             }
             
+            // 验证日期是否有效
+            if (!autoDisplayAt || isNaN(autoDisplayAt.getTime())) {
+                globalConfig.warn(`auto_display_at 是无效的日期: ${autoDisplayAtValue}`);
+                return;
+            }
+            
+            // 计算卸下时间：解锁时间（auto_display_at）+ 24小时
+            const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000);
+            
             // 获取当前 UTC+8 时区的时间
             const now = TimeUtils.getUTC8Date();
-            
-            // 计算时间差（毫秒）
-            const diffMs = now.getTime() - autoDisplayAt.getTime();
-            const diffHours = diffMs / (1000 * 60 * 60);
 
-            // 如果超过24小时，自动卸下
-            if (diffHours >= 24) {
-                await this.dbService.run(
+            // 如果当前时间 >= 卸下时间，自动卸下
+            if (now.getTime() >= removeAt.getTime()) {
+                const deleteResult = await this.dbService.run(
                     'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
                     groupId,
                     userId
                 );
-                if (globalConfig.getConfig('global.debugLog')) {
-                    globalConfig.debug(`自动卸下用户 ${userId} 在群 ${groupId} 的自动佩戴成就（已超过24小时）`);
+                
+                // 验证删除是否成功
+                const verifyDeleted = await this.dbService.getDisplayAchievement(groupId, userId);
+                if (verifyDeleted) {
+                    globalConfig.error(`❌ 自动卸下失败: 用户 ${userId} 在群 ${groupId} 的自动佩戴成就仍然存在（解锁时间: ${autoDisplayAtValue}, 卸下时间: ${TimeUtils.formatDateTime(removeAt)}）`);
+                } else {
+                    // 使用 logger 输出重要信息（始终显示）
+                    global.logger.mark(`[发言统计] ✅ 自动卸下用户 ${userId} 在群 ${groupId} 的自动佩戴成就（解锁时间: ${autoDisplayAtValue}, 卸下时间: ${TimeUtils.formatDateTime(removeAt)}, 当前时间: ${TimeUtils.formatDateTime(now)}）`);
                 }
+            } else if (globalConfig.getConfig('global.debugLog')) {
+                const remainingMs = removeAt.getTime() - now.getTime();
+                const remainingHours = remainingMs / (1000 * 60 * 60);
+                globalConfig.debug(`成就未过期: 用户 ${userId} 在群 ${groupId}（解锁时间: ${autoDisplayAtValue}, 剩余时间: ${remainingHours.toFixed(2)}小时）`);
             }
         } catch (error) {
             globalConfig.error('检查自动卸下成就失败:', error);

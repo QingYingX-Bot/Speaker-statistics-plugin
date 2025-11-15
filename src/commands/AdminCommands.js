@@ -51,7 +51,7 @@ class AdminCommands {
      */
     async clearRanking(e) {
         // 验证管理员权限和群消息
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
         if (!CommandWrapper.validateAndReply(e, CommonUtils.validateGroupMessage(e))) return;
 
         return await CommandWrapper.safeExecute(
@@ -70,7 +70,7 @@ class AdminCommands {
      */
     async setDisplayCount(e) {
         // 验证管理员权限
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
 
         return await CommandWrapper.safeExecute(
             async () => {
@@ -98,7 +98,7 @@ class AdminCommands {
      */
     async toggleSetting(e) {
         // 验证管理员权限
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
 
         return await CommandWrapper.safeExecute(
             async () => {
@@ -136,7 +136,7 @@ class AdminCommands {
      */
     async updatePlugin(e) {
         // 验证管理员权限
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
 
         try {
             const isForce = e.msg.includes('强制');
@@ -255,7 +255,7 @@ class AdminCommands {
      */
     async refreshAchievements(e) {
         // 验证管理员权限和群消息
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e))) return;
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
         if (!CommandWrapper.validateAndReply(e, CommonUtils.validateGroupMessage(e))) return;
 
         return await CommandWrapper.safeExecute(
@@ -280,7 +280,8 @@ class AdminCommands {
      * 刷新单个群组的成就
      */
     async refreshSingleGroupAchievements(e, groupId) {
-        await e.reply(`🔄 开始刷新群组 ${groupId} 的成就显示...`);
+        const maskedGroupId = CommonUtils.maskGroupId(groupId);
+        await e.reply(`🔄 开始刷新群组 ${maskedGroupId} 的成就显示...`);
         
         // 获取所有显示中的成就
         const allDisplayAchievements = await this.achievementService.dbService.all(
@@ -289,7 +290,7 @@ class AdminCommands {
         );
         
         if (!allDisplayAchievements || allDisplayAchievements.length === 0) {
-            return e.reply(`✅ 群组 ${groupId} 没有显示中的成就`);
+            return e.reply(`✅ 群组 ${maskedGroupId} 没有显示中的成就`);
         }
         
         const result = await this.processGroupAchievements(groupId, allDisplayAchievements);
@@ -297,7 +298,7 @@ class AdminCommands {
         // 构建合并转发消息
         const forwardMsg = [
             {
-                message: `✅ 群组 ${groupId} 成就刷新完成\n\n📊 统计信息：\n- 已刷新: ${result.refreshedCount} 个\n- 已卸下: ${result.removedCount} 个`
+                message: `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
             }
         ];
         
@@ -342,6 +343,7 @@ class AdminCommands {
         
         let totalRefreshedCount = 0;
         let totalRemovedCount = 0;
+        let totalAutoWornCount = 0;
         const allErrors = [];
         const groupResults = [];
         
@@ -363,24 +365,28 @@ class AdminCommands {
                 
                 totalRefreshedCount += result.refreshedCount;
                 totalRemovedCount += result.removedCount;
-                allErrors.push(...result.errors.map(err => `群 ${groupId}: ${err}`));
+                totalAutoWornCount += result.autoWornCount;
+                const maskedGroupId = CommonUtils.maskGroupId(groupId);
+                allErrors.push(...result.errors.map(err => `群 ${maskedGroupId}: ${err}`));
                 
                 groupResults.push({
                     groupId,
                     refreshedCount: result.refreshedCount,
                     removedCount: result.removedCount,
+                    autoWornCount: result.autoWornCount,
                     errorCount: result.errors.length
                 });
             } catch (error) {
-                globalConfig.error(`刷新群组 ${groupId} 成就失败:`, error);
-                allErrors.push(`群 ${groupId}: ${error.message || '未知错误'}`);
+                const maskedGroupId = CommonUtils.maskGroupId(groupId);
+                globalConfig.error(`刷新群组 ${maskedGroupId} 成就失败:`, error);
+                allErrors.push(`群 ${maskedGroupId}: ${error.message || '未知错误'}`);
             }
         }
         
         // 构建合并转发消息
         const forwardMsg = [
             {
-                message: `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已刷新成就: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个`
+                message: `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
             }
         ];
         
@@ -391,7 +397,8 @@ class AdminCommands {
                 const chunk = groupResults.slice(i, i + chunkSize);
                 let groupDetailMsg = `📋 群组详情 ${Math.floor(i / chunkSize) + 1}：\n`;
                 for (const result of chunk) {
-                    groupDetailMsg += `- 群 ${result.groupId}: 刷新 ${result.refreshedCount} 个, 卸下 ${result.removedCount} 个`;
+                    const maskedGroupId = CommonUtils.maskGroupId(result.groupId);
+                    groupDetailMsg += `- 群 ${maskedGroupId}: 用户 ${result.refreshedCount} 个, 卸下 ${result.removedCount} 个, 自动佩戴 ${result.autoWornCount} 个`;
                     if (result.errorCount > 0) {
                         groupDetailMsg += ` (${result.errorCount} 个错误)`;
                     }
@@ -430,88 +437,259 @@ class AdminCommands {
 
     /**
      * 处理单个群组的成就
+     * 新逻辑：先卸下所有自动佩戴的成就，然后重新检查并自动佩戴符合条件的成就
      */
     async processGroupAchievements(groupId, allDisplayAchievements) {
         // 获取所有成就定义
         const allDefinitions = this.achievementService.getAllAchievementDefinitions(groupId);
         
         let removedCount = 0;
-        let refreshedCount = 0;
+        let autoWornCount = 0;
         const errors = [];
         
-        // 检查每个显示的成就
+        if (globalConfig.getConfig('global.debugLog')) {
+            globalConfig.debug(`开始处理群组 ${groupId} 的成就，共 ${allDisplayAchievements.length} 个`);
+        }
+        
+        // 第一步：先检查并卸下过期的自动佩戴成就，然后卸下所有自动佩戴的成就（保留手动设置的成就）
+        const userIds = new Set();
         for (const displayAchievement of allDisplayAchievements) {
             try {
                 const userId = String(displayAchievement.user_id);
-                const achievementId = displayAchievement.achievement_id;
+                userIds.add(userId);
                 
-                // 1. 检查成就是否存在
-                const definition = allDefinitions[achievementId];
-                if (!definition) {
-                    // 成就不存在，卸下
-                    await this.achievementService.dbService.run(
-                        'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-                        groupId,
-                        userId
-                    );
-                    removedCount++;
-                    if (globalConfig.getConfig('global.debugLog')) {
-                        globalConfig.debug(`卸下不存在的成就: 用户 ${userId}, 成就 ${achievementId}`);
-                    }
-                    continue;
-                }
+                // 检查是否是手动设置的成就
+                // 注意：PostgreSQL 返回的 is_manual 可能是布尔值，SQLite 返回的可能是 0/1
+                const isManual = displayAchievement.is_manual === true || displayAchievement.is_manual === 1;
                 
-                // 2. 检查用户是否解锁了该成就
-                // 先检查当前群的成就
-                const userAchievements = await this.achievementService.dbService.getAllUserAchievements(groupId, userId);
-                let userAchievement = userAchievements.find(a => a.achievement_id === achievementId);
-                
-                // 如果是全局成就（特殊成就或节日成就），需要检查其他群是否已解锁
-                if ((!userAchievement || !userAchievement.unlocked) && AchievementUtils.isGlobalAchievement(definition.rarity)) {
-                    // 检查其他群是否已解锁
-                    const otherGroupAchievement = await this.achievementService.dbService.getAchievementFromAnyGroup(userId, achievementId);
-                    if (otherGroupAchievement && otherGroupAchievement.unlocked) {
-                        // 其他群已解锁，视为已解锁（全局成就）
-                        userAchievement = { unlocked: true };
-                    }
-                }
-                
-                if (!userAchievement || !userAchievement.unlocked) {
-                    // 用户未解锁该成就，卸下
-                    await this.achievementService.dbService.run(
-                        'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-                        groupId,
-                        userId
-                    );
-                    removedCount++;
-                    if (globalConfig.getConfig('global.debugLog')) {
-                        globalConfig.debug(`卸下未解锁的成就: 用户 ${userId}, 成就 ${achievementId}`);
-                    }
-                    continue;
-                }
-                
-                // 3. 检查自动佩戴的成就是否超过24小时
-                if (!displayAchievement.is_manual && displayAchievement.auto_display_at) {
+                if (!isManual) {
+                    // 自动佩戴的成就，先检查是否过期
                     await this.achievementService.checkAndRemoveExpiredAutoDisplay(groupId, userId);
                     
-                    // 检查是否已被卸下
+                    // 检查是否已被卸下（过期卸下）
                     const stillDisplayed = await this.achievementService.dbService.getDisplayAchievement(groupId, userId);
                     if (!stillDisplayed) {
                         removedCount++;
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`卸下过期的自动佩戴成就: 用户 ${userId}, 成就 ${displayAchievement.achievement_id}`);
+                        }
                         continue;
                     }
+                    
+                    // 如果未过期，也直接卸下（后续会重新检查并自动佩戴）
+                    const deleteResult = await this.achievementService.dbService.run(
+                        'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
+                        groupId,
+                        userId
+                    );
+                    
+                    // 验证删除是否成功
+                    const verifyDeleted = await this.achievementService.dbService.getDisplayAchievement(groupId, userId);
+                    if (verifyDeleted) {
+                        globalConfig.error(`删除显示成就失败: 用户 ${userId}, 群 ${groupId}, 成就 ${displayAchievement.achievement_id}`);
+                    } else {
+                        removedCount++;
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`✅ 成功卸下自动佩戴的成就: 用户 ${userId}, 成就 ${displayAchievement.achievement_id}`);
+                        }
+                    }
+                } else {
+                    // 手动设置的成就，检查是否仍然有效
+                    const achievementId = displayAchievement.achievement_id;
+                    
+                    // 1. 检查成就是否存在
+                    const definition = allDefinitions[achievementId];
+                    if (!definition) {
+                        // 成就不存在，卸下
+                        await this.achievementService.dbService.run(
+                            'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
+                            groupId,
+                            userId
+                        );
+                        removedCount++;
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`卸下不存在的成就: 用户 ${userId}, 成就 ${achievementId}`);
+                        }
+                        continue;
+                    }
+                    
+                    // 2. 检查用户是否解锁了该成就
+                    const userAchievements = await this.achievementService.dbService.getAllUserAchievements(groupId, userId);
+                    let userAchievement = userAchievements.find(a => a.achievement_id === achievementId);
+                    
+                    // 如果是全局成就（特殊成就或节日成就），需要检查其他群是否已解锁
+                    if ((!userAchievement || !userAchievement.unlocked) && AchievementUtils.isGlobalAchievement(definition.rarity)) {
+                        const otherGroupAchievement = await this.achievementService.dbService.getAchievementFromAnyGroup(userId, achievementId);
+                        if (otherGroupAchievement && otherGroupAchievement.unlocked) {
+                            userAchievement = { unlocked: true };
+                        }
+                    }
+                    
+                    if (!userAchievement || !userAchievement.unlocked) {
+                        // 用户未解锁该成就，卸下
+                        await this.achievementService.dbService.run(
+                            'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
+                            groupId,
+                            userId
+                        );
+                        removedCount++;
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`卸下未解锁的成就: 用户 ${userId}, 成就 ${achievementId}`);
+                        }
+                    }
                 }
-                
-                refreshedCount++;
             } catch (error) {
-                globalConfig.error(`刷新成就失败: 用户 ${displayAchievement.user_id}, 成就 ${displayAchievement.achievement_id}`, error);
+                globalConfig.error(`检查成就失败: 用户 ${displayAchievement.user_id}, 成就 ${displayAchievement.achievement_id}`, error);
                 errors.push(`用户 ${displayAchievement.user_id}: ${error.message || '未知错误'}`);
             }
         }
         
+        // 第二步：重新检查所有用户，自动佩戴符合条件的成就（史诗及以上，使用解锁时间+24小时）
+        for (const userId of userIds) {
+            try {
+                // 检查用户当前是否有显示成就（手动设置的）
+                const currentDisplay = await this.achievementService.dbService.getDisplayAchievement(groupId, userId);
+                const hasManualDisplay = currentDisplay && (currentDisplay.is_manual === true || currentDisplay.is_manual === 1);
+                
+                // 如果没有手动设置的显示成就，检查是否有史诗及以上成就可以自动佩戴
+                if (!hasManualDisplay) {
+                    // 获取用户的所有成就
+                    const userAchievementsData = await this.achievementService.getUserAchievements(groupId, userId);
+                    const achievements = userAchievementsData.achievements || {};
+                    
+                    // 筛选史诗及以上已解锁的成就，并检查是否过期（解锁时间+24小时）
+                    const now = TimeUtils.getUTC8Date();
+                    const epicOrHigher = Object.entries(achievements)
+                        .filter(([achievementId, achievementData]) => {
+                            if (!achievementData.unlocked) return false;
+                            const definition = allDefinitions[achievementId];
+                            if (!definition) return false;
+                            if (!AchievementUtils.isRarityOrHigher(definition.rarity, 'epic')) return false;
+                            
+                            // 检查成就是否过期（解锁时间+24小时）
+                            const unlockedAt = achievementData.unlocked_at;
+                            if (!unlockedAt) return false;
+                            
+                            // 解析解锁时间
+                            let unlockedAtDate;
+                            if (unlockedAt instanceof Date) {
+                                unlockedAtDate = unlockedAt;
+                            } else if (typeof unlockedAt === 'string') {
+                                if (unlockedAt.includes('T')) {
+                                    // ISO 8601 格式
+                                    unlockedAtDate = new Date(unlockedAt);
+                                    if (unlockedAt.endsWith('Z')) {
+                                        const utc8Offset = 8 * 60 * 60 * 1000;
+                                        unlockedAtDate = new Date(unlockedAtDate.getTime() + utc8Offset);
+                                    }
+                                } else {
+                                    // 普通格式：YYYY-MM-DD HH:mm:ss
+                                    const [datePart, timePart] = unlockedAt.split(' ');
+                                    if (datePart && timePart) {
+                                        const [year, month, day] = datePart.split('-').map(Number);
+                                        const [hour, minute, second] = timePart.split(':').map(Number);
+                                        const utc8Offset = 8 * 60 * 60 * 1000;
+                                        const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                                        unlockedAtDate = new Date(utcTimestamp - utc8Offset);
+                                    } else {
+                                        return false;
+                                    }
+                                }
+                            } else {
+                                return false;
+                            }
+                            
+                            if (!unlockedAtDate || isNaN(unlockedAtDate.getTime())) {
+                                return false;
+                            }
+                            
+                            // 计算卸下时间：解锁时间 + 24小时
+                            const removeAt = new Date(unlockedAtDate.getTime() + 24 * 60 * 60 * 1000);
+                            
+                            // 如果当前时间 >= 卸下时间，说明已过期，不自动佩戴
+                            if (now.getTime() >= removeAt.getTime()) {
+                                if (globalConfig.getConfig('global.debugLog')) {
+                                    globalConfig.debug(`成就已过期，不自动佩戴: 用户 ${userId}, 成就 ${achievementId}, 解锁时间 ${unlockedAt}, 卸下时间 ${TimeUtils.formatDateTime(removeAt)}`);
+                                }
+                                return false;
+                            }
+                            
+                            return true;
+                        })
+                        .map(([achievementId, achievementData]) => ({
+                            achievement_id: achievementId,
+                            unlocked: achievementData.unlocked,
+                            unlocked_at: achievementData.unlocked_at,
+                            definition: allDefinitions[achievementId]
+                        }));
+                    
+                    // 按稀有度和解锁时间排序
+                    if (epicOrHigher.length > 0) {
+                        AchievementUtils.sortUnlockedAchievements(
+                            epicOrHigher,
+                            (item) => item.definition?.rarity || 'common',
+                            (item) => new Date(item.unlocked_at).getTime()
+                        );
+                        
+                        const topAchievement = epicOrHigher[0];
+                        const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id];
+                        const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTimeForDB();
+                        
+                        // 检查是否是全局成就
+                        const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);
+                        
+                        if (isGlobal) {
+                            // 全局成就：在所有群都自动佩戴
+                            const userGroups = await this.achievementService.dbService.getUserGroups(userId);
+                            for (const gId of userGroups) {
+                                // 检查该群是否已有手动设置的成就
+                                const gDisplay = await this.achievementService.dbService.getDisplayAchievement(gId, userId);
+                                const gHasManual = gDisplay && (gDisplay.is_manual === true || gDisplay.is_manual === 1);
+                                
+                                if (!gHasManual) {
+                                    await this.achievementService.setDisplayAchievement(
+                                        gId,
+                                        userId,
+                                        topAchievement.achievement_id,
+                                        definition?.name || topAchievement.achievement_id,
+                                        definition?.rarity || 'common',
+                                        false,  // isManual = false，自动佩戴
+                                        unlockedAt  // 使用解锁时间作为 auto_display_at
+                                    );
+                                    autoWornCount++;
+                                    if (globalConfig.getConfig('global.debugLog')) {
+                                        globalConfig.debug(`自动佩戴全局成就: 用户 ${userId}, 群 ${gId}, 成就 ${topAchievement.achievement_id}, 解锁时间 ${unlockedAt}`);
+                                    }
+                                }
+                            }
+                        } else {
+                            // 普通成就：只在当前群自动佩戴
+                            await this.achievementService.setDisplayAchievement(
+                                groupId,
+                                userId,
+                                topAchievement.achievement_id,
+                                definition?.name || topAchievement.achievement_id,
+                                definition?.rarity || 'common',
+                                false,  // isManual = false，自动佩戴
+                                unlockedAt  // 使用解锁时间作为 auto_display_at
+                            );
+                            autoWornCount++;
+                            if (globalConfig.getConfig('global.debugLog')) {
+                                globalConfig.debug(`自动佩戴成就: 用户 ${userId}, 群 ${groupId}, 成就 ${topAchievement.achievement_id}, 解锁时间 ${unlockedAt}`);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                globalConfig.error(`自动佩戴成就失败: 用户 ${userId}`, error);
+                errors.push(`用户 ${userId}: ${error.message || '未知错误'}`);
+            }
+        }
+        
         return {
-            refreshedCount,
+            refreshedCount: userIds.size,  // 处理的用户数
             removedCount,
+            autoWornCount,
             errors
         };
     }

@@ -755,23 +755,18 @@ class DatabaseService {
         const now = this.getCurrentTime();
         const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false;
         
-        // 检查是否已存在显示成就
-        const existing = await this.getDisplayAchievement(groupId, userId);
-        
-        let autoDisplayAt;
+        // 获取自动佩戴时间
+        // 如果提供了 autoDisplayAt，使用提供的值（通常是解锁时间）
+        // 如果未提供且是自动设置，使用当前时间
+        let autoDisplayAt = achievementData.autoDisplayAt;
         if (isManual) {
             // 手动设置，清除自动显示时间
             autoDisplayAt = null;
-        } else {
-            // 自动设置
-            if (existing && existing.is_manual === false && existing.auto_display_at) {
-                // 如果已存在自动显示的成就，保留原有的 auto_display_at（不重置24小时）
-                autoDisplayAt = existing.auto_display_at;
-            } else {
-                // 首次自动设置，使用当前时间
+        } else if (!autoDisplayAt) {
+            // 自动设置但未提供时间，使用当前时间
                 autoDisplayAt = now;
             }
-        }
+        // 如果提供了 autoDisplayAt，直接使用（通常是解锁时间）
         
         await this.run(`
             INSERT INTO user_display_achievements (

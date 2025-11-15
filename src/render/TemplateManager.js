@@ -819,23 +819,61 @@ class TemplateManager {
                     displayStatusHtml = '<span class="display-status manual">✅ 已佩戴（手动设置）</span>';
                 } else if (displayAchievement.autoDisplayAt) {
                     // 自动佩戴，计算剩余时间
-                    // 解析 autoDisplayAt 字符串为 UTC+8 时区的 Date 对象
-                    const autoDisplayAtStr = displayAchievement.autoDisplayAt;
-                    const [datePart, timePart] = autoDisplayAtStr.split(' ');
-                    const [year, month, day] = datePart.split('-').map(Number);
-                    const [hour, minute, second] = timePart.split(':').map(Number);
+                    // 解析 autoDisplayAt 为 UTC+8 时区的 Date 对象
+                    // autoDisplayAt 可能是字符串（SQLite）或 Date 对象（PostgreSQL）
+                    let autoDisplayAt;
+                    const autoDisplayAtValue = displayAchievement.autoDisplayAt;
                     
-                    // 创建 UTC+8 时区的 Date 对象
-                    const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
-                    const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
-                    const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+                    if (autoDisplayAtValue instanceof Date) {
+                        // PostgreSQL 返回的是 Date 对象
+                        autoDisplayAt = autoDisplayAtValue;
+                    } else if (typeof autoDisplayAtValue === 'string') {
+                        // 可能是 ISO 8601 格式（PostgreSQL JSON序列化）或普通格式（SQLite）
+                        if (autoDisplayAtValue.includes('T')) {
+                            // ISO 8601 格式：可能是 "2025-11-14T15:52:22.000Z" 或 "2025-11-14T15:52:22"
+                            autoDisplayAt = new Date(autoDisplayAtValue);
+                            if (isNaN(autoDisplayAt.getTime())) {
+                                // 解析失败，跳过时间显示
+                                displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>';
+                            } else {
+                                // 如果带 Z，说明是 UTC 时间，需要加8小时转换为 UTC+8
+                                if (autoDisplayAtValue.endsWith('Z')) {
+                                    const utc8Offset = 8 * 60 * 60 * 1000;
+                                    autoDisplayAt = new Date(autoDisplayAt.getTime() + utc8Offset);
+                                }
+                            }
+                        } else {
+                            // 普通格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
+                            const [datePart, timePart] = autoDisplayAtValue.split(' ');
+                            if (!datePart || !timePart) {
+                                // 格式不正确，跳过时间显示
+                                displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>';
+                            } else {
+                                const [year, month, day] = datePart.split('-').map(Number);
+                                const [hour, minute, second] = timePart.split(':').map(Number);
+                                
+                                // 创建 UTC+8 时区的 Date 对象
+                                const utc8Offset = 8 * 60 * 60 * 1000;
+                                const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                                autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+                            }
+                        }
+                    } else {
+                        // 未知类型，跳过时间显示
+                        displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>';
+                    }
                     
-                    // 获取当前 UTC+8 时区的时间
-                    const now = TimeUtils.getUTC8Date();
-                    
-                    const diffMs = now.getTime() - autoDisplayAt.getTime();
+                    // 如果成功解析了日期，计算剩余时间
+                    if (displayStatusHtml === '' && autoDisplayAt && !isNaN(autoDisplayAt.getTime())) {
+                        // 计算卸下时间：解锁时间（auto_display_at）+ 24小时
+                        const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000);
+                        
+                        // 获取当前 UTC+8 时区的时间
+                        const now = TimeUtils.getUTC8Date();
+                        
+                        const diffMs = removeAt.getTime() - now.getTime();
                     const diffHours = diffMs / (1000 * 60 * 60);
-                    const remainingHours = Math.max(0, 24 - diffHours);
+                        const remainingHours = Math.max(0, diffHours);
                     const remainingMinutes = Math.floor((remainingHours % 1) * 60);
                     
                     if (remainingHours > 0) {
@@ -843,6 +881,7 @@ class TemplateManager {
                         displayStatusHtml = `<span class="display-status auto">✅ 已佩戴（自动佩戴剩余 ${hours}小时${remainingMinutes > 0 ? remainingMinutes + '分钟' : ''}）</span>`;
                     } else {
                         displayStatusHtml = '<span class="display-status expired">⏰ 已过期（将自动卸下）</span>';
+                        }
                     }
                 } else {
                     displayStatusHtml = '<span class="display-status manual">✅ 已佩戴</span>';

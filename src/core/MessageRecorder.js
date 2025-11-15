@@ -491,21 +491,26 @@ class MessageRecorder {
                             const userNickname = userData?.nickname || userId;
                             
                             // 检查是否需要自动设置显示成就
+                            // 规则：史诗及以上成就自动佩戴，使用解锁时间（unlocked_at）作为 auto_display_at
                             let shouldAutoSetDisplay = false;
                             let bestAchievement = null;
                             
                             // 检查当前是否有显示成就（手动或自动）
                             const currentDisplay = await achievementService.dataService.dbService.getDisplayAchievement(groupId, userId);
                             const hasManualDisplay = currentDisplay && currentDisplay.is_manual === true;
-                            const hasAutoDisplay = currentDisplay && currentDisplay.is_manual === false;
                             
-                            // 如果没有显示成就（手动或自动都没有），检查新解锁的成就是否符合自动佩戴条件
-                            if (!hasManualDisplay && !hasAutoDisplay) {
+                            // 如果没有手动设置的显示成就，检查新解锁的成就是否符合自动佩戴条件
+                            // 注意：即使已有自动佩戴的成就，新解锁的更高稀有度成就也会替换
+                            if (!hasManualDisplay) {
                                 for (const achievement of newAchievements) {
                                     const rarity = achievement.rarity || 'common';
                                     // 检查是否是史诗及以上
                                     if (AchievementUtils.isRarityOrHigher(rarity, 'epic')) {
-                                        if (!bestAchievement || AchievementUtils.compareRarity(rarity, bestAchievement.rarity) > 0) {
+                                        // 选择稀有度最高的成就，如果稀有度相同，选择最新解锁的
+                                        if (!bestAchievement || 
+                                            AchievementUtils.compareRarity(rarity, bestAchievement.rarity) > 0 ||
+                                            (AchievementUtils.compareRarity(rarity, bestAchievement.rarity) === 0 && 
+                                             new Date(achievement.unlockedAt).getTime() > new Date(bestAchievement.unlockedAt).getTime())) {
                                             bestAchievement = achievement;
                                             shouldAutoSetDisplay = true;
                                         }
@@ -513,17 +518,42 @@ class MessageRecorder {
                                 }
                             }
                             
-                            // 如果符合条件，自动设置为显示成就（24小时时限，从解锁时间开始计算）
+                            // 如果符合条件，自动设置为显示成就
+                            // 使用解锁时间（unlocked_at）作为 auto_display_at，24小时后自动卸下
                             if (shouldAutoSetDisplay && bestAchievement) {
                                 try {
+                                    // 获取成就的解锁时间（UTC+8 时区的字符串格式）
+                                    const unlockedAt = bestAchievement.unlockedAt || TimeUtils.formatDateTimeForDB();
+                                    
+                                    // 检查是否是全局成就（特殊成就或节日成就）
+                                    const isGlobal = AchievementUtils.isGlobalAchievement(bestAchievement.rarity);
+                                    
+                                    if (isGlobal) {
+                                        // 全局成就：在所有群都自动佩戴
+                                        const userGroups = await achievementService.dataService.dbService.getUserGroups(userId);
+                                        for (const gId of userGroups) {
+                                            await achievementService.setDisplayAchievement(
+                                                gId,
+                                                userId,
+                                                bestAchievement.id,
+                                                bestAchievement.name || bestAchievement.id,
+                                                bestAchievement.rarity || 'common',
+                                                false,  // isManual = false，自动佩戴
+                                                unlockedAt  // 使用解锁时间作为 auto_display_at
+                                            );
+                                        }
+                                    } else {
+                                        // 普通成就：只在当前群自动佩戴
                                     await achievementService.setDisplayAchievement(
                                         groupId,
                                         userId,
                                         bestAchievement.id,
                                         bestAchievement.name || bestAchievement.id,
                                         bestAchievement.rarity || 'common',
-                                        false  // isManual = false，自动佩戴
+                                            false,  // isManual = false，自动佩戴
+                                            unlockedAt  // 使用解锁时间作为 auto_display_at
                                     );
+                                    }
                                 } catch (error) {
                                     globalConfig.error('自动设置显示成就失败:', error);
                                 }

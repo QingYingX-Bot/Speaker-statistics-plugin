@@ -25,7 +25,9 @@ class CommandWrapper {
         return async function(e) {
             // 验证管理员权限
             if (requireAdmin) {
-                const adminValidation = CommonUtils.validateAdminPermission(e);
+                const { getPermissionManager } = await import('./PermissionManager.js');
+                const permissionManager = getPermissionManager();
+                const adminValidation = await permissionManager.validateAdminPermission(e);
                 if (!adminValidation.valid) {
                     return e.reply(adminValidation.message);
                 }
@@ -68,14 +70,17 @@ class CommandWrapper {
     }
 
     /**
-     * 验证并回复模式
+     * 验证并回复模式（支持异步验证）
      * @param {Object} e 消息事件对象
-     * @param {Object} validation 验证结果
-     * @returns {boolean} 是否通过验证
+     * @param {Object|Promise<Object>} validation 验证结果或验证结果的 Promise
+     * @returns {Promise<boolean>} 是否通过验证
      */
-    static validateAndReply(e, validation) {
-        if (!validation.valid) {
-            e.reply(validation.message);
+    static async validateAndReply(e, validation) {
+        // 如果 validation 是 Promise，等待它完成
+        const result = validation instanceof Promise ? await validation : validation;
+        
+        if (!result.valid) {
+            e.reply(result.message);
             return false;
         }
         return true;

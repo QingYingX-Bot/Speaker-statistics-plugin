@@ -23,10 +23,27 @@ export class AuthApi {
      * 注册所有认证相关API路由
      */
     registerRoutes() {
-        // 获取当前用户信息（从cookie）
+        // 获取当前用户信息（从cookie或token）
         this.app.get('/api/current-user',
             ApiResponse.asyncHandler(async (req, res) => {
-                const userId = req.cookies?.userId || req.query.userId;
+                // 优先从 cookie 获取，其次从 query 参数，最后尝试从 token 解析
+                let userId = req.cookies?.userId || req.query.userId;
+                
+                // 如果没有 userId，尝试从 token 中解析（如果 URL 路径是 token）
+                if (!userId) {
+                    const pathParts = req.path.split('/').filter(p => p);
+                    if (pathParts.length > 0 && pathParts[0] !== 'api') {
+                        // 可能是 token 路径，尝试解析
+                        try {
+                            const tokenData = this.tokenManager.validateToken(pathParts[0]);
+                            if (tokenData && tokenData.valid && tokenData.userId) {
+                                userId = tokenData.userId;
+                            }
+                        } catch (error) {
+                            // token 无效，忽略
+                        }
+                    }
+                }
                 
                 if (!userId) {
                     return ApiResponse.success(res, {
@@ -52,19 +69,21 @@ export class AuthApi {
                     // 静默失败，继续处理
                 }
                 
-                // 检查用户权限（不需要秘钥，仅检查角色）
+                // 检查用户权限（仅检查 key.json 中的角色）
                 let role = null;
+                let isAdmin = false;
                 try {
                     role = await this.authService.getUserRole(userId);
+                    isAdmin = role === 'admin';
                 } catch (error) {
-                    // 静默失败，继续处理
+                    globalConfig.error('[API] 检查用户权限失败:', error);
                 }
                 
                 ApiResponse.success(res, {
                     userId: userId,
                     userName: userName,
                     role: role,
-                    isAdmin: role === 'admin'
+                    isAdmin: isAdmin
                 });
             }, '获取当前用户信息失败')
         );

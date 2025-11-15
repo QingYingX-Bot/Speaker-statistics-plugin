@@ -25,7 +25,7 @@ class API {
         
         // 如果 body 是普通对象且不是 FormData，自动转换为 JSON
         let body = options.body;
-        if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof URLSearchParams)) {
+        if (body && typeof body === 'object' && !(body instanceof FormData) && !(body instanceof URLSearchParams) && !(body instanceof Blob)) {
             if (headers['Content-Type'] === 'application/json') {
                 body = JSON.stringify(body);
             }
@@ -225,11 +225,14 @@ class API {
     // ========== 用户认证API ==========
     
     /**
-     * 获取当前用户信息（从cookie）
+     * 获取当前用户信息（从cookie或userId参数）
+     * @param {string} userId 用户ID（可选，如果提供则作为query参数传递）
      * @returns {Promise} 当前用户信息
      */
-    async getCurrentUser() {
-        return this.request('/api/current-user');
+    async getCurrentUser(userId = null) {
+        const url = userId ? `/api/current-user?userId=${encodeURIComponent(userId)}` : '/api/current-user';
+        const result = await this.request(url);
+        return result;
     }
     
     // ========== 秘钥API ==========
@@ -240,7 +243,8 @@ class API {
      * @returns {Promise} 秘钥数据
      */
     async getSecretKey(userId) {
-        return this.request(`/api/secret-key/${userId}`);
+        const result = await this.request(`/api/secret-key/${userId}`);
+        return result;
     }
     
     /**
@@ -250,13 +254,14 @@ class API {
      * @returns {Promise} 保存结果
      */
     async saveSecretKey(userId, secretKey) {
-        return this.request('/api/save-secret-key', {
+        const result = await this.request('/api/save-secret-key', {
             method: 'POST',
             body: {
                 userId,
                 secretKey
             },
         });
+        return result;
     }
     
     /**
@@ -266,13 +271,14 @@ class API {
      * @returns {Promise} 验证结果
      */
     async validateSecretKey(userId, secretKey) {
-        return this.request('/api/validate-secret-key', {
+        const result = await this.request('/api/validate-secret-key', {
             method: 'POST',
             body: {
                 userId,
                 secretKey
             },
         });
+        return result;
     }
     
     // ========== 管理API ==========

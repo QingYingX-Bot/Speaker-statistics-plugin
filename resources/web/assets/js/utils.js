@@ -330,7 +330,6 @@ class SecretKeyManager {
             // 先检查本地存储
             const localSecretKey = this._getLocalSecretKey();
             if (localSecretKey) {
-                console.log('本地存储中找到秘钥');
                 return true;
             }
             
@@ -338,23 +337,21 @@ class SecretKeyManager {
             if (userId) {
                 try {
                     const result = await api.getSecretKey(userId);
-                    if (result && result.secretKey && result.secretKey.length > 0 && result.secretKey !== '***已加密***') {
+                    // 处理 API 返回格式：可能是 { secretKey: ... } 或 { success: true, data: { secretKey: ... } }
+                    const serverKey = result?.secretKey || (result?.success && result?.data?.secretKey ? result.data.secretKey : null);
+                    if (serverKey && serverKey.length > 0 && serverKey !== '***已加密***' && serverKey !== '***已加密存储***') {
                         // 如果服务器有原始秘钥，保存到本地
-                        this._saveLocalSecretKey(result.secretKey);
-                        console.log('服务器中找到秘钥，已同步到本地');
+                        this._saveLocalSecretKey(serverKey);
+                        return true;
+                    } else if (serverKey === '***已加密***' || serverKey === '***已加密存储***') {
+                        // 服务器有加密的秘钥，但无法显示原始值，视为存在
                         return true;
                     }
                 } catch (error) {
-                    // 404错误表示秘钥不存在，这是正常情况
-                    if (error.message && (error.message.includes('404') || error.message.includes('秘钥文件不存在'))) {
-                        console.log('服务器上秘钥不存在，这是正常情况');
-                    } else {
-                        console.log('检查服务器秘钥时发生错误:', error.message);
-                    }
+                    // 静默处理错误
                 }
             }
             
-            console.log('秘钥不存在（本地和服务器都没有）');
             return false;
         } catch (error) {
             console.error('检查秘钥存在性失败:', error);
@@ -376,13 +373,16 @@ class SecretKeyManager {
             }
             
             const localSecretKey = this._getLocalSecretKey();
+            
             if (!localSecretKey) {
                 // 本地没有秘钥，检查服务器是否有
                 try {
                     const result = await api.getSecretKey(userId);
-                    if (result && result.secretKey && result.secretKey.length > 0 && result.secretKey !== '***已加密***') {
+                    // 处理 API 返回格式：可能是 { secretKey: ... } 或 { success: true, data: { secretKey: ... } }
+                    const serverKey = result?.secretKey || (result?.success && result?.data?.secretKey ? result.data.secretKey : null);
+                    if (serverKey && serverKey.length > 0 && serverKey !== '***已加密***' && serverKey !== '***已加密存储***') {
                         // 服务器有原始秘钥，但本地没有，同步到本地
-                        this._saveLocalSecretKey(result.secretKey);
+                        this._saveLocalSecretKey(serverKey);
                         return { matched: true };
                     }
                 } catch (error) {
@@ -395,7 +395,11 @@ class SecretKeyManager {
             // 本地有秘钥，检查服务器是否有
             try {
                 const result = await api.getSecretKey(userId);
-                if (!result || !result.secretKey || result.secretKey.length === 0) {
+                
+                // 处理 API 返回格式：可能是 { secretKey: ... } 或 { success: true, data: { secretKey: ... } }
+                const serverKey = result?.secretKey || (result?.success && result?.data?.secretKey ? result.data.secretKey : null);
+                
+                if (!serverKey || serverKey.length === 0) {
                     // 服务器没有秘钥，但本地有，视为不匹配
                     return { 
                         matched: false, 
@@ -405,11 +409,16 @@ class SecretKeyManager {
                 
                 // 如果服务器返回的是加密占位符，说明服务器有秘钥但无法显示原始值
                 // 这种情况下，如果本地有秘钥，我们应该验证本地秘钥是否有效
-                if (result.secretKey === '***已加密***') {
+                if (serverKey === '***已加密***' || serverKey === '***已加密存储***') {
                     // 服务器有加密的秘钥，使用验证API验证本地秘钥
                     try {
                         const response = await api.validateSecretKey(userId, localSecretKey);
-                        if (response && response.success && response.data?.valid) {
+                        
+                        // 检查响应格式：可能是 { success: true, data: { valid: true } } 或 { valid: true }
+                        const isValid = (response && response.success && response.data?.valid === true) || 
+                                       (response && response.valid === true);
+                        
+                        if (isValid) {
                             return { matched: true };
                         } else {
                             return { 
@@ -418,18 +427,33 @@ class SecretKeyManager {
                             };
                         }
                     } catch (validateError) {
-                        // 验证失败，返回匹配（避免误报）
-                        console.warn('验证秘钥失败，视为匹配:', validateError);
+                        // 如果是因为网络错误或服务器错误，视为匹配（避免误报）
+                        // 但如果是明确的验证失败，应该返回不匹配
+                        if (validateError.message && (
+                            validateError.message.includes('验证失败') || 
+                            validateError.message.includes('不匹配') ||
+                            validateError.message.includes('401') ||
+                            validateError.message.includes('403')
+                        )) {
+                            return { 
+                                matched: false, 
+                                message: `本地秘钥验证失败\n用户ID: ${userId}${userName ? `\n用户名: ${userName}` : ''}\n请重新设置秘钥`
+                            };
+                        }
+                        // 其他错误（网络错误等），视为匹配（避免误报）
                         return { matched: true };
                     }
                 }
                 
-                // 比较秘钥是否匹配
-                if (localSecretKey.trim() !== result.secretKey.trim()) {
+                // 比较秘钥是否匹配（去除首尾空格）
+                const localTrimmed = localSecretKey.trim();
+                const serverTrimmed = serverKey.trim();
+                
+                if (localTrimmed !== serverTrimmed) {
                     // 不匹配
                     return { 
                         matched: false, 
-                        serverKey: result.secretKey,
+                        serverKey: serverKey,
                         message: `本地秘钥与服务器不匹配\n用户ID: ${userId}${userName ? `\n用户名: ${userName}` : ''}\n请重新设置秘钥`
                     };
                 }
@@ -446,11 +470,9 @@ class SecretKeyManager {
                     };
                 }
                 // 其他错误，无法确定，返回匹配（避免误报）
-                console.error('验证本地秘钥时发生错误:', error);
                 return { matched: true };
             }
         } catch (error) {
-            console.error('验证本地秘钥失败:', error);
             return { matched: true }; // 出错时视为匹配，避免误报
         }
     }
@@ -584,12 +606,6 @@ class SecretKeyManager {
         if (!saved) {
             throw new Error('无法保存秘钥到本地存储');
         }
-        
-        // 验证存储是否成功
-        const stored = this._getLocalSecretKey();
-        if (stored !== secretKey) {
-            console.warn('秘钥存储验证失败，存储的值与预期不符');
-        }
     }
     
     /**
@@ -681,5 +697,233 @@ class SecretKeyManager {
     }
 }
 
+// 自定义下拉框组件
+class CustomSelect {
+    constructor(selectElement, options = {}) {
+        this.select = selectElement;
+        this.options = {
+            placeholder: options.placeholder || '请选择',
+            searchable: options.searchable || false,
+            ...options
+        };
+        this.isOpen = false;
+        this.init();
+    }
+    
+    init() {
+        // 获取原 select 的宽度和位置信息（在隐藏前获取）
+        const selectRect = this.select.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(this.select);
+        let originalWidth = selectRect.width;
+        
+        // 如果宽度为0，尝试从父元素或样式获取
+        if (!originalWidth || originalWidth === 0) {
+            originalWidth = parseInt(computedStyle.width) || 
+                          (this.select.parentElement ? this.select.parentElement.offsetWidth : 0) ||
+                          220;
+        }
+        
+        const originalMinWidth = computedStyle.minWidth;
+        const parentElement = this.select.parentElement;
+        const parentWidth = parentElement ? window.getComputedStyle(parentElement).width : null;
+        
+        // 立即隐藏原生 select，避免闪烁
+        this.select.style.opacity = '0';
+        this.select.style.position = 'absolute';
+        this.select.style.pointerEvents = 'none';
+        this.select.style.width = '0';
+        this.select.style.height = '0';
+        this.select.style.visibility = 'hidden';
+        
+        // 创建自定义下拉框结构
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'custom-select-wrapper relative';
+        
+        // 使用原 select 的宽度，避免宽度变化
+        // 优先使用实际测量的宽度，其次使用父元素宽度，最后使用默认值
+        if (originalWidth > 0) {
+            this.wrapper.style.width = `${originalWidth}px`;
+        } else if (parentWidth && parentWidth !== 'auto') {
+            this.wrapper.style.width = parentWidth;
+            } else {
+                // 默认宽度，根据是否有 w-full 类决定
+                if (this.select.classList.contains('w-full')) {
+                    this.wrapper.style.width = '100%';
+                } else {
+                    this.wrapper.style.width = '220px'; // 统一默认宽度（从160px增加到220px）
+                }
+            }
+        
+        // 保持最小宽度
+        if (originalMinWidth && originalMinWidth !== 'auto' && originalMinWidth !== '0px') {
+            this.wrapper.style.minWidth = originalMinWidth;
+        } else if (this.select.classList.contains('w-full')) {
+            // 如果原 select 是 w-full，保持 wrapper 也是 100%
+            this.wrapper.style.width = '100%';
+        }
+        
+        this.button = document.createElement('button');
+        this.button.type = 'button';
+        this.button.className = 'custom-select-button w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm appearance-none cursor-pointer hover:border-gray-300 dark:hover:border-gray-600 text-left flex items-center justify-between';
+        
+        this.buttonText = document.createElement('span');
+        this.buttonText.className = 'flex-1 text-left truncate';
+        this.updateButtonText();
+        
+        this.buttonIcon = document.createElement('svg');
+        this.buttonIcon.className = 'w-4 h-4 text-gray-400 flex-shrink-0 ml-2 transition-transform';
+        this.buttonIcon.setAttribute('fill', 'none');
+        this.buttonIcon.setAttribute('stroke', 'currentColor');
+        this.buttonIcon.setAttribute('viewBox', '0 0 24 24');
+        this.buttonIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+        
+        this.button.appendChild(this.buttonText);
+        this.button.appendChild(this.buttonIcon);
+        
+        this.dropdown = document.createElement('div');
+        this.dropdown.className = 'custom-select-dropdown absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto hidden';
+        
+        this.optionsList = document.createElement('div');
+        this.optionsList.className = 'py-1';
+        this.renderOptions();
+        
+        this.dropdown.appendChild(this.optionsList);
+        
+        this.wrapper.appendChild(this.button);
+        this.wrapper.appendChild(this.dropdown);
+        
+        // 插入到原 select 的位置
+        this.select.parentNode.insertBefore(this.wrapper, this.select);
+        this.wrapper.appendChild(this.select);
+        
+        // 绑定事件
+        this.button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggle();
+        });
+        
+        // 点击外部关闭
+        document.addEventListener('click', (e) => {
+            if (!this.wrapper.contains(e.target)) {
+                this.close();
+            }
+        });
+        
+        // 监听原 select 变化
+        this.select.addEventListener('change', () => {
+            this.updateButtonText();
+            this.highlightSelected();
+        });
+    }
+    
+    renderOptions() {
+        this.optionsList.innerHTML = '';
+        const options = Array.from(this.select.options);
+        
+        options.forEach((option, index) => {
+            const item = document.createElement('div');
+            item.className = `custom-select-option px-3 py-2 text-sm cursor-pointer transition-colors text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 ${option.selected ? 'bg-primary/10 text-primary dark:text-primary' : ''}`;
+            item.textContent = option.textContent;
+            item.dataset.value = option.value;
+            
+            item.addEventListener('click', () => {
+                this.select.value = option.value;
+                this.select.dispatchEvent(new Event('change', { bubbles: true }));
+                this.updateButtonText();
+                this.highlightSelected();
+                this.close();
+            });
+            
+            this.optionsList.appendChild(item);
+        });
+    }
+    
+    updateButtonText() {
+        const selectedOption = this.select.options[this.select.selectedIndex];
+        this.buttonText.textContent = selectedOption ? selectedOption.textContent : this.options.placeholder;
+    }
+    
+    highlightSelected() {
+        const options = this.optionsList.querySelectorAll('.custom-select-option');
+        const selectedValue = this.select.value;
+        
+        options.forEach(option => {
+            if (option.dataset.value === selectedValue) {
+                option.className = 'custom-select-option px-3 py-2 text-sm cursor-pointer transition-colors bg-primary/10 text-primary dark:text-primary';
+            } else {
+                option.className = 'custom-select-option px-3 py-2 text-sm cursor-pointer transition-colors text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700';
+            }
+        });
+    }
+    
+    toggle() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+    
+    open() {
+        this.isOpen = true;
+        this.dropdown.classList.remove('hidden');
+        this.buttonIcon.style.transform = 'rotate(180deg)';
+        this.button.classList.add('ring-2', 'ring-primary', 'border-primary');
+        this.highlightSelected();
+    }
+    
+    close() {
+        this.isOpen = false;
+        this.dropdown.classList.add('hidden');
+        this.buttonIcon.style.transform = 'rotate(0deg)';
+        this.button.classList.remove('ring-2', 'ring-primary', 'border-primary');
+    }
+    
+    updateOptions() {
+        // 重新渲染选项列表
+        this.renderOptions();
+        this.updateButtonText();
+        this.highlightSelected();
+    }
+    
+    destroy() {
+        if (this.wrapper && this.wrapper.parentNode) {
+            this.select.style.display = '';
+            this.wrapper.parentNode.replaceChild(this.select, this.wrapper);
+        }
+    }
+}
+
+// 初始化所有自定义下拉框
+function initCustomSelects() {
+    document.querySelectorAll('select.select-custom').forEach(select => {
+        if (!select.dataset.customSelectInitialized) {
+            // 如果 select 还没有渲染完成，等待一下
+            if (select.offsetParent === null && select.offsetWidth === 0) {
+                // 使用 requestAnimationFrame 等待 DOM 渲染
+                requestAnimationFrame(() => {
+                    initCustomSelects();
+                });
+                return;
+            }
+            
+            select.dataset.customSelectInitialized = 'true';
+            const customSelect = new CustomSelect(select);
+            // 保存实例到 select 元素上，方便后续更新
+            select._customSelectInstance = customSelect;
+        }
+    });
+}
+
+// 更新指定下拉框的选项（当动态添加选项后调用）
+function updateCustomSelect(selectElement) {
+    if (selectElement && selectElement._customSelectInstance) {
+        selectElement._customSelectInstance.updateOptions();
+    }
+}
+
 // 导出到全局
 window.SecretKeyManager = SecretKeyManager;
+window.CustomSelect = CustomSelect;
+window.initCustomSelects = initCustomSelects;
+window.updateCustomSelect = updateCustomSelect;

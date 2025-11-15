@@ -39,21 +39,15 @@ class CommonUtils {
     }
 
     /**
-     * 验证管理员权限
+     * 验证管理员权限（已废弃，请使用 PermissionManager）
+     * @deprecated 使用 PermissionManager.validateAdminPermission() 替代
      * @param {Object} e 消息事件对象
-     * @returns {Object} 验证结果 {valid: boolean, message?: string}
+     * @returns {Promise<Object>} 验证结果 {valid: boolean, message?: string}
      */
-    static validateAdminPermission(e) {
-        if (!e.isMaster) {
-            return {
-                valid: false,
-                message: '只有主人才能执行此操作！'
-            };
-        }
-
-        return {
-            valid: true
-        };
+    static async validateAdminPermission(e) {
+        const { getPermissionManager } = await import('./PermissionManager.js');
+        const permissionManager = getPermissionManager();
+        return await permissionManager.validateAdminPermission(e);
     }
 
     /**

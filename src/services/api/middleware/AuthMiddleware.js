@@ -23,8 +23,10 @@ export class AuthMiddleware {
                 return res.status(400).json({ error: '缺少必要参数' });
             }
             
-            // 权限验证
-            const permission = await this.authService.checkAdminPermission(userId, secretKey);
+            // 权限验证（使用统一的权限管理器）
+            const { getPermissionManager } = await import('../../../core/utils/PermissionManager.js');
+            const permissionManager = getPermissionManager();
+            const permission = await permissionManager.checkWebAdminPermission(userId, secretKey);
             if (!permission.isAdmin) {
                 return res.status(403).json({ error: '权限不足' });
             }

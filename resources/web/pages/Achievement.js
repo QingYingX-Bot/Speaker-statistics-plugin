@@ -13,20 +13,20 @@ export default class Achievement {
     
     async render() {
         return `
-            <div class="bg-white min-h-full">
+            <div class="bg-white dark:bg-gray-900 min-h-full">
                 <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
                     <!-- 页面标题和筛选器 -->
                     <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                         <div>
-                            <h1 class="text-xl sm:text-2xl font-semibold text-gray-900 mb-1">成就</h1>
-                            <p class="text-xs text-gray-500">查看和管理您的成就</p>
+                            <h1 class="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">成就</h1>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">查看和管理您的成就</p>
                         </div>
                         
                         <!-- 群选择 -->
-                        <div class="w-full sm:w-auto sm:min-w-[160px]">
-                            <label class="block text-xs font-medium text-gray-600 mb-1.5">选择群聊</label>
+                        <div class="w-full sm:w-auto sm:min-w-[220px]">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">选择群聊</label>
                             <div class="relative">
-                                <select id="groupSelect" class="select-custom w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 text-sm appearance-none cursor-pointer hover:border-gray-300">
+                                <select id="groupSelect" class="select-custom w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm appearance-none cursor-pointer hover:border-gray-300 dark:hover:border-gray-600">
                                     <option value="">加载中...</option>
                                 </select>
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -43,7 +43,7 @@ export default class Achievement {
                         <div class="flex items-center justify-center py-20">
                             <div class="text-center">
                                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-                                <p class="text-gray-500 text-sm">加载中...</p>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm">加载中...</p>
                             </div>
                         </div>
                     </div>
@@ -113,25 +113,25 @@ export default class Achievement {
         return new Promise((resolve) => {
             window.Modal.show('身份验证', `
                 <div class="space-y-4">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <div class="flex items-start gap-3">
-                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-blue-800 mb-2">需要身份验证</p>
-                                <p class="text-xs text-blue-700">请输入您的秘钥以访问成就设置功能</p>
+                                <p class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">需要身份验证</p>
+                                <p class="text-xs text-blue-700 dark:text-blue-400">请输入您的秘钥以访问成就设置功能</p>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">秘钥</label>
-                        <input type="password" id="achievementSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入秘钥">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">秘钥</label>
+                        <input type="password" id="achievementSecretKeyInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入秘钥">
                     </div>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmAchievementBtn">确认验证</button>
-                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
+                <button class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
             `);
             
             setTimeout(() => {
@@ -210,7 +210,6 @@ export default class Achievement {
         this._achievementClickHandler = async (e) => {
             const btn = e.target.closest('.set-display-btn');
             if (!btn || btn.disabled) {
-                console.log('按钮被忽略:', { disabled: btn?.disabled, btn });
                 return;
             }
             
@@ -220,8 +219,6 @@ export default class Achievement {
             const achievementId = btn.getAttribute('data-achievement-id');
             const achievementName = btn.getAttribute('data-achievement-name');
             const achievementRarity = btn.getAttribute('data-achievement-rarity');
-            
-            console.log('点击设置显示按钮:', { achievementId, achievementName, achievementRarity, btn });
             
             if (achievementId && achievementName) {
                 try {
@@ -274,6 +271,11 @@ export default class Achievement {
                 option.textContent = group.group_name || group.group_id;
                 select.appendChild(option);
             });
+            
+            // 更新自定义下拉框
+            if (window.updateCustomSelect) {
+                window.updateCustomSelect(select);
+            }
             
             // 默认选择第一个群聊
             if (this.groups.length > 0) {
@@ -344,9 +346,9 @@ export default class Achievement {
                 await new Promise(resolve => setTimeout(resolve, 200));
                 
                 content.innerHTML = `
-                    <div class="bg-white rounded-lg border border-gray-200 p-16 text-center" style="min-height: 200px;">
-                        <div class="text-4xl mb-3 text-gray-400">🎖️</div>
-                        <div class="text-gray-500 text-sm">请选择群聊查看成就</div>
+                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-16 text-center" style="min-height: 200px;">
+                        <div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">🎖️</div>
+                        <div class="text-gray-500 dark:text-gray-400 text-sm">请选择群聊查看成就</div>
                     </div>
                 `;
                 
@@ -384,10 +386,6 @@ export default class Achievement {
                 }
             }
             
-            // 调试信息
-            console.log('API响应:', response);
-            console.log('当前显示的成就ID:', this.currentDisplayAchievementId);
-            
             await this.renderAchievements();
         } catch (error) {
             console.error('加载成就列表失败:', error);
@@ -397,9 +395,9 @@ export default class Achievement {
             await new Promise(resolve => setTimeout(resolve, 200));
             
             content.innerHTML = `
-                <div class="bg-white rounded-lg border border-gray-200 p-16 text-center" style="min-height: 200px;">
-                    <div class="text-4xl mb-3 text-gray-400">❌</div>
-                    <div class="text-gray-500 text-sm">加载失败: ${error.message}</div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-16 text-center" style="min-height: 200px;">
+                    <div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">❌</div>
+                    <div class="text-gray-500 dark:text-gray-400 text-sm">加载失败: ${error.message}</div>
                 </div>
             `;
             
@@ -421,9 +419,9 @@ export default class Achievement {
         
         if (this.achievements.length === 0) {
             content.innerHTML = `
-                <div class="bg-white rounded-lg border border-gray-200 p-16 text-center" style="min-height: 200px;">
-                    <div class="text-4xl mb-3 text-gray-400">🎖️</div>
-                    <div class="text-gray-500 text-sm">暂无成就数据</div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-16 text-center" style="min-height: 200px;">
+                    <div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">🎖️</div>
+                    <div class="text-gray-500 dark:text-gray-400 text-sm">暂无成就数据</div>
                 </div>
             `;
             // 淡入空状态
@@ -452,7 +450,7 @@ export default class Achievement {
         if (unlocked.length > 0) {
             html += `
                 <div class="mb-4 sm:mb-6">
-                    <h2 class="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">已解锁成就 <span class="text-xs sm:text-sm font-normal text-gray-500">(${unlocked.length})</span></h2>
+                    <h2 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4">已解锁成就 <span class="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-400">(${unlocked.length})</span></h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             `;
             
@@ -466,8 +464,8 @@ export default class Achievement {
         // 未解锁成就
         if (locked.length > 0) {
             html += `
-                <div class="${unlocked.length > 0 ? 'mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200' : ''}">
-                    <h2 class="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">未解锁成就 <span class="text-xs sm:text-sm font-normal text-gray-500">(${locked.length})</span></h2>
+                <div class="${unlocked.length > 0 ? 'mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700' : ''}">
+                    <h2 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 sm:mb-4">未解锁成就 <span class="text-xs sm:text-sm font-normal text-gray-500 dark:text-gray-400">(${locked.length})</span></h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             `;
             
@@ -508,14 +506,14 @@ export default class Achievement {
         };
         
         const rarityColors = {
-            'Common': 'bg-gray-100 text-gray-700 border-gray-300',
-            'Uncommon': 'bg-green-100 text-green-700 border-green-300',
-            'Rare': 'bg-blue-100 text-blue-700 border-blue-300',
-            'Epic': 'bg-purple-100 text-purple-700 border-purple-300',
-            'Legendary': 'bg-yellow-100 text-yellow-700 border-yellow-300',
-            'Mythic': 'bg-orange-100 text-orange-700 border-orange-300',
-            'Festival': 'bg-pink-100 text-pink-700 border-pink-300',
-            'Special': 'bg-indigo-100 text-indigo-700 border-indigo-300'
+            'Common': 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600',
+            'Uncommon': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700',
+            'Rare': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700',
+            'Epic': 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700',
+            'Legendary': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700',
+            'Mythic': 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700',
+            'Festival': 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 border-pink-300 dark:border-pink-700',
+            'Special': 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700'
         };
         
         const emoji = rarityEmoji[achievement.rarity] || '🎖️';
@@ -529,29 +527,108 @@ export default class Achievement {
              this.currentDisplayAchievementId.toString() === achievementId.toString())) ||
             achievement.is_display === true;
         
-        // 计算卸下时间（如果是自动佩戴的）
+        // 计算卸下时间（仅对自动佩戴的成就显示）
         let removeTimeInfo = '';
-        if (isDisplayed && this.displayInfo && !this.displayInfo.isManual && this.displayInfo.autoDisplayAt) {
-            // 解析 autoDisplayAt 字符串为 UTC+8 时区的 Date 对象
-            // autoDisplayAt 格式为 "YYYY-MM-DD HH:mm:ss"（UTC+8 时区）
-            const autoDisplayAtStr = this.displayInfo.autoDisplayAt;
-            const [datePart, timePart] = autoDisplayAtStr.split(' ');
-            const [year, month, day] = datePart.split('-').map(Number);
-            const [hour, minute, second] = timePart.split(':').map(Number);
-            
-            // 创建 UTC+8 时区的 Date 对象
-            const utc8Offset = 8 * 60 * 60 * 1000; // UTC+8 偏移量（毫秒）
-            const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
-            const autoDisplayAt = new Date(utcTimestamp - utc8Offset);
-            
-            // 计算24小时后的时间
-            const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000);
-            
-            // 获取当前 UTC+8 时区的时间
+        // 只有自动佩戴的成就才显示卸下时间（isManual 为 false 或 undefined）
+        if (isDisplayed && this.displayInfo && 
+            (this.displayInfo.isManual === false || this.displayInfo.isManual === undefined) && 
+            this.displayInfo.autoDisplayAt) {
+            try {
+                // 解析 autoDisplayAt 为 UTC+8 时区的 Date 对象
+                // autoDisplayAt 可能是：
+                // 1. ISO 8601 格式字符串（PostgreSQL JSON序列化）："2025-11-14T15:52:22.000Z"
+                // 2. 普通日期时间字符串（SQLite）："YYYY-MM-DD HH:mm:ss"
+                // 3. Date 对象（很少见）
+                const autoDisplayAtValue = this.displayInfo.autoDisplayAt;
+                let autoDisplayAt;
+                
+                if (typeof autoDisplayAtValue === 'string' && autoDisplayAtValue.trim()) {
+                    // 检查是否是 ISO 8601 格式（包含 'T'）
+                    if (autoDisplayAtValue.includes('T')) {
+                        // ISO 8601 格式：可能是 "2025-11-14T15:52:22.000Z" 或 "2025-11-14T15:52:22"
+                        // 直接解析为 Date 对象
+                        autoDisplayAt = new Date(autoDisplayAtValue);
+                        
+                        // 验证日期是否有效
+                        if (isNaN(autoDisplayAt.getTime())) {
+                            console.warn('autoDisplayAt ISO 格式解析失败:', autoDisplayAtValue);
+                            removeTimeInfo = '';
+                        } else {
+                            // auto_display_at 存储的是 UTC+8 时区的本地时间字符串（格式：YYYY-MM-DD HH:mm:ss）
+                            // PostgreSQL 的 TIMESTAMP 类型在 JSON 序列化时会转换为 ISO 8601 格式
+                            // 如果带 Z（如 "2025-11-14T15:52:22.000Z"），表示 UTC 时间
+                            // 但实际存储的是 UTC+8 时区的本地时间，所以需要正确处理时区
+                            // 
+                            // 例如：存储的是 "2025-11-14 15:52:22"（UTC+8 时区的本地时间）
+                            // PostgreSQL 可能返回 "2025-11-14T15:52:22.000Z"（被当作 UTC 时间）
+                            // 但实际上这个时间应该是 UTC+8 时区的本地时间
+                            // 所以需要加8小时来得到正确的 UTC+8 时间
+                            if (autoDisplayAtValue.endsWith('Z')) {
+                                // 如果是 UTC 时间（带 Z），需要加8小时转换为 UTC+8
+                                // 因为存储的是 UTC+8 时区的本地时间，但被序列化为 UTC 了
+                                const utc8Offset = 8 * 60 * 60 * 1000;
+                                autoDisplayAt = new Date(autoDisplayAt.getTime() + utc8Offset);
+                            } else if (autoDisplayAtValue.includes('+') || autoDisplayAtValue.includes('-') && autoDisplayAtValue.match(/[+-]\d{2}:\d{2}$/)) {
+                                // 如果包含时区偏移（如 +08:00），直接解析即可
+                                // Date 对象会自动处理时区
+                            }
+                            // 如果不带时区信息，说明已经是本地时间（UTC+8），直接使用
+                        }
+                    } else {
+                        // 普通日期时间格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
+                        const parts = autoDisplayAtValue.split(' ');
+                        if (!parts || parts.length < 2) {
+                            console.warn('autoDisplayAt 格式不正确:', autoDisplayAtValue);
+                            removeTimeInfo = '';
+                        } else {
+                            const [datePart, timePart] = parts;
+                            if (!datePart || !timePart) {
+                                console.warn('autoDisplayAt 格式不正确:', autoDisplayAtValue);
+                                removeTimeInfo = '';
+                            } else {
+                                const dateParts = datePart.split('-');
+                                const timeParts = timePart.split(':');
+                                if (dateParts.length < 3 || timeParts.length < 2) {
+                                    console.warn('autoDisplayAt 格式不正确:', autoDisplayAtValue);
+                                    removeTimeInfo = '';
+                                } else {
+                                    const [year, month, day] = dateParts.map(Number);
+                                    const [hour, minute, second] = timeParts.map(Number);
+                                    
+                                    // 验证数字是否有效
+                                    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
+                                        console.warn('autoDisplayAt 包含无效数字:', autoDisplayAtValue);
+                                        removeTimeInfo = '';
+                                    } else {
+                                        // 创建 UTC+8 时区的 Date 对象
+                                        const utc8Offset = 8 * 60 * 60 * 1000;
+                                        const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0);
+                                        autoDisplayAt = new Date(utcTimestamp - utc8Offset);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (autoDisplayAtValue instanceof Date) {
+                    // Date 对象，直接使用
+                    autoDisplayAt = autoDisplayAtValue;
+                } else {
+                    // 未知类型或无效值
+                    console.warn('autoDisplayAt 类型不正确或为空:', typeof autoDisplayAtValue, autoDisplayAtValue);
+                    removeTimeInfo = '';
+                }
+                
+                // 如果成功解析了日期，计算剩余时间
+                if (removeTimeInfo === '' && autoDisplayAt && !isNaN(autoDisplayAt.getTime())) {
+                    // 计算24小时后的时间（从获取成就的时间开始计算）
+                    const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000);
+                    
+                    // 获取当前 UTC+8 时区的时间
             const now = new Date();
-            const nowUTC8 = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset);
-            
-            const diffMs = removeAt.getTime() - nowUTC8.getTime();
+                    const utc8Offset = 8 * 60 * 60 * 1000;
+                    const nowUTC8 = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset);
+                    
+                    const diffMs = removeAt.getTime() - nowUTC8.getTime();
             
             if (diffMs > 0) {
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -577,6 +654,12 @@ export default class Achievement {
                         </span>
                     </div>
                 `;
+                    }
+                }
+            } catch (error) {
+                console.error('计算卸下时间失败:', error, 'autoDisplayAt:', this.displayInfo?.autoDisplayAt);
+                // 出错时不显示卸下时间，但不影响其他功能
+                removeTimeInfo = '';
             }
         }
         
@@ -592,12 +675,12 @@ export default class Achievement {
         ` : '';
         
         return `
-            <div class="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 hover:border-gray-300 transition-colors ${opacityClass} ${displayedClass} flex flex-col h-full relative">
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${opacityClass} ${displayedClass} flex flex-col h-full relative">
                 ${displayedBadge}
                 <div class="flex items-start gap-2.5 sm:gap-3 mb-2.5 sm:mb-3 flex-shrink-0">
                     <div class="text-2xl sm:text-3xl flex-shrink-0">${emoji}</div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 truncate">${achievement.name || achievement.id}</div>
+                        <div class="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1.5 truncate">${achievement.name || achievement.id}</div>
                         ${removeTimeInfo ? `
                             <div class="mb-1.5">
                                 ${removeTimeInfo.replace('mt-2', 'mt-0')}
@@ -608,7 +691,7 @@ export default class Achievement {
                         </div>
                     </div>
                 </div>
-                <div class="text-xs text-gray-600 mb-2.5 sm:mb-3 line-clamp-2 flex-1">
+                <div class="text-xs text-gray-600 dark:text-gray-400 mb-2.5 sm:mb-3 line-clamp-2 flex-1">
                     ${achievement.description || '无描述'}
                 </div>
                 ${unlocked ? `
@@ -616,7 +699,7 @@ export default class Achievement {
                         <div class="mt-auto">
                             <button 
                                 type="button"
-                                class="set-display-btn w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium cursor-not-allowed"
+                                class="set-display-btn w-full px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-xs font-medium cursor-not-allowed"
                                 disabled
                                 data-achievement-id="${achievementId}"
                                 data-achievement-name="${achievement.name || achievementId}"
@@ -637,41 +720,33 @@ export default class Achievement {
                         </button>
                     `}
                 ` : `
-                    <div class="text-xs text-gray-400 text-center py-1.5 sm:py-2 mt-auto">未解锁</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 text-center py-1.5 sm:py-2 mt-auto">未解锁</div>
                 `}
             </div>
         `;
     }
     
     async setDisplayAchievement(achievementId, achievementName, achievementRarity) {
-        console.log('setDisplayAchievement 方法被调用:', { achievementId, achievementName, achievementRarity });
-        
         // 获取秘钥
         let secretKey;
         try {
-            console.log('开始获取秘钥...');
             secretKey = await SecretKeyManager.get(this.app.userId, true);
-            console.log('秘钥获取结果:', secretKey ? '已获取' : '未获取');
         } catch (error) {
-            console.log('获取秘钥失败或用户取消:', error);
             // 用户取消输入
             return;
         }
         
         if (!secretKey) {
-            console.warn('秘钥为空，无法继续');
             Toast.show('请先设置秘钥', 'error');
             return;
         }
         
         if (!this.currentGroupId) {
-            console.warn('当前群聊ID为空');
             Toast.show('请选择群聊', 'error');
             return;
         }
         
         const groupId = this.currentGroupId;
-        console.log('准备设置显示成就:', { userId: this.app.userId, groupId, achievementId });
         
         try {
             // 显示加载状态
@@ -679,33 +754,23 @@ export default class Achievement {
             if (btn) {
                 btn.disabled = true;
                 btn.textContent = '设置中...';
-                console.log('按钮状态已更新为加载中');
-            } else {
-                console.warn('未找到按钮元素');
             }
             
-            console.log('开始调用API设置显示成就:', { userId: this.app.userId, groupId, achievementId, secretKey: secretKey ? '已提供' : '未提供' });
-            
             const result = await api.setDisplayAchievement(this.app.userId, groupId, achievementId, secretKey);
-            console.log('设置显示成就API完整响应:', JSON.stringify(result, null, 2));
             
             // 从API响应中获取当前显示的成就ID
             const newDisplayId = result?.current_display || result?.displayAchievementId || achievementId;
             
             if (newDisplayId) {
                 this.currentDisplayAchievementId = newDisplayId;
-                console.log('更新当前显示成就ID:', this.currentDisplayAchievementId);
             } else {
-                console.warn('API响应中没有找到当前显示成就ID，使用设置的成就ID:', achievementId);
                 this.currentDisplayAchievementId = achievementId;
             }
             
             Toast.show(`已设置为显示：${achievementName}`, 'success');
             
             // 重新加载成就列表以获取最新状态（从服务器获取最新数据）
-            console.log('开始重新加载成就列表...');
             await this.loadAchievements();
-            console.log('成就列表重新加载完成，当前显示成就ID:', this.currentDisplayAchievementId);
         } catch (error) {
             console.error('设置显示成就失败:', error);
             console.error('错误详情:', error.message, error.stack);

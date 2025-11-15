@@ -47,27 +47,27 @@ export class Modal {
         
         this.overlay = overlay;
         
-        // 设置模态框内容 - 简约风格
+        // 设置模态框内容 - 简约风格（深色模式适配）
         const closeButton = options.showCloseButton ? 
-            `<button class="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" id="modalClose" title="关闭">
+            `<button class="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" id="modalClose" title="关闭">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>` : '';
         
         overlay.innerHTML = `
-            <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden relative transform transition-all duration-200" style="transform: scale(0.95) translateY(10px);">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden relative transform transition-all duration-200" style="transform: scale(0.95) translateY(10px);">
                 ${title ? `
-                <div class="px-6 py-4 border-b border-gray-200 relative">
-                    <h3 class="text-lg font-semibold text-gray-900 pr-8">${title}</h3>
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 relative">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 pr-8">${title}</h3>
                     ${closeButton}
                 </div>
                 ` : closeButton ? `<div class="absolute top-4 right-4 z-10">${closeButton}</div>` : ''}
-                <div class="px-6 py-5 text-gray-700 max-h-[60vh] overflow-y-auto" id="modalBody">
+                <div class="px-6 py-5 text-gray-700 dark:text-gray-300 max-h-[60vh] overflow-y-auto" id="modalBody">
                     ${options.content}
                 </div>
                 ${options.footer ? `
-                    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3" id="modalFooter">
+                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-end gap-3" id="modalFooter">
                         ${options.footer}
                     </div>
                 ` : ''}
@@ -157,13 +157,13 @@ export class Modal {
      */
     confirm({ title = '确认', message, onConfirm, onCancel = null }) {
         const footer = `
-            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" id="modalCancel">取消</button>
+            <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" id="modalCancel">取消</button>
             <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="modalConfirm">确认</button>
         `;
         
         this.show({
             title,
-            content: `<p class="text-gray-700 leading-relaxed">${message}</p>`,
+            content: `<p class="text-gray-700 dark:text-gray-300 leading-relaxed">${message}</p>`,
             footer
         });
         
@@ -201,14 +201,14 @@ export class Modal {
      */
     prompt({ title = '输入', message, placeholder = '请输入', type = 'text', value = '', onConfirm, onCancel = null }) {
         const content = `
-            ${message ? `<p class="text-sm text-gray-600 mb-3">${message}</p>` : ''}
+            ${message ? `<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">${message}</p>` : ''}
             <div>
-                <input type="${type}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 text-sm placeholder-gray-400" id="modalInput" placeholder="${placeholder}" value="${value}">
+                <input type="${type}" class="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-700 text-sm placeholder-gray-400 dark:placeholder-gray-500" id="modalInput" placeholder="${placeholder}" value="${value}">
             </div>
         `;
         
         const footer = `
-            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" id="modalCancel">取消</button>
+            <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" id="modalCancel">取消</button>
             <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="modalConfirm">确认</button>
         `;
         

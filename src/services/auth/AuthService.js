@@ -107,19 +107,12 @@ class AuthService {
             }
 
             if (userKeyData.hash && userKeyData.salt) {
-                if (userKeyData.originalKey) {
-                    return {
-                        secretKey: userKeyData.originalKey,
-                        hasExistingKey: true,
-                        message: '秘钥获取成功'
-                    };
-                } else {
-                    return {
-                        secretKey: '***已加密***',
-                        hasExistingKey: true,
-                        message: '秘钥已加密存储，无法显示原始值'
-                    };
-                }
+                // 不再返回明文秘钥，只返回提示信息
+                return {
+                    secretKey: '***已加密存储***',
+                    hasExistingKey: true,
+                    message: '秘钥已加密存储，无法显示原始值。如需修改，请使用"修改秘钥"功能。'
+                };
             } else {
                 return {
                     hasExistingKey: false,
@@ -172,19 +165,25 @@ class AuthService {
             const salt = crypto.randomBytes(16).toString('hex');
             const hash = crypto.pbkdf2Sync(secretKey, salt, 1000, 64, 'sha512').toString('hex');
 
-            // 保存秘钥（同时保存原始值用于编辑器）
+            // 保存秘钥（不保存明文，只保存 hash 和 salt）
             const { TimeUtils } = await import('../../core/utils/TimeUtils.js');
             
             // 保留原有的 role 和 createdAt（如果存在）
             const existingUser = keyData[userId];
-            keyData[userId] = {
+            const newUserData = {
                 hash: hash,
                 salt: salt,
-                originalKey: secretKey,
                 role: existingUser?.role || 'user', // 保留原有角色，新用户默认为 'user'
                 createdAt: existingUser?.createdAt || TimeUtils.formatDateTimeForDB(),
                 updatedAt: TimeUtils.formatDateTimeForDB()
             };
+            
+            // 移除 originalKey 字段（如果存在），提高安全性
+            if (existingUser?.originalKey) {
+                globalConfig.debug(`[权限系统] 移除用户 ${userId} 的明文秘钥存储`);
+            }
+            
+            keyData[userId] = newUserData;
 
             // 确保目录存在
             PathResolver.ensureDirectory(path.dirname(keyFilePath));
@@ -202,6 +201,7 @@ class AuthService {
 
     /**
      * 获取用户权限角色
+     * 仅检查 key.json 中的角色配置
      * @param {string} userId 用户ID
      * @returns {Promise<'admin'|'user'|null>} 返回 'admin'（管理员）、'user'（普通用户）或 null（无权限）
      */
@@ -313,13 +313,21 @@ class AuthService {
                 return { success: false, message: '用户不存在' };
             }
 
-            // 更新角色
+            // 更新角色（保留其他字段，移除 originalKey）
             const { TimeUtils } = await import('../../core/utils/TimeUtils.js');
-            keyData[userId] = {
+            const updatedUserData = {
                 ...keyData[userId],
                 role: role,
                 updatedAt: TimeUtils.formatDateTimeForDB()
             };
+            
+            // 移除 originalKey 字段（如果存在），提高安全性
+            if (updatedUserData.originalKey) {
+                delete updatedUserData.originalKey;
+                globalConfig.debug(`[权限系统] 移除用户 ${userId} 的明文秘钥存储`);
+            }
+            
+            keyData[userId] = updatedUserData;
 
             // 确保目录存在
             PathResolver.ensureDirectory(path.dirname(keyFilePath));

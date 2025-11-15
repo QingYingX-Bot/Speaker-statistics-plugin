@@ -77,6 +77,17 @@ class Plugin extends plugin {
         Plugin._initializing = true;
 
         try {
+            // 优化 key.json 文件（移除明文秘钥）
+            try {
+                const { KeyFileOptimizer } = await import('./utils/KeyFileOptimizer.js');
+                const optimizeResult = await KeyFileOptimizer.optimizeKeyFile();
+                if (optimizeResult.cleaned > 0) {
+                    logger.mark(`[发言统计] key.json 优化完成，清理了 ${optimizeResult.cleaned} 个用户的明文秘钥`);
+                }
+            } catch (optimizeError) {
+                logger.warn('[发言统计] key.json 优化失败:', optimizeError);
+            }
+
             const { getWebServer } = await import('../services/WebServer.js');
             const webServer = getWebServer();
             

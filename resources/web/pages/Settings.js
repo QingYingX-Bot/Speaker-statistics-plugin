@@ -8,29 +8,29 @@ export default class Settings {
     
     async render() {
         return `
-            <div class="bg-white min-h-full">
-                <div class="max-w-4xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+            <div class="bg-white dark:bg-gray-900 min-h-full">
+                <div class="max-w-[1200px] mx-auto px-3 sm:px-4 lg:px-8 xl:px-12 py-4 sm:py-6 lg:py-8">
                     <!-- 页面标题 -->
                     <div class="mb-4 sm:mb-6">
-                        <h1 class="text-xl sm:text-2xl font-semibold text-gray-900 mb-1">设置</h1>
-                        <p class="text-xs text-gray-500">管理您的账户和偏好设置</p>
+                        <h1 class="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">设置</h1>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">管理您的账户和偏好设置</p>
                     </div>
                     
                     <div class="space-y-4 sm:space-y-6">
                         <!-- 用户信息设置 -->
-                        <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
                             <div class="flex items-center justify-between mb-3 sm:mb-4">
                                 <div>
-                                    <h2 class="text-base sm:text-lg font-semibold text-gray-900 mb-1">用户信息</h2>
-                                    <p class="text-xs text-gray-500">管理您的用户ID和登录状态</p>
+                                    <h2 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">用户信息</h2>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">管理您的用户ID和登录状态</p>
                                 </div>
                             </div>
                             
                             <div class="space-y-3 sm:space-y-4">
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 py-2 sm:py-3 border-b border-gray-100">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 py-2 sm:py-3 border-b border-gray-100 dark:border-gray-800">
                                     <div class="flex-1">
-                                        <div class="text-xs sm:text-sm font-medium text-gray-900 mb-1">用户ID</div>
-                                        <div class="text-xs text-gray-500 truncate" id="settingsUserId">${this.app.userId || '未登录'}</div>
+                                        <div class="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">用户ID</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 truncate" id="settingsUserId">${this.app.userId || '未登录'}</div>
                                     </div>
                                     <button id="changeUserIdBtn" class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-primary hover:text-primary-hover transition-colors self-start sm:self-auto">
                                         更换
@@ -39,29 +39,29 @@ export default class Settings {
                                 
                                 <div class="flex items-center justify-between py-2 sm:py-3">
                                     <div class="flex-1">
-                                        <div class="text-xs sm:text-sm font-medium text-gray-900 mb-1">用户名</div>
-                                        <div class="text-xs text-gray-500 truncate" id="settingsUserName">${localStorage.getItem(`userName_${this.app.userId}`) || '未设置'}</div>
+                                        <div class="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">用户名</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 truncate" id="settingsUserName">${localStorage.getItem(`userName_${this.app.userId}`) || '未设置'}</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- 安全设置 -->
-                        <div class="bg-white rounded-lg border border-gray-200 p-5">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 lg:p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-gray-900 mb-1">安全设置</h2>
-                                    <p class="text-xs text-gray-500">管理您的秘钥和安全信息</p>
+                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">安全设置</h2>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">管理您的秘钥和安全信息</p>
                                 </div>
                             </div>
                             
                             <div class="space-y-4">
-                                <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                                <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
                                     <div class="flex-1">
-                                        <div class="text-sm font-medium text-gray-900 mb-1">秘钥</div>
-                                        <div class="text-xs text-gray-500">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">秘钥</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
                                             ${Storage.get('secretKey') ? '已设置' : '未设置'}
-                                            ${Storage.get('secretKey') ? `<span class="ml-2 text-gray-400 font-mono">${this.maskSecretKey(Storage.get('secretKey'))}</span>` : ''}
+                                            ${Storage.get('secretKey') ? `<span class="ml-2 text-gray-400 dark:text-gray-500 font-mono">${this.maskSecretKey(Storage.get('secretKey'))}</span>` : ''}
                                         </div>
                                     </div>
                                     <div class="flex gap-2">
@@ -76,12 +76,12 @@ export default class Settings {
                                     </div>
                                 </div>
                                 
-                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                                     <div class="flex items-start gap-2">
-                                        <svg class="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                         </svg>
-                                        <div class="text-xs text-yellow-800">
+                                        <div class="text-xs text-yellow-800 dark:text-yellow-300">
                                             <div class="font-medium mb-1">安全提示</div>
                                             <div>秘钥用于验证您的身份，请妥善保管，不要泄露给他人。</div>
                                         </div>
@@ -91,31 +91,31 @@ export default class Settings {
                         </div>
                         
                         <!-- 数据管理 -->
-                        <div class="bg-white rounded-lg border border-gray-200 p-5">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 lg:p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-gray-900 mb-1">数据管理</h2>
-                                    <p class="text-xs text-gray-500">管理本地存储的数据</p>
+                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">数据管理</h2>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">管理本地存储的数据</p>
                                 </div>
                             </div>
                             
                             <div class="space-y-4">
-                                <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                                <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
                                     <div class="flex-1">
-                                        <div class="text-sm font-medium text-gray-900 mb-1">清除缓存</div>
-                                        <div class="text-xs text-gray-500">清除本地存储的缓存数据，不会影响您的账户信息</div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">清除缓存</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">清除本地存储的缓存数据，不会影响您的账户信息</div>
                                     </div>
-                                    <button id="clearCacheBtn" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
+                                    <button id="clearCacheBtn" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">
                                         清除
                                     </button>
                                 </div>
                                 
                                 <div class="flex items-center justify-between py-3">
                                     <div class="flex-1">
-                                        <div class="text-sm font-medium text-gray-900 mb-1">重置所有设置</div>
-                                        <div class="text-xs text-gray-500">清除所有本地存储的数据，包括用户ID和秘钥</div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">重置所有设置</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">清除所有本地存储的数据，包括用户ID和秘钥</div>
                                     </div>
-                                    <button id="resetAllBtn" class="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 transition-colors">
+                                    <button id="resetAllBtn" class="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors">
                                         重置
                                     </button>
                                 </div>
@@ -123,22 +123,22 @@ export default class Settings {
                         </div>
                         
                         <!-- 关于 -->
-                        <div class="bg-white rounded-lg border border-gray-200 p-5">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 lg:p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-gray-900 mb-1">关于</h2>
-                                    <p class="text-xs text-gray-500">系统信息和版本</p>
+                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">关于</h2>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">系统信息和版本</p>
                                 </div>
                             </div>
                             
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between py-2">
-                                    <div class="text-sm text-gray-600">系统名称</div>
-                                    <div class="text-sm font-medium text-gray-900">发言统计系统</div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">系统名称</div>
+                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">发言统计系统</div>
                                 </div>
-                                <div class="flex items-center justify-between py-2 border-t border-gray-100">
-                                    <div class="text-sm text-gray-600">版本</div>
-                                    <div class="text-sm font-medium text-gray-900">1.0.0</div>
+                                <div class="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">版本</div>
+                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">1.0.0</div>
                                 </div>
                             </div>
                         </div>
@@ -337,15 +337,15 @@ export default class Settings {
         
         Modal.show('更换用户ID', `
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">请输入新的用户ID</label>
-                <input type="text" id="newUserIdInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入用户ID" value="${currentUserId}">
-                <div class="mt-2 text-xs text-gray-500">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">请输入新的用户ID</label>
+                <input type="text" id="newUserIdInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入用户ID" value="${currentUserId}">
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     当前用户ID: ${currentUserId || '未设置'}
                 </div>
             </div>
         `, `
             <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmUserIdBtn">确认</button>
-            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
+            <button class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
         `);
         
         setTimeout(() => {
@@ -387,37 +387,37 @@ export default class Settings {
         Modal.show(isModifying ? '修改秘钥' : '设置秘钥', `
             <div class="mb-4 space-y-4">
                 ${isModifying ? `
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
                         <div class="flex items-start gap-2">
-                            <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-yellow-800">修改秘钥需要验证码验证</p>
-                                <p class="text-xs text-yellow-600 mt-1">验证码将发送到您的QQ，有效期1分钟</p>
+                                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">修改秘钥需要验证码验证</p>
+                                <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">验证码将发送到您的QQ，有效期1分钟</p>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">验证码</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                         <div class="flex gap-2">
-                            <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入6位验证码" maxlength="6">
-                            <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
+                            <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入6位验证码" maxlength="6">
+                            <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
                         </div>
-                        <div class="mt-1 text-xs text-gray-500" id="codeHint">验证码将发送到您的QQ</div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400" id="codeHint">验证码将发送到您的QQ</div>
                     </div>
                 ` : ''}
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">${isModifying ? '新' : ''}秘钥</label>
-                    <input type="password" id="secretKeyInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入秘钥" value="${currentKey}">
-                    <div class="mt-2 text-xs text-gray-500">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${isModifying ? '新' : ''}秘钥</label>
+                    <input type="password" id="secretKeyInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入秘钥" value="${currentKey}">
+                    <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         秘钥用于验证您的身份，请妥善保管
                     </div>
                 </div>
             </div>
         `, `
             <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmSecretKeyBtn">确认</button>
-            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
+            <button class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
         `);
         
         setTimeout(() => {
@@ -460,7 +460,7 @@ export default class Settings {
                         
                         Toast.show('验证码已发送，请查看QQ消息', 'success');
                         codeHint.textContent = '验证码已发送，请查看QQ消息（有效期1分钟）';
-                        codeHint.className = 'mt-1 text-xs text-green-600';
+                        codeHint.className = 'mt-1 text-xs text-green-600 dark:text-green-400';
                         
                         startCountdown();
                     } catch (error) {
@@ -550,29 +550,29 @@ export default class Settings {
         // 显示验证码输入窗口
         Modal.show('清除秘钥', `
             <div class="mb-4 space-y-4">
-                <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                     <div class="flex items-start gap-2">
-                        <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                         </svg>
                         <div class="flex-1">
-                            <p class="text-sm font-medium text-red-800">警告：清除秘钥操作不可逆</p>
-                            <p class="text-xs text-red-600 mt-1">清除后需要重新设置才能使用需要验证的功能</p>
+                            <p class="text-sm font-medium text-red-800 dark:text-red-300">警告：清除秘钥操作不可逆</p>
+                            <p class="text-xs text-red-600 dark:text-red-400 mt-1">清除后需要重新设置才能使用需要验证的功能</p>
                         </div>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">验证码</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                     <div class="flex gap-2">
-                        <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入6位验证码" maxlength="6">
-                        <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
+                        <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入6位验证码" maxlength="6">
+                        <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
                     </div>
-                    <div class="mt-1 text-xs text-gray-500" id="codeHint">验证码将发送到您的QQ</div>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400" id="codeHint">验证码将发送到您的QQ</div>
                 </div>
             </div>
         `, `
             <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium" id="confirmClearBtn">确认清除</button>
-            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
+            <button class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium" onclick="Modal.hide()">取消</button>
         `);
         
         setTimeout(() => {
