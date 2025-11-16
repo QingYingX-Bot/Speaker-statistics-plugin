@@ -2,7 +2,6 @@ import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { PathResolver } from '../core/utils/PathResolver.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js';
-import { segment } from 'oicq';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,11 +47,7 @@ class BackgroundManager {
                 return e.reply(`❌ ${result.message}`);
             }
             
-            return e.reply([
-                segment.text('🖼️ 背景设置页面链接：\n'),
-                segment.text(result.url),
-                segment.text('\n\n⚠️ 链接24小时内有效，请勿分享给他人')
-            ]);
+            return e.reply(`🖼️ 背景设置页面链接：\n${result.url}\n\n⚠️ 链接24小时内有效，请勿分享给他人`);
         } catch (error) {
             globalConfig.error('生成背景设置链接失败:', error);
             return e.reply('❌ 生成链接失败，请稍后重试');

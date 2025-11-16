@@ -1,0 +1,47 @@
+{
+  "words_1000": {
+    "id": "words_1000",
+    "name": "笔下生花",
+    "description": "累计字数1000字",
+    "rarity": "common",
+    "category": "words",
+    "condition": {
+      "type": "total_words",
+      "value": 1000
+    }
+  },
+  "words_5000": {
+    "id": "words_5000",
+    "name": "文思泉涌",
+    "description": "累计字数5000字",
+    "rarity": "uncommon",
+    "category": "words",
+    "condition": {
+      "type": "total_words",
+      "value": 5000
+    }
+  },
+  "words_10000": {
+    "id": "words_10000",
+    "name": "文采飞扬",
+    "description": "累计字数10000字",
+    "rarity": "rare",
+    "category": "words",
+    "condition": {
+      "type": "total_words",
+      "value": 10000
+    }
+  },
+  "words_50000": {
+    "id": "words_50000",
+    "name": "文坛巨匠",
+    "description": "累计字数50000字",
+    "rarity": "epic",
+    "category": "words",
+    "condition": {
+      "type": "total_words",
+      "value": 50000
+    }
+  }
+}
+

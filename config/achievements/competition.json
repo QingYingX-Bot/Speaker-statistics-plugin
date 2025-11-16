@@ -1,0 +1,124 @@
+{
+  "daily_champion": {
+    "id": "daily_champion",
+    "name": "日冠群雄",
+    "description": "单日发言200条",
+    "rarity": "epic",
+    "category": "competition",
+    "condition": {
+      "type": "daily_count",
+      "value": 200
+    }
+  },
+  "weekly_champion": {
+    "id": "weekly_champion",
+    "name": "周冠天下",
+    "description": "单周发言500条",
+    "rarity": "epic",
+    "category": "competition",
+    "condition": {
+      "type": "weekly_count",
+      "value": 500
+    }
+  },
+  "weekly_champion_1000": {
+    "id": "weekly_champion_1000",
+    "name": "周冠无双",
+    "description": "单周发言1000条",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "weekly_count",
+      "value": 1000
+    }
+  },
+  "monthly_champion": {
+    "id": "monthly_champion",
+    "name": "月冠无双",
+    "description": "单月发言2000条",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "monthly_count",
+      "value": 2000
+    }
+  },
+  "monthly_champion_5000": {
+    "id": "monthly_champion_5000",
+    "name": "月冠千古",
+    "description": "单月发言5000条",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "monthly_count",
+      "value": 5000
+    }
+  },
+  "daily_words_champion": {
+    "id": "daily_words_champion",
+    "name": "日墨如金",
+    "description": "单日字数1000字",
+    "rarity": "epic",
+    "category": "competition",
+    "condition": {
+      "type": "daily_words",
+      "value": 1000
+    }
+  },
+  "daily_words_champion_3000": {
+    "id": "daily_words_champion_3000",
+    "name": "一日万字",
+    "description": "单日字数3000字",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "daily_words",
+      "value": 3000
+    }
+  },
+  "weekly_words_champion": {
+    "id": "weekly_words_champion",
+    "name": "周墨飘香",
+    "description": "单周字数5000字",
+    "rarity": "epic",
+    "category": "competition",
+    "condition": {
+      "type": "weekly_words",
+      "value": 5000
+    }
+  },
+  "weekly_words_champion_15000": {
+    "id": "weekly_words_champion_15000",
+    "name": "周墨如海",
+    "description": "单周字数15000字",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "weekly_words",
+      "value": 15000
+    }
+  },
+  "monthly_words_champion": {
+    "id": "monthly_words_champion",
+    "name": "月墨千秋",
+    "description": "单月字数20000字",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "monthly_words",
+      "value": 20000
+    }
+  },
+  "monthly_words_champion_50000": {
+    "id": "monthly_words_champion_50000",
+    "name": "月墨万古",
+    "description": "单月字数50000字",
+    "rarity": "legendary",
+    "category": "competition",
+    "condition": {
+      "type": "monthly_words",
+      "value": 50000
+    }
+  }
+}
+

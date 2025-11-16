@@ -1,0 +1,91 @@
+{
+  "daily_10": {
+    "id": "daily_10",
+    "name": "每日初见",
+    "description": "单日发言10条",
+    "rarity": "common",
+    "category": "daily",
+    "condition": {
+      "type": "daily_count",
+      "value": 10
+    }
+  },
+  "daily_50": {
+    "id": "daily_50",
+    "name": "一日千里",
+    "description": "单日发言50条",
+    "rarity": "uncommon",
+    "category": "daily",
+    "condition": {
+      "type": "daily_count",
+      "value": 50
+    }
+  },
+  "daily_100": {
+    "id": "daily_100",
+    "name": "舌战群雄",
+    "description": "单日发言100条",
+    "rarity": "rare",
+    "category": "daily",
+    "condition": {
+      "type": "daily_count",
+      "value": 100
+    }
+  },
+  "daily_200": {
+    "id": "daily_200",
+    "name": "一日千言",
+    "description": "单日发言200条",
+    "rarity": "epic",
+    "category": "daily",
+    "condition": {
+      "type": "daily_count",
+      "value": 200
+    }
+  },
+  "daily_words_100": {
+    "id": "daily_words_100",
+    "name": "落笔成章",
+    "description": "单日字数100字",
+    "rarity": "common",
+    "category": "daily",
+    "condition": {
+      "type": "daily_words",
+      "value": 100
+    }
+  },
+  "daily_words_500": {
+    "id": "daily_words_500",
+    "name": "妙笔生花",
+    "description": "单日字数500字",
+    "rarity": "uncommon",
+    "category": "daily",
+    "condition": {
+      "type": "daily_words",
+      "value": 500
+    }
+  },
+  "daily_words_1000": {
+    "id": "daily_words_1000",
+    "name": "一日千字",
+    "description": "单日字数1000字",
+    "rarity": "rare",
+    "category": "daily",
+    "condition": {
+      "type": "daily_words",
+      "value": 1000
+    }
+  },
+  "daily_words_2000": {
+    "id": "daily_words_2000",
+    "name": "笔下千言",
+    "description": "单日字数2000字",
+    "rarity": "epic",
+    "category": "daily",
+    "condition": {
+      "type": "daily_words",
+      "value": 2000
+    }
+  }
+}
+

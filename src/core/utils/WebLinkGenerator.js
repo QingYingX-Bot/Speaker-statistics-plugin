@@ -31,17 +31,19 @@ export class WebLinkGenerator {
     /**
      * 生成链接
      * @param {string} token Token字符串
-     * @param {string} route 路由路径（可选）
+     * @param {string} hashRoute 前端hash路由（可选，如 '/background'）
      * @returns {string} 完整URL
      */
-    static generateLink(token, route = '') {
+    static generateLink(token, hashRoute = '') {
         const config = this.getServerConfig();
         const baseUrl = `${config.protocol}://${config.domain || config.host}:${config.port}`;
-        return route ? `${baseUrl}/${route}/${token}` : `${baseUrl}/${token}`;
+        // 生成带token的基础URL，hash路由直接附加在URL后面
+        const hash = hashRoute ? `#${hashRoute}` : '#/';
+        return `${baseUrl}/${token}${hash}`;
     }
 
     /**
-     * 生成网页链接
+     * 生成网页链接（首页）
      * @param {string} userId 用户ID
      * @returns {Promise<{success: boolean, url?: string, message?: string}>}
      */
@@ -55,7 +57,8 @@ export class WebLinkGenerator {
             }
             
             const token = webServer.generateToken(userId);
-            const url = this.generateLink(token);
+            // 生成首页链接，使用 #/ 作为hash路由
+            const url = this.generateLink(token, '/');
             
             return { success: true, url };
         } catch (error) {
@@ -79,7 +82,8 @@ export class WebLinkGenerator {
             }
             
             const token = webServer.generateToken(userId);
-            const url = this.generateLink(token, 'background');
+            // 生成背景设置页面链接，使用 #/background 作为hash路由
+            const url = this.generateLink(token, '/background');
             
             return { success: true, url };
         } catch (error) {

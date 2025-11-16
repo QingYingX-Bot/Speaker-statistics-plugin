@@ -7,7 +7,7 @@
 ## 🏗️ 目录结构
 
 ```
-config/achievements/group/
+data/achievements/group/
   └── {群ID}/                    # 特定群组目录
       ├── group.json             # 群专属成就文件（默认文件名）
       └── custom.json            # 其他自定义成就文件
@@ -17,9 +17,9 @@ config/achievements/group/
 
 ### 1. 创建群专属成就目录
 
-在 `config/achievements/group/` 目录下创建以群号命名的文件夹，例如：
-- `config/achievements/group/123456789/` （群号 123456789）
-- `config/achievements/group/987654321/` （群号 987654321）
+在 `data/achievements/group/` 目录下创建以群号命名的文件夹，例如：
+- `data/achievements/group/123456789/` （群号 123456789）
+- `data/achievements/group/987654321/` （群号 987654321）
 
 ### 2. 创建成就文件
 
@@ -76,9 +76,9 @@ config/achievements/group/
 
 成就加载按以下顺序合并（后加载的覆盖先加载的）：
 
-1. 系统默认成就：`config/achievements.json`
-2. 用户自定义成就：`config/achievements/*.json`
-3. **群专属成就**：`config/achievements/group/{群ID}/*.json`
+1. 系统默认成就：`config/achievements/` 目录（按分类分文件）
+2. 用户自定义成就：`data/achievements/*.json`
+3. **群专属成就**：`data/achievements/group/{群ID}/*.json`
 
 ## 💡 使用建议
 

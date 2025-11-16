@@ -430,21 +430,48 @@ class ConfigManager {
 
     /**
      * 获取默认成就配置数据（系统内置）
-     * @returns {Object} 默认成就配置对象
+     * 从 config/achievements/ 目录加载所有成就文件，并从 achievements-config.json 加载分类和稀有度配置
+     * @returns {Object} 默认成就配置对象 { achievements: {}, categories: {}, rarities: {} }
      */
     getDefaultAchievementsConfig() {
         try {
             const configDir = PathResolver.getConfigDir();
-            const achievementsPath = path.join(configDir, 'achievements.json');
-            if (!fs.existsSync(achievementsPath)) {
-                return { achievements: {}, categories: {}, rarities: {} };
+            const achievementsDir = path.join(configDir, 'achievements');
+            const achievementsConfigPath = path.join(configDir, 'achievements-config.json');
+            const achievements = {};
+            let categories = {};
+            let rarities = {};
+
+            // 加载成就配置（分类和稀有度）
+            if (fs.existsSync(achievementsConfigPath)) {
+                try {
+                    const configContent = fs.readFileSync(achievementsConfigPath, 'utf8');
+                    const config = JSON.parse(configContent);
+                    categories = config.categories || {};
+                    rarities = config.rarities || {};
+                } catch (error) {
+                    this.error('读取成就配置文件失败:', error);
+                }
             }
 
-            const configContent = fs.readFileSync(achievementsPath, 'utf8');
-            const config = JSON.parse(configContent);
-            return config;
+            // 加载所有成就文件
+            if (fs.existsSync(achievementsDir)) {
+                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'));
+                for (const file of files) {
+                    const filePath = path.join(achievementsDir, file);
+                    try {
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        const fileData = JSON.parse(fileContent);
+                        Object.assign(achievements, fileData);
+                    } catch (fileError) {
+                        this.error(`加载成就文件失败: ${file}`, fileError);
+                    }
+                }
+            }
+
+            return { achievements, categories, rarities };
         } catch (error) {
-            this.error('读取默认成就配置文件失败:', error);
+            this.error('读取默认成就配置失败:', error);
             return { achievements: {}, categories: {}, rarities: {} };
         }
     }

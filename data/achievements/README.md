@@ -8,7 +8,17 @@
 
 ```
 config/
-  └── achievements.json                  # 系统默认成就（30个成就，只读）
+  ├── achievements-config.json          # 成就分类和稀有度配置
+  └── achievements/                      # 系统默认成就目录（41个成就，按分类分文件，只读）
+      ├── basic.json                    # 基础类成就
+      ├── count.json                    # 计数类成就
+      ├── words.json                    # 字数类成就
+      ├── active.json                   # 活跃类成就
+      ├── daily.json                    # 每日类成就
+      ├── streak.json                   # 连续类成就
+      ├── time.json                     # 时段类成就
+      ├── social.json                   # 社交类成就
+      └── competition.json              # 竞赛类成就
 
 data/
   └── achievements/                      # 用户自定义成就目录
@@ -23,12 +33,13 @@ data/
 
 ### 📄 配置文件说明
 
-#### 1. 系统默认成就（`achievements.json`）
+#### 1. 系统默认成就（`config/achievements/` 目录）
 
-包含30个系统预定义的成就，作为基础成就配置。
+包含41个系统预定义的成就，按分类分文件存储，作为基础成就配置。
 
 - ✅ **只读**：由插件提供，不建议修改
-- 📦 **完整配置**：包含 achievements、categories、rarities 完整配置
+- 📁 **分类存储**：每个分类独立文件，便于管理和维护
+- 📦 **配置分离**：成就定义、分类配置、稀有度配置分别存储
 
 #### 2. 用户自定义成就（`data/achievements/` 目录）
 
@@ -84,7 +95,7 @@ data/
 
 成就加载遵循以下优先级（后加载的覆盖先加载的）：
 
-1. **系统默认**：加载 `config/achievements.json` 中的默认成就
+1. **系统默认**：加载 `config/achievements/` 目录下的默认成就（按分类分文件）
 2. **用户自定义**：加载 `data/achievements/` 目录下的用户自定义成就
 3. **群专属**：针对特定群组，加载 `data/achievements/group/{群ID}/` 目录下的群专属成就
 
@@ -134,7 +145,7 @@ data/
 
 ## 🎯 当前状态
 
-- ✅ 系统默认成就：`config/achievements.json` 已创建，包含30个成就定义（只读）
+- ✅ 系统默认成就：`config/achievements/` 目录已创建，包含41个成就定义（按分类分文件，只读）
 - ✅ 用户自定义目录：`data/achievements/` 文件夹已创建
 - ✅ 群专属支持：支持在 `data/achievements/group/{群ID}/` 创建群专属成就
 - ✅ 三层结构完整：系统默认 → 用户自定义 → 群专属，支持完整覆盖
@@ -142,7 +153,7 @@ data/
 ## 💡 使用建议
 
 ### 基础使用
-直接使用系统默认的30个成就即可，无需额外配置。
+直接使用系统默认的41个成就即可，无需额外配置。
 
 ### 扩展使用
 1. **添加自定义成就**：在 `data/achievements/` 目录下创建 JSON 文件

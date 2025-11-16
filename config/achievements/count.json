@@ -1,0 +1,80 @@
+{
+  "message_10": {
+    "id": "message_10",
+    "name": "初次登场",
+    "description": "累计发言10条",
+    "rarity": "common",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 10
+    }
+  },
+  "message_50": {
+    "id": "message_50",
+    "name": "渐入佳境",
+    "description": "累计发言50条",
+    "rarity": "common",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 50
+    }
+  },
+  "message_100": {
+    "id": "message_100",
+    "name": "百言成章",
+    "description": "累计发言100条",
+    "rarity": "uncommon",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 100
+    }
+  },
+  "message_500": {
+    "id": "message_500",
+    "name": "口若悬河",
+    "description": "累计发言500条",
+    "rarity": "uncommon",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 500
+    }
+  },
+  "message_1000": {
+    "id": "message_1000",
+    "name": "千言万语",
+    "description": "累计发言1000条",
+    "rarity": "rare",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 1000
+    }
+  },
+  "message_5000": {
+    "id": "message_5000",
+    "name": "滔滔不绝",
+    "description": "累计发言5000条",
+    "rarity": "epic",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 5000
+    }
+  },
+  "message_10000": {
+    "id": "message_10000",
+    "name": "万语千言",
+    "description": "累计发言10000条",
+    "rarity": "legendary",
+    "category": "count",
+    "condition": {
+      "type": "total_count",
+      "value": 10000
+    }
+  }
+}
+

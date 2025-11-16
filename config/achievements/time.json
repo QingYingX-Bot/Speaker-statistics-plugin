@@ -1,0 +1,59 @@
+{
+  "night_owl": {
+    "id": "night_owl",
+    "name": "夜半星辰",
+    "description": "在深夜时段发言",
+    "rarity": "uncommon",
+    "category": "time",
+    "condition": {
+      "type": "night_time"
+    }
+  },
+  "early_bird": {
+    "id": "early_bird",
+    "name": "晨光熹微",
+    "description": "在清晨时段发言",
+    "rarity": "uncommon",
+    "category": "time",
+    "condition": {
+      "type": "morning_time"
+    }
+  },
+  "noon_time": {
+    "id": "noon_time",
+    "name": "正午时分",
+    "description": "在午间时段发言",
+    "rarity": "common",
+    "category": "time",
+    "condition": {
+      "type": "time_window",
+      "start": "11:00",
+      "end": "13:00"
+    }
+  },
+  "afternoon_time": {
+    "id": "afternoon_time",
+    "name": "午后时光",
+    "description": "在下午时段发言",
+    "rarity": "common",
+    "category": "time",
+    "condition": {
+      "type": "time_window",
+      "start": "13:00",
+      "end": "18:00"
+    }
+  },
+  "evening_time": {
+    "id": "evening_time",
+    "name": "黄昏时分",
+    "description": "在傍晚时段发言",
+    "rarity": "common",
+    "category": "time",
+    "condition": {
+      "type": "time_window",
+      "start": "18:00",
+      "end": "22:00"
+    }
+  }
+}
+

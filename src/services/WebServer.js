@@ -162,33 +162,57 @@ class WebServer {
             }
 
             const config = this.loadConfig();
-            const port = config.port || 39999;
+            let port = config.port || 39999;
             const host = config.host || "127.0.0.1";
+            const maxRetries = 10; // 最多尝试10个备用端口
+            let currentRetry = 0;
 
-            this.server = this.app.listen(port, host, () => {
-                // 双重检查，防止重复设置
-                if (this.isRunning) {
-                    globalConfig.debug('[发言统计] Web服务器已在运行，跳过重复初始化');
-                    return;
-                }
-                
-                this.isRunning = true;
-                this._starting = false; // 启动成功，清除启动标志
-                const url = `${config.protocol}://${config.domain || host}:${port}`;
-                globalConfig.debug(`[发言统计] Web服务器启动成功: ${url}`);
-            });
+            // 尝试启动服务器的函数
+            const tryStartServer = () => {
+                return new Promise((resolve, reject) => {
+                    this.server = this.app.listen(port, host, () => {
+                        // 双重检查，防止重复设置
+                        if (this.isRunning) {
+                            globalConfig.debug('[发言统计] Web服务器已在运行，跳过重复初始化');
+                            resolve();
+                            return;
+                        }
+                        
+                        this.isRunning = true;
+                        this._starting = false; // 启动成功，清除启动标志
+                        const url = `${config.protocol}://${config.domain || host}:${port}`;
+                        globalConfig.debug(`[发言统计] Web服务器启动成功: ${url}`);
+                        resolve();
+                    });
 
-            this.server.on('error', (error) => {
-                this._starting = false; // 启动失败，清除启动标志
-                this.isRunning = false;
-                this.server = null; // 清除服务器实例引用
-                
-                if (error.code === 'EADDRINUSE') {
-                    globalConfig.error(`[发言统计] 端口 ${port} 已被占用，Web服务器启动失败`);
-                } else {
-                    globalConfig.error('[发言统计] Web服务器错误:', error);
-                }
-            });
+                    this.server.on('error', (error) => {
+                        this.server = null; // 清除服务器实例引用
+                        
+                        if (error.code === 'EADDRINUSE') {
+                            // 端口被占用，尝试下一个端口
+                            currentRetry++;
+                            if (currentRetry < maxRetries) {
+                                port = port + 1;
+                                globalConfig.warn(`[发言统计] 端口 ${port - 1} 已被占用，尝试使用端口 ${port}...`);
+                                setTimeout(() => {
+                                    tryStartServer().then(resolve).catch(reject);
+                                }, 500);
+                            } else {
+                                this._starting = false;
+                                this.isRunning = false;
+                                reject(new Error(`端口 ${port} 及后续 ${maxRetries} 个端口均被占用，Web服务器启动失败`));
+                            }
+                        } else {
+                            this._starting = false;
+                            this.isRunning = false;
+                            reject(error);
+                        }
+                    });
+                });
+            };
+
+            // 尝试启动服务器
+            await tryStartServer();
 
         } catch (error) {
             this._starting = false; // 启动失败，清除启动标志

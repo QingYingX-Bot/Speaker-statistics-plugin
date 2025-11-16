@@ -7,6 +7,8 @@ class Router {
         this.routes = {};
         this.currentRoute = null;
         this.currentPage = null;
+        this.initialized = false;
+        this.initialHash = null; // 延迟到 init() 时设置
     }
     
     // 注册路由
@@ -16,9 +18,29 @@ class Router {
     
     // 获取当前路由
     getCurrentRoute() {
-        const hash = window.location.hash.slice(1) || '/';
+        // 优先使用保存的初始 hash
+        let hash = this.initialHash;
+        
+        // 如果初始 hash 为空，尝试从当前 URL 读取
+        if (!hash || hash === '') {
+            hash = window.location.hash;
+        }
+        
+        // 处理 hash 路由
+        // 如果 hash 是 '#/' 或空，返回根路由 '/'
+        // 如果 hash 是 '#/background'，返回 '/background'
+        let route = '/';
+        if (hash) {
+            // 移除 # 号，获取路由路径
+            route = hash.slice(1);
+            // 如果路由为空或只有 /，返回根路由
+            if (!route || route === '/') {
+                route = '/';
+            }
+        }
+        
         // 移除查询参数，只返回路径
-        return hash.split('?')[0];
+        return route.split('?')[0] || '/';
     }
     
     // 获取URL参数
@@ -51,19 +73,97 @@ class Router {
     
     // 初始化路由
     init() {
+        // 保存初始 hash（在初始化时保存，确保能捕获到重定向后的 hash）
+        // 如果当前 hash 为空，等待一下再读取（给后端重定向时间）
+        if (this.initialHash === null) {
+            this.initialHash = window.location.hash;
+            
+            // 如果 hash 为空，延迟一下再读取（可能后端重定向还在处理）
+            if (!this.initialHash || this.initialHash === '') {
+                // 等待下一个事件循环，给重定向时间完成
+                setTimeout(() => {
+                    this.initialHash = window.location.hash;
+                    // 如果还是为空，使用 getCurrentRoute 的路径推断逻辑
+                    if (!this.initialHash || this.initialHash === '') {
+                        const route = this.getCurrentRoute();
+                        if (route !== '/') {
+                            this.initialHash = `#${route}`;
+                        }
+                    }
+                    // 继续初始化流程
+                    this._continueInit();
+                }, 10);
+                return;
+            }
+        }
+        
+        this._continueInit();
+    }
+    
+    // 继续初始化流程
+    _continueInit() {
         // 监听hash变化
         window.addEventListener('hashchange', () => {
             this.handleRoute();
         });
         
-        // 初始路由
+        // 标记为已初始化
+        this.initialized = true;
+        
+        // 处理初始路由
+        this.handleInitialRoute();
+    }
+    
+    // 处理初始路由（带重试机制）
+    handleInitialRoute() {
+        const route = this.getCurrentRoute();
+        
+        // 检查路由是否已注册
+        if (Object.keys(this.routes).length === 0) {
+            // 路由还未注册，延迟重试
+            setTimeout(() => this.handleInitialRoute(), 50);
+            return;
+        }
+        
+        // 检查目标路由是否存在
+        if (!this.routes[route] && route !== '/') {
+            // 目标路由还未注册，延迟重试（最多等待1秒）
+            if (!this._initialRetryCount) {
+                this._initialRetryCount = 0;
+            }
+            if (this._initialRetryCount < 20) {
+                this._initialRetryCount++;
+                setTimeout(() => this.handleInitialRoute(), 50);
+                return;
+            }
+            // 超时后重置，使用默认路由
+            this._initialRetryCount = 0;
+        } else {
+            this._initialRetryCount = 0;
+        }
+        
+        // 检查 DOM 是否准备好
+        const content = document.getElementById('pageContent');
+        if (!content) {
+            setTimeout(() => this.handleInitialRoute(), 50);
+            return;
+        }
+        
+        // DOM 和路由都准备好了，处理路由
         this.handleRoute();
     }
     
     // 处理路由
     async handleRoute() {
         const route = this.getCurrentRoute();
-        const handler = this.routes[route] || this.routes['/'];
+        
+        // 获取路由处理器
+        const handler = this.routes[route];
+        
+        // 如果找不到目标路由的处理器，且不是根路由，使用默认路由
+        
+        // 使用目标路由的处理器，如果不存在则使用根路由
+        const finalHandler = handler || this.routes['/'];
         
         // 更新导航栏激活状态（通过 app.navigation）
         if (window.app && window.app.navigation) {
@@ -76,6 +176,12 @@ class Router {
         
         // 显示加载状态
         const content = document.getElementById('pageContent');
+        if (!content) {
+            // 如果页面内容容器还不存在，延迟处理
+            setTimeout(() => this.handleRoute(), 50);
+            return;
+        }
+        
         // 临时移除 padding 以确保完全居中
         const originalPadding = content.style.padding;
         content.style.padding = '0';
@@ -89,8 +195,8 @@ class Router {
         
         try {
             // 执行路由处理器
-            if (handler) {
-                await handler();
+            if (finalHandler) {
+                await finalHandler();
                 // 恢复 padding（页面内容会自己处理 padding）
                 if (content.style.padding === '0') {
                     content.style.padding = originalPadding || '';

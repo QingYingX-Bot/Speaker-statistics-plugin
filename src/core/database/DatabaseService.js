@@ -11,41 +11,159 @@ class DatabaseService {
     constructor() {
         this.adapter = null;
         this.initialized = false;
+        this.healthCheckInterval = null;
+        this.healthCheckIntervalMs = 60000; // 60秒健康检查间隔
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000; // 初始重连延迟1秒
     }
 
     /**
-     * 初始化数据库连接
+     * 初始化数据库连接（带重试机制）
+     * @param {number} maxRetries 最大重试次数，默认5次
+     * @param {number} initialDelay 初始延迟（毫秒），默认1000ms
      * @returns {Promise<void>}
      */
-    async initialize() {
+    async initialize(maxRetries = 5, initialDelay = 1000) {
         if (this.initialized && this.adapter) {
-            return;
+            // 如果已初始化，执行健康检查
+            try {
+                await this.healthCheck();
+                return;
+            } catch (error) {
+                // 健康检查失败，重置状态并重试
+                globalConfig.warn('[数据库服务] 健康检查失败，尝试重新初始化:', error.message);
+                this.initialized = false;
+                this.adapter = null;
+            }
+        }
+
+        // 指数退避重试策略
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                // 从配置获取数据库连接信息
+                const dbConfig = globalConfig.getConfig('database') || {};
+                const dbType = (dbConfig.type || 'sqlite').toLowerCase();
+                
+                // 根据配置选择适配器
+                if (dbType === 'sqlite') {
+                    this.adapter = new SQLiteAdapter();
+                    globalConfig.debug('[数据库服务] 使用 SQLite 适配器');
+                } else {
+                    this.adapter = new PostgreSQLAdapter();
+                    globalConfig.debug('[数据库服务] 使用 PostgreSQL 适配器');
+                }
+
+                // 初始化适配器
+                await this.adapter.initialize();
+                
+                // 执行健康检查
+                await this.healthCheck();
+                
+                this.initialized = true;
+                this.reconnectAttempts = 0;
+                
+                // 启动定期健康检查
+                this.startHealthCheck();
+                
+                return;
+            } catch (error) {
+                const isLastAttempt = i === maxRetries - 1;
+                
+                if (isLastAttempt) {
+                    // 最后一次尝试失败，抛出错误
+                    if (error.message && error.message.includes('数据库')) {
+                        throw error;
+                    }
+                    throw new Error(`数据库初始化失败（已重试${maxRetries}次）: ${error.message}`);
+                }
+                
+                // 计算延迟时间（指数退避）
+                const delay = initialDelay * Math.pow(2, i);
+                globalConfig.warn(`[数据库服务] 初始化失败，${delay}ms 后重试 (${i + 1}/${maxRetries}):`, error.message);
+                
+                // 等待后重试
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    /**
+     * 健康检查
+     * @returns {Promise<boolean>}
+     */
+    async healthCheck() {
+        if (!this.adapter) {
+            this.initialized = false;
+            throw new Error('数据库适配器未初始化');
         }
 
         try {
-            // 从配置获取数据库连接信息
-            const dbConfig = globalConfig.getConfig('database') || {};
-            const dbType = (dbConfig.type || 'sqlite').toLowerCase();
-            
-            // 根据配置选择适配器
-            if (dbType === 'sqlite') {
-                this.adapter = new SQLiteAdapter();
-                globalConfig.debug('[数据库服务] 使用 SQLite 适配器');
-            } else {
-                this.adapter = new PostgreSQLAdapter();
-                globalConfig.debug('[数据库服务] 使用 PostgreSQL 适配器');
-            }
-
-            // 初始化适配器
-            await this.adapter.initialize();
-            this.initialized = true;
+            // 执行简单的查询测试连接
+            await this.adapter.get('SELECT 1');
+            return true;
         } catch (error) {
-            // 如果已经是自定义错误消息，直接抛出；否则包装错误
-            if (error.message && error.message.includes('数据库')) {
-                throw error;
-            }
-            throw new Error(`数据库初始化失败: ${error.message}`);
+            this.initialized = false;
+            throw new Error(`数据库健康检查失败: ${error.message}`);
         }
+    }
+
+    /**
+     * 启动定期健康检查
+     */
+    startHealthCheck() {
+        // 清除之前的健康检查定时器
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+        }
+
+        // 设置定期健康检查
+        this.healthCheckInterval = setInterval(async () => {
+            try {
+                await this.healthCheck();
+            } catch (error) {
+                globalConfig.warn('[数据库服务] 定期健康检查失败:', error.message);
+                // 健康检查失败，尝试重新连接
+                this.handleReconnect();
+            }
+        }, this.healthCheckIntervalMs);
+    }
+
+    /**
+     * 停止健康检查
+     */
+    stopHealthCheck() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+    }
+
+    /**
+     * 处理重连逻辑
+     */
+    async handleReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            globalConfig.error(`[数据库服务] 重连失败，已达到最大重试次数 (${this.maxReconnectAttempts})`);
+            this.reconnectAttempts = 0;
+            return;
+        }
+
+        this.reconnectAttempts++;
+        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        
+        globalConfig.warn(`[数据库服务] 尝试重连数据库 (${this.reconnectAttempts}/${this.maxReconnectAttempts})，${delay}ms 后重试...`);
+        
+        setTimeout(async () => {
+            try {
+                await this.initialize(1, 0); // 只重试1次，延迟为0（已经在setTimeout中延迟了）
+                globalConfig.mark('[数据库服务] 数据库重连成功');
+            } catch (error) {
+                globalConfig.error('[数据库服务] 重连失败:', error.message);
+                // 继续尝试重连
+                this.handleReconnect();
+            }
+        }, delay);
     }
 
     /**
@@ -58,7 +176,19 @@ class DatabaseService {
         if (!this.adapter) {
             throw new Error('数据库未初始化');
         }
-        return await this.adapter.run(sql, ...params);
+        
+        // 如果数据库连接失效，尝试重连
+        try {
+            return await this.adapter.run(sql, ...params);
+        } catch (error) {
+            // 检查是否是连接错误
+            if (this.isConnectionError(error)) {
+                await this.handleReconnect();
+                // 重连后重试一次
+                return await this.adapter.run(sql, ...params);
+            }
+            throw error;
+        }
     }
 
     /**
@@ -71,7 +201,19 @@ class DatabaseService {
         if (!this.adapter) {
             throw new Error('数据库未初始化');
         }
-        return await this.adapter.get(sql, ...params);
+        
+        // 如果数据库连接失效，尝试重连
+        try {
+            return await this.adapter.get(sql, ...params);
+        } catch (error) {
+            // 检查是否是连接错误
+            if (this.isConnectionError(error)) {
+                await this.handleReconnect();
+                // 重连后重试一次
+                return await this.adapter.get(sql, ...params);
+            }
+            throw error;
+        }
     }
 
     /**
@@ -84,7 +226,82 @@ class DatabaseService {
         if (!this.adapter) {
             throw new Error('数据库未初始化');
         }
-        return await this.adapter.all(sql, ...params);
+        
+        // 如果数据库连接失效，尝试重连
+        try {
+            return await this.adapter.all(sql, ...params);
+        } catch (error) {
+            // 检查是否是连接错误
+            if (this.isConnectionError(error)) {
+                await this.handleReconnect();
+                // 重连后重试一次
+                return await this.adapter.all(sql, ...params);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * 判断是否是连接错误
+     * @param {Error} error 错误对象
+     * @returns {boolean}
+     */
+    isConnectionError(error) {
+        if (!error) return false;
+        
+        const errorMessage = error.message || '';
+        const errorCode = error.code || '';
+        
+        // PostgreSQL 连接错误代码
+        const postgresConnectionErrors = [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            '57P01', // 管理员关闭
+            '57P02', // 崩溃
+            '57P03', // 无法连接
+            '08003', // 连接不存在
+            '08006', // 连接失败
+            '08001', // SQL客户端无法建立连接
+            '08004'  // SQL服务器拒绝连接
+        ];
+        
+        // SQLite 连接错误
+        const sqliteConnectionErrors = [
+            'SQLITE_BUSY',
+            'SQLITE_LOCKED',
+            'SQLITE_IOERR',
+            'SQLITE_CORRUPT',
+            'SQLITE_CANTOPEN'
+        ];
+        
+        // 检查错误代码
+        if (postgresConnectionErrors.includes(errorCode) || 
+            sqliteConnectionErrors.includes(errorCode)) {
+            return true;
+        }
+        
+        // 检查错误消息
+        const connectionErrorMessages = [
+            'connection',
+            '连接',
+            'connect',
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'timeout',
+            '超时',
+            'closed',
+            '关闭',
+            'lost',
+            '丢失',
+            'refused',
+            '拒绝'
+        ];
+        
+        return connectionErrorMessages.some(msg => 
+            errorMessage.toLowerCase().includes(msg.toLowerCase())
+        );
     }
 
     /**
@@ -760,6 +977,48 @@ class DatabaseService {
     }
 
     /**
+     * 批量获取用户成就（优化性能，避免 N+1 查询）
+     * @param {string} groupId 群号
+     * @param {Array<string>} userIds 用户ID数组
+     * @returns {Promise<Array>} 成就数组
+     */
+    async getAllUserAchievementsBatch(groupId, userIds) {
+        if (!userIds || userIds.length === 0) {
+            return [];
+        }
+
+        // 构建 IN 子句的占位符
+        const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
+        const params = [groupId, ...userIds];
+        
+        const sql = `
+            SELECT * FROM achievements 
+            WHERE group_id = $1 AND user_id IN (${placeholders})
+        `;
+        
+        return await this.all(sql, ...params);
+    }
+
+    /**
+     * 批量保存用户成就（使用事务）
+     * @param {Array<Object>} achievements 成就数组，每个对象包含 {groupId, userId, achievementId, achievementData}
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async saveUserAchievementsBatch(achievements) {
+        if (!achievements || achievements.length === 0) {
+            return true;
+        }
+
+        return await this.transaction(async () => {
+            for (const achievement of achievements) {
+                const { groupId, userId, achievementId, achievementData } = achievement;
+                await this.saveUserAchievement(groupId, userId, achievementId, achievementData);
+            }
+            return true;
+        });
+    }
+
+    /**
      * 获取已解锁的成就
      * @param {string} groupId 群号
      * @param {string} userId 用户ID
@@ -1203,6 +1462,9 @@ class DatabaseService {
      * @returns {Promise<void>}
      */
     async close() {
+        // 停止健康检查
+        this.stopHealthCheck();
+        
         if (this.adapter) {
             await this.adapter.close();
             this.adapter = null;

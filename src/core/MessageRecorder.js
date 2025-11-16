@@ -27,6 +27,11 @@ class MessageRecorder {
         this.recordMessageLock = false; // 记录消息的锁（防止并发处理）
         this.messageQueue = []; // 消息队列（用于处理并发情况下的消息）
         this.isProcessingQueue = false; // 是否正在处理消息队列
+        this.failureCount = 0; // 失败计数
+        this.maxFailures = 100; // 最大失败次数（达到后进入降级模式）
+        this.degradedMode = false; // 降级模式标志
+        this.lastFailureTime = 0; // 最后失败时间
+        this.degradedModeResetInterval = 5 * 60 * 1000; // 5分钟后尝试退出降级模式
         
         // 设置消息记录器引用到数据服务
         this.dataService.setMessageRecorder(this);
@@ -176,8 +181,18 @@ class MessageRecorder {
             // 使用已计算的 messageId 作为日志去重的唯一标识
             const logMessageId = messageId;
             
+            // 如果在降级模式，跳过统计更新（但仍记录错误）
+            if (this.degradedMode) {
+                return;
+            }
+
             // 更新用户统计（传递消息ID用于日志去重）
             await this.dataService.updateUserStats(groupId, userId, nickname, wordCount, messageTime, logMessageId);
+            
+            // 成功处理，重置失败计数（每次成功减少1，避免累积过多）
+            if (this.failureCount > 0) {
+                this.failureCount = Math.max(0, this.failureCount - 1);
+            }
             
             // 调试日志：仅在调试模式下输出（减少日志噪音）
             // 消息成功记录的信息已经通过水群统计日志输出，这里不需要重复
@@ -187,7 +202,28 @@ class MessageRecorder {
                 this.addToAchievementCheck(groupId, userId);
             }
         } catch (error) {
-            globalConfig.error(`记录消息失败: ${messageId}, user_id=${e.sender?.user_id}, group_id=${e.group_id}`, error);
+            this.failureCount++;
+            this.lastFailureTime = Date.now();
+            
+            // 如果失败次数过多，进入降级模式
+            if (this.failureCount >= this.maxFailures && !this.degradedMode) {
+                this.degradedMode = true;
+                globalConfig.warn(`[消息记录] 失败次数过多 (${this.failureCount})，进入降级模式（仅记录错误，不更新统计）`);
+            }
+            
+            // 在降级模式下，只记录错误，不抛出异常
+            if (this.degradedMode) {
+                globalConfig.warn(`[消息记录] 降级模式: 记录消息失败: ${messageId}, user_id=${e.sender?.user_id}, group_id=${e.group_id}`, error.message);
+            } else {
+                globalConfig.error(`记录消息失败: ${messageId}, user_id=${e.sender?.user_id}, group_id=${e.group_id}`, error);
+            }
+            
+            // 尝试退出降级模式（如果距离最后失败时间超过重置间隔）
+            if (this.degradedMode && Date.now() - this.lastFailureTime > this.degradedModeResetInterval) {
+                this.degradedMode = false;
+                this.failureCount = 0;
+                globalConfig.mark('[消息记录] 退出降级模式，恢复正常处理');
+            }
         } finally {
             // 释放锁（必须在 finally 中执行，确保锁被释放）
             this.recordMessageLock = false;

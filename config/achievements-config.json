@@ -1,0 +1,73 @@
+{
+  "categories": {
+    "basic": {
+      "name": "基础",
+      "description": "基础成就"
+    },
+    "count": {
+      "name": "发言数",
+      "description": "发言数量相关成就"
+    },
+    "words": {
+      "name": "字数",
+      "description": "字数相关成就"
+    },
+    "active": {
+      "name": "活跃",
+      "description": "活跃天数相关成就"
+    },
+    "daily": {
+      "name": "每日",
+      "description": "每日相关成就"
+    },
+    "streak": {
+      "name": "连续",
+      "description": "连续发言相关成就"
+    },
+    "time": {
+      "name": "时段",
+      "description": "时段相关成就"
+    },
+    "social": {
+      "name": "社交",
+      "description": "社交相关成就（连续活跃、最长连续等）"
+    },
+    "competition": {
+      "name": "竞赛",
+      "description": "竞赛类成就（发言王、字数王等）"
+    }
+  },
+  "rarities": {
+    "common": {
+      "name": "普通",
+      "color": "#9ca3af",
+      "emoji": "🥉"
+    },
+    "uncommon": {
+      "name": "不普通",
+      "color": "#22c55e",
+      "emoji": "🥈"
+    },
+    "rare": {
+      "name": "稀有",
+      "color": "#3b82f6",
+      "emoji": "🥇"
+    },
+    "epic": {
+      "name": "史诗",
+      "color": "#a855f7",
+      "emoji": "💎"
+    },
+    "legendary": {
+      "name": "传说",
+      "color": "#f59e0b",
+      "emoji": "👑"
+    },
+    "festival": {
+      "name": "节日",
+      "color": "#ff6b6b",
+      "emoji": "🎉"
+    }
+  }
+}
+

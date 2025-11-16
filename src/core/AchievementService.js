@@ -65,14 +65,30 @@ class AchievementService {
         const achievements = {};
 
         try {
-            // 第一步：加载系统默认成就（config/achievements.json）
-            const configPath = path.join(this.configDir, 'achievements.json');
-            if (fs.existsSync(configPath)) {
-                const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-                Object.assign(achievements, configData.achievements || {});
-                globalConfig.debug('已加载系统默认成就配置');
+            // 第一步：加载系统默认成就（config/achievements/ 目录下的分类文件）
+            const achievementsDir = path.join(this.configDir, 'achievements');
+            
+            if (fs.existsSync(achievementsDir) && fs.statSync(achievementsDir).isDirectory()) {
+                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'));
+                
+                for (const file of files) {
+                    const filePath = path.join(achievementsDir, file);
+                    try {
+                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        Object.assign(achievements, fileData);
+                        globalConfig.debug(`已加载系统默认成就分类文件: ${file}`);
+                    } catch (fileError) {
+                        globalConfig.error(`加载系统成就分类文件失败: ${file}`, fileError);
+                    }
+                }
+                
+                if (Object.keys(achievements).length > 0) {
+                    globalConfig.debug('已加载系统默认成就配置');
+                } else {
+                    globalConfig.error('未找到系统默认成就配置文件');
+                }
             } else {
-                globalConfig.error('未找到系统默认成就配置文件');
+                globalConfig.error('未找到系统默认成就配置目录');
             }
 
             // 第二步：加载用户自定义成就（data/achievements/ 目录），覆盖默认成就
@@ -106,15 +122,17 @@ class AchievementService {
      * 从JSON文件加载分类定义
      */
     loadCategoriesFromFile() {
-        const configPath = path.join(this.configDir, 'achievements.json');
-
-        try {
-            if (fs.existsSync(configPath)) {
+        const configPath = path.join(this.configDir, 'achievements-config.json');
+        
+        if (fs.existsSync(configPath)) {
+            try {
                 const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
                 return configData.categories || {};
+            } catch (error) {
+                globalConfig.error('加载成就分类配置失败:', error);
             }
-        } catch (error) {
-            globalConfig.error('加载成就分类配置失败:', error);
+        } else {
+            globalConfig.error('未找到成就分类配置文件: achievements-config.json');
         }
 
         return {};
@@ -124,15 +142,17 @@ class AchievementService {
      * 从JSON文件加载稀有度定义
      */
     loadRaritiesFromFile() {
-        const configPath = path.join(this.configDir, 'achievements.json');
-
-        try {
-            if (fs.existsSync(configPath)) {
+        const configPath = path.join(this.configDir, 'achievements-config.json');
+        
+        if (fs.existsSync(configPath)) {
+            try {
                 const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
                 return configData.rarities || {};
+            } catch (error) {
+                globalConfig.error('加载成就稀有度配置失败:', error);
             }
-        } catch (error) {
-            globalConfig.error('加载成就稀有度配置失败:', error);
+        } else {
+            globalConfig.error('未找到成就稀有度配置文件: achievements-config.json');
         }
 
         return {};
@@ -160,15 +180,28 @@ class AchievementService {
         }
         
         try {
-            // 监听系统默认成就文件（config/achievements.json）
-            const defaultAchievementsPath = path.join(this.configDir, 'achievements.json');
-            if (fs.existsSync(defaultAchievementsPath) && !AchievementService.achievementWatchers.has(defaultAchievementsPath)) {
-                const watcher = fs.watch(defaultAchievementsPath, (eventType) => {
+            // 监听系统默认成就目录（config/achievements/）
+            const defaultAchievementsDir = path.join(this.configDir, 'achievements');
+            if (fs.existsSync(defaultAchievementsDir) && fs.statSync(defaultAchievementsDir).isDirectory()) {
+                if (!AchievementService.achievementWatchers.has(defaultAchievementsDir)) {
+                    const watcher = fs.watch(defaultAchievementsDir, { recursive: false }, (eventType, filename) => {
+                        if (eventType === 'change' && filename && filename.endsWith('.json')) {
+                            this.handleAchievementFileChange();
+                        }
+                    });
+                    AchievementService.achievementWatchers.set(defaultAchievementsDir, watcher);
+                }
+            }
+
+            // 监听配置文件（achievements-config.json）
+            const configPath = path.join(this.configDir, 'achievements-config.json');
+            if (fs.existsSync(configPath) && !AchievementService.achievementWatchers.has(configPath)) {
+                const watcher = fs.watch(configPath, (eventType) => {
                     if (eventType === 'change') {
                         this.handleAchievementFileChange();
                     }
                 });
-                AchievementService.achievementWatchers.set(defaultAchievementsPath, watcher);
+                AchievementService.achievementWatchers.set(configPath, watcher);
             }
 
             // 监听用户自定义成就目录（data/achievements/）
@@ -312,6 +345,16 @@ class AchievementService {
             
             // 获取显示成就
             let displayAchievement = await this.dbService.getDisplayAchievement(groupId, userId);
+            
+            // 如果存在显示成就，使用成就定义中的最新名称和稀有度（确保修改配置后名称会同步）
+            if (displayAchievement) {
+                const definition = allDefinitions[displayAchievement.achievement_id];
+                if (definition) {
+                    // 使用定义中的最新名称和稀有度，覆盖数据库中可能过期的数据
+                    displayAchievement.achievement_name = definition.name || displayAchievement.achievement_name;
+                    displayAchievement.rarity = definition.rarity || displayAchievement.rarity;
+                }
+            }
             
             // 如果没有显示成就，自动选择史诗级及以上成就（按稀有度降序，24小时时限）
             // 注意：只选择未过期的成就（解锁时间+24小时）
@@ -751,13 +794,23 @@ class AchievementService {
 
             const now = TimeUtils.getUTC8Date();
             const nowMs = now.getTime();
+            const currentYear = now.getFullYear();
 
             const parse = (s) => {
                 if (typeof s !== 'string') return NaN;
+                
+                // 支持 MM-DDTHH:mm:ss 格式（自动添加当前年份，用于每年重复的节日）
+                if (/^\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(s)) {
+                    const dateStr = `${currentYear}-${s}`;
+                    return new Date(dateStr).getTime();
+                }
+                
+                // ISO 格式：YYYY-MM-DDTHH:mm:ss
                 if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
                     return new Date(s).getTime();
                 }
-                // 简化解析逻辑
+                
+                // 其他格式使用 Date.parse
                 return Date.parse(s);
             };
 

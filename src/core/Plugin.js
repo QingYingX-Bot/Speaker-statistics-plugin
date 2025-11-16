@@ -227,6 +227,18 @@ class Plugin extends plugin {
 
     // 消息处理
     async accept(e) {
+        // 清理消息文本，移除零宽字符和不可见字符，解决复制命令无法触发的问题
+        if (e.msg && typeof e.msg === 'string') {
+            // 移除零宽字符（Zero-width characters）
+            e.msg = e.msg.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '');
+            // 移除其他不可见字符（但保留空格、换行等常见空白字符）
+            e.msg = e.msg.replace(/[\u2000-\u200A\u2028-\u2029]/g, ' ');
+            // 规范化空白字符：将多个连续空白字符替换为单个空格
+            e.msg = e.msg.replace(/[\s\u00A0]+/g, ' ');
+            // 移除首尾空白
+            e.msg = e.msg.trim();
+        }
+        
         // 记录消息（recordMessage 内部已有去重机制，这里只需要调用即可）
         if (globalConfig.getConfig('global.enableStatistics') && 
             globalConfig.getConfig('global.recordMessage')) {

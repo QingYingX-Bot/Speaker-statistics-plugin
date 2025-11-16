@@ -1,0 +1,124 @@
+{
+  "weekly_active_3": {
+    "id": "weekly_active_3",
+    "name": "周周有约",
+    "description": "单周发言50条",
+    "rarity": "uncommon",
+    "category": "social",
+    "condition": {
+      "type": "weekly_count",
+      "value": 50
+    }
+  },
+  "weekly_active_10": {
+    "id": "weekly_active_10",
+    "name": "群星闪耀",
+    "description": "单周发言100条",
+    "rarity": "rare",
+    "category": "social",
+    "condition": {
+      "type": "weekly_count",
+      "value": 100
+    }
+  },
+  "weekly_active_200": {
+    "id": "weekly_active_200",
+    "name": "周冠群雄",
+    "description": "单周发言200条",
+    "rarity": "epic",
+    "category": "social",
+    "condition": {
+      "type": "weekly_count",
+      "value": 200
+    }
+  },
+  "monthly_active_500": {
+    "id": "monthly_active_500",
+    "name": "月满乾坤",
+    "description": "单月发言500条",
+    "rarity": "epic",
+    "category": "social",
+    "condition": {
+      "type": "monthly_count",
+      "value": 500
+    }
+  },
+  "weekly_words_1000": {
+    "id": "weekly_words_1000",
+    "name": "周墨成章",
+    "description": "单周字数1000字",
+    "rarity": "rare",
+    "category": "social",
+    "condition": {
+      "type": "weekly_words",
+      "value": 1000
+    }
+  },
+  "weekly_words_3000": {
+    "id": "weekly_words_3000",
+    "name": "周墨如海",
+    "description": "单周字数3000字",
+    "rarity": "epic",
+    "category": "social",
+    "condition": {
+      "type": "weekly_words",
+      "value": 3000
+    }
+  },
+  "monthly_words_5000": {
+    "id": "monthly_words_5000",
+    "name": "月笔如椽",
+    "description": "单月字数5000字",
+    "rarity": "epic",
+    "category": "social",
+    "condition": {
+      "type": "monthly_words",
+      "value": 5000
+    }
+  },
+  "monthly_words_15000": {
+    "id": "monthly_words_15000",
+    "name": "月墨千秋",
+    "description": "单月字数15000字",
+    "rarity": "legendary",
+    "category": "social",
+    "condition": {
+      "type": "monthly_words",
+      "value": 15000
+    }
+  },
+  "max_streak_30": {
+    "id": "max_streak_30",
+    "name": "持之以恒",
+    "description": "最长连续发言30天",
+    "rarity": "rare",
+    "category": "social",
+    "condition": {
+      "type": "max_continuous_days",
+      "value": 30
+    }
+  },
+  "max_streak_100": {
+    "id": "max_streak_100",
+    "name": "百炼成钢",
+    "description": "最长连续发言100天",
+    "rarity": "epic",
+    "category": "social",
+    "condition": {
+      "type": "max_continuous_days",
+      "value": 100
+    }
+  },
+  "max_streak_365": {
+    "id": "max_streak_365",
+    "name": "经年累月",
+    "description": "最长连续发言365天",
+    "rarity": "legendary",
+    "category": "social",
+    "condition": {
+      "type": "max_continuous_days",
+      "value": 365
+    }
+  }
+}
+

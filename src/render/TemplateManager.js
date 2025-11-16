@@ -920,9 +920,11 @@ class TemplateManager {
             lastWasUnlocked = isUnlocked;
 
             const itemHtml = `<div class="achievement-item ${statusClass}">
-					<div class="achievement-status ${statusClass}">${statusIcon}</div>
-					<div class="achievement-badge">
-						<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+					<div class="achievement-header">
+						<div class="achievement-status ${statusClass}">${statusIcon}</div>
+						<div class="achievement-badge">
+							<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+						</div>
 					</div>
 					<div class="achievement-info">
 						<div class="achievement-name-row">
@@ -1019,9 +1021,11 @@ class TemplateManager {
             }
 
             const itemHtml = `<div class="achievement-item ${statusClass}">
-					<div class="achievement-status ${statusClass}">📊</div>
-					<div class="achievement-badge">
-						<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+					<div class="achievement-header">
+						<div class="achievement-status ${statusClass}">📊</div>
+						<div class="achievement-badge">
+							<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
+						</div>
 					</div>
 					<div class="achievement-info">
 						<div class="achievement-name-row">

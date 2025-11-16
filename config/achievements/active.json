@@ -1,0 +1,47 @@
+{
+  "active_7": {
+    "id": "active_7",
+    "name": "七日之约",
+    "description": "活跃7天",
+    "rarity": "common",
+    "category": "active",
+    "condition": {
+      "type": "active_days",
+      "value": 7
+    }
+  },
+  "active_30": {
+    "id": "active_30",
+    "name": "月满盈辉",
+    "description": "活跃30天",
+    "rarity": "uncommon",
+    "category": "active",
+    "condition": {
+      "type": "active_days",
+      "value": 30
+    }
+  },
+  "active_100": {
+    "id": "active_100",
+    "name": "百日筑基",
+    "description": "活跃100天",
+    "rarity": "rare",
+    "category": "active",
+    "condition": {
+      "type": "active_days",
+      "value": 100
+    }
+  },
+  "active_365": {
+    "id": "active_365",
+    "name": "岁岁年年",
+    "description": "活跃365天",
+    "rarity": "epic",
+    "category": "active",
+    "condition": {
+      "type": "active_days",
+      "value": 365
+    }
+  }
+}
+

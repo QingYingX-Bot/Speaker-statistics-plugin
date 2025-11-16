@@ -1,0 +1,13 @@
+{
+  "first_message": {
+    "id": "first_message",
+    "name": "初来乍到",
+    "description": "发送第一条消息",
+    "rarity": "common",
+    "category": "basic",
+    "condition": {
+      "type": "first_message"
+    }
+  }
+}
+

@@ -38,34 +38,7 @@ export class PageRoutes {
      * 注册所有页面路由
      */
     registerRoutes() {
-        // 带路由的token路径（必须在静态文件之前定义）
-        // 精确匹配：/background/:token, /ranking/:token等
-        this.app.get('/background/:token', (req, res) => {
-            const validation = this.handleTokenValidation(req.params.token, res);
-            if (validation.valid) {
-                return res.redirect('/#/background');
-            }
-            this.sendIndexPage(res);
-        });
-        
-        // 其他带token的路径
-        this.app.get('/ranking/:token', (req, res) => {
-            const validation = this.handleTokenValidation(req.params.token, res);
-            if (validation.valid) {
-                return res.redirect('/#/ranking');
-            }
-            this.sendIndexPage(res);
-        });
-        
-        this.app.get('/achievements/:token', (req, res) => {
-            const validation = this.handleTokenValidation(req.params.token, res);
-            if (validation.valid) {
-                return res.redirect('/#/achievements');
-            }
-            this.sendIndexPage(res);
-        });
-        
-        // 静态文件服务（必须在token路由之后）
+        // 静态文件服务
         const webDir = PathResolver.getWebDir();
         if (webDir && typeof webDir === 'string') {
             // 排除API路径和token路径

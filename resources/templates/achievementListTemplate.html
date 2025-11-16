@@ -17,7 +17,7 @@
 			}
 
 			.container {
-				max-width: 1600px;
+				max-width: 2800px;
 				margin: 0 auto;
 				background: #A9BCD0;
 				border-radius: 20px;
@@ -29,30 +29,13 @@
 			.header {
 				background: #58A4B0;
 				color: #FEF9FF;
-				padding: 40px 30px;
+				padding: 24px 30px;
 				text-align: center;
-				position: relative;
-			}
-
-			.header::before {
-				content: '';
-				position: absolute;
-				top: 0;
-				left: 0;
-				right: 0;
-				bottom: 0;
-				background: rgba(255, 255, 255, 0.1);
-				backdrop-filter: blur(10px);
-			}
-
-			.header>* {
-				position: relative;
-				z-index: 1;
 			}
 
 			.title {
-				font-size: 64px;
-				font-weight: 1000;
+				font-size: 48px;
+				font-weight: 700;
 				line-height: 1.2;
 				text-overflow: ellipsis;
 				white-space: nowrap;
@@ -60,144 +43,110 @@
 			}
 
 			.achievement-count {
-				font-size: 44px;
-				margin-top: 12px;
-				font-weight: 1000;
+				font-size: 32px;
+				margin-top: 8px;
+				font-weight: 600;
 			}
 
 			.achievement-count span {
-				font-weight: 1000;
-				font-size: 52px;
+				font-weight: 700;
+				font-size: 36px;
 				color: #fff;
-				text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 			}
 
 			.group-info {
-				font-size: 36px;
-				opacity: 0.95;
-				font-weight: 900;
-				letter-spacing: 0.5px;
+				font-size: 24px;
+				opacity: 0.9;
+				font-weight: 500;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 				overflow: hidden;
-				margin-top: 12px;
+				margin-top: 8px;
 			}
 
 			.achievements-list {
-				padding: 40px;
+				padding: 24px;
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 16px;
+				column-gap: 20px;
 			}
 
 			.achievement-separator {
 				display: flex;
 				align-items: center;
-				margin: 32px 0;
-				gap: 20px;
+				margin: 20px 0 16px 0;
+				gap: 12px;
+				grid-column: 1 / -1;
 			}
 
 			.separator-line {
 				flex: 1;
-				height: 2px;
-				background: linear-gradient(90deg, transparent, #58A4B0, transparent);
+				height: 1px;
+				background: #58A4B0;
+				opacity: 0.3;
 			}
 
 			.separator-text {
-				font-size: 32px;
-				font-weight: 900;
+				font-size: 24px;
+				font-weight: 600;
 				color: #58A4B0;
-				padding: 0 20px;
-				text-shadow: 0 1px 3px rgba(88, 164, 176, 0.3);
+				padding: 0 12px;
 			}
 
 			.achievement-item {
-				display: grid;
-				grid-template-columns: 48px 220px 1fr;
-				grid-template-rows: auto;
-				gap: 18px;
-				align-items: start;
-				padding: 18px 22px;
-				margin-bottom: 14px;
-				border-radius: 18px;
-				border: 1px solid rgba(88, 164, 176, 0.15);
-				background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
-				position: relative;
-				overflow: hidden;
-				transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
-			}
-
-			.achievement-item::before {
-				content: '';
-				position: absolute;
-				top: 0;
-				left: 0;
-				width: 4px;
-				height: 100%;
-				background: linear-gradient(180deg, rgba(88, 164, 176, 0.3) 0%, rgba(88, 164, 176, 0.1) 100%);
-				opacity: 0;
-				transition: opacity 0.3s ease;
-			}
-
-			.achievement-item:hover {
-				border-color: rgba(88, 164, 176, 0.35);
-				box-shadow: 0 8px 24px rgba(88, 164, 176, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
-				transform: translateY(-2px);
-			}
-
-			.achievement-item:hover::before {
-				opacity: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				padding: 14px 16px;
+				border-radius: 12px;
+				border: 1px solid rgba(88, 164, 176, 0.2);
+				background: #fff;
+				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+				min-height: 140px;
 			}
 
 			.achievement-item.unlocked {
-				background: linear-gradient(135deg, rgba(88, 164, 176, 0.08) 0%, rgba(169, 188, 208, 0.12) 100%);
-				border-color: rgba(88, 164, 176, 0.25);
-			}
-
-			.achievement-item.unlocked::before {
-				background: linear-gradient(180deg, #38a169 0%, rgba(56, 161, 105, 0.6) 100%);
-				opacity: 1;
+				background: rgba(88, 164, 176, 0.05);
+				border-color: rgba(88, 164, 176, 0.3);
 			}
 
 			.achievement-item.locked {
-				opacity: 0.65;
-				background: linear-gradient(135deg, rgba(240, 242, 245, 0.95) 0%, rgba(232, 236, 240, 0.95) 100%);
+				opacity: 0.6;
+				background: #f5f5f5;
+			}
+
+			.achievement-header {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				flex-wrap: wrap;
 			}
 
 			.achievement-status {
-				grid-column: 1;
-				grid-row: 1;
-				width: 48px;
-				height: 48px;
-				font-size: 28px;
+				width: 32px;
+				height: 32px;
+				font-size: 20px;
 				text-align: center;
 				flex-shrink: 0;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				border-radius: 12px;
-				background: rgba(255, 255, 255, 0.8);
-				box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-				transition: all 0.3s ease;
-			}
-
-			.achievement-item:hover .achievement-status {
-				transform: scale(1.05);
-				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+				border-radius: 8px;
+				background: #fff;
 			}
 
 			.achievement-status.unlocked {
 				color: #38a169;
-				background: linear-gradient(135deg, rgba(56, 161, 105, 0.15) 0%, rgba(56, 161, 105, 0.08) 100%);
+				background: rgba(56, 161, 105, 0.1);
 			}
 
 			.achievement-status.locked {
 				color: #a0aec0;
-				background: rgba(240, 242, 245, 0.8);
+				background: #f0f0f0;
 			}
 
 			.achievement-badge {
-				grid-column: 2;
-				grid-row: 1;
-				width: 100%;
 				flex-shrink: 0;
 				display: flex;
 				align-items: center;
@@ -205,124 +154,93 @@
 			}
 
 			.achievement-inline {
-				font-size: 28px;
-				font-weight: 700;
-				padding: 10px 18px;
-				border-radius: 14px;
-				text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-				box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+				font-size: 18px;
+				font-weight: 600;
+				padding: 6px 12px;
+				border-radius: 8px;
+				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 				display: inline-block;
 				vertical-align: middle;
 				line-height: 1.2;
-				border: 1px solid rgba(255, 255, 255, 0.3);
-				backdrop-filter: blur(10px);
-				transition: all 0.3s ease;
 				white-space: nowrap;
-			}
-
-			.achievement-item:hover .achievement-inline {
-				transform: translateY(-1px);
-				box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.12);
 			}
 
 			/* 成就等级颜色样式 */
 			.achievement-inline.achievement-common {
 				background: #F2DFD7;
 				color: #373F51;
-				box-shadow: 0 2px 8px rgba(242, 223, 215, 0.3);
 			}
 
 			.achievement-inline.achievement-uncommon {
 				background: #FEF9FF;
 				color: #373F51;
-				box-shadow: 0 2px 8px rgba(254, 249, 255, 0.3);
 			}
 
 			.achievement-inline.achievement-rare {
 				background: #D4C1EC;
 				color: #373F51;
-				box-shadow: 0 2px 8px rgba(212, 193, 236, 0.3);
 			}
 
 			.achievement-inline.achievement-epic {
 				background: #9F9FED;
 				color: #FEF9FF;
-				box-shadow: 0 2px 8px rgba(159, 159, 237, 0.3);
 			}
 
 			.achievement-inline.achievement-legendary {
 				background: #736CED;
 				color: #FEF9FF;
-				box-shadow: 0 2px 8px rgba(115, 108, 237, 0.3);
 			}
 
 			.achievement-inline.achievement-mythic {
-				background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+				background: #FF6B6B;
 				color: #FEF9FF;
-				box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
 			}
 
 			.achievement-inline.achievement-festival {
-				background: linear-gradient(135deg, #FFD93D 0%, #FFE066 100%);
+				background: #FFD93D;
 				color: #373F51;
-				box-shadow: 0 2px 8px rgba(255, 217, 61, 0.4);
 			}
 
 			.achievement-inline.achievement-special {
-				background: linear-gradient(135deg, #9D4EDD 0%, #C77DFF 50%, #E0AAFF 100%);
+				background: #9D4EDD;
 				color: #FEF9FF;
-				box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
-				animation: special-glow 2s ease-in-out infinite alternate;
-			}
-
-			@keyframes special-glow {
-				from {
-					box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
-				}
-				to {
-					box-shadow: 0 4px 16px rgba(157, 78, 221, 0.8);
-				}
 			}
 
 			.achievement-info {
-				grid-column: 3;
-				grid-row: 1;
 				display: flex;
 				flex-direction: column;
-				gap: 6px;
+				gap: 8px;
+				flex: 1;
 				min-width: 0;
 			}
 
 			.achievement-name-row {
 				display: flex;
 				align-items: center;
-				gap: 12px;
+				gap: 8px;
 				flex-wrap: wrap;
 			}
 
 			.achievement-name {
-				font-size: 34px;
-				font-weight: 900;
+				font-size: 20px;
+				font-weight: 600;
 				color: #1a202c;
 				line-height: 1.3;
-				letter-spacing: -0.3px;
+				word-break: break-word;
 			}
 
 			.achievement-description-row {
 				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 16px;
-				flex-wrap: wrap;
+				flex-direction: column;
+				gap: 6px;
 			}
 
 			.achievement-description {
-				font-size: 24px;
+				font-size: 16px;
 				color: #4a5568;
-				font-weight: 600;
-				line-height: 1.5;
-				flex: 1;
-				min-width: 0;
+				font-weight: 400;
+				line-height: 1.4;
+				word-break: break-word;
 			}
 
 			.achievement-meta-row {
@@ -341,16 +259,16 @@
 			}
 
 			.achievement-display-status {
-				font-size: 22px;
+				font-size: 18px;
 				font-weight: 700;
 				flex-shrink: 0;
 			}
 
 			.display-status {
 				display: inline-block;
-				padding: 3px 10px;
-				border-radius: 10px;
-				font-size: 20px;
+				padding: 2px 8px;
+				border-radius: 8px;
+				font-size: 16px;
 				white-space: nowrap;
 			}
 
@@ -370,29 +288,23 @@
 			}
 
 			.achievement-unlock-time {
-				font-size: 30px;
-				color: #38a169;
-				font-weight: 800;
+				font-size: 14px;
+				color: #2c5282;
+				font-weight: 500;
 				display: flex;
 				align-items: center;
-				gap: 8px;
+				gap: 6px;
 				white-space: nowrap;
-			}
-
-			.achievement-unlock-time::before {
-				content: '👥';
-				font-size: 28px;
-				opacity: 0.9;
 			}
 
 			.footer {
 				background: #f7fafc;
-				padding: 30px;
+				padding: 20px;
 				text-align: center;
 				border-top: 1px solid #e2e8f0;
 				color: #718096;
-				font-size: 28px;
-				font-weight: 800;
+				font-size: 20px;
+				font-weight: 500;
 			}
 
 			.footer p {
