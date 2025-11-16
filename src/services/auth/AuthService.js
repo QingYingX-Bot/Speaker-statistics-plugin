@@ -108,11 +108,11 @@ class AuthService {
 
             if (userKeyData.hash && userKeyData.salt) {
                 // 不再返回明文秘钥，只返回提示信息
-                return {
+                    return {
                     secretKey: '***已加密存储***',
-                    hasExistingKey: true,
+                        hasExistingKey: true,
                     message: '秘钥已加密存储，无法显示原始值。如需修改，请使用"修改秘钥"功能。'
-                };
+                    };
             } else {
                 return {
                     hasExistingKey: false,

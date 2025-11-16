@@ -173,7 +173,7 @@ export default class Settings {
                                 </div>
                                 <div class="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
                                     <div class="text-sm text-gray-600 dark:text-gray-400">版本</div>
-                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">1.0.0</div>
+                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100" id="systemVersion">加载中...</div>
                                 </div>
                             </div>
                         </div>
@@ -187,11 +187,30 @@ export default class Settings {
         this.setupEventListeners();
         await this.updateUserInfo();
         await this.updateSecretKeyDisplay();
+        await this.loadSystemVersion();
     }
     
     maskSecretKey(key) {
         if (!key || key.length <= 8) return '****';
         return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+    }
+    
+    async loadSystemVersion() {
+        try {
+            const response = await api.getSystemVersion();
+            if (response.success && response.data) {
+                const versionEl = document.getElementById('systemVersion');
+                if (versionEl) {
+                    versionEl.textContent = response.data.version || '1.0.0';
+                }
+            }
+        } catch (error) {
+            console.error('加载系统版本失败:', error);
+            const versionEl = document.getElementById('systemVersion');
+            if (versionEl) {
+                versionEl.textContent = '1.0.0';
+            }
+        }
     }
     
     async updateUserInfo() {

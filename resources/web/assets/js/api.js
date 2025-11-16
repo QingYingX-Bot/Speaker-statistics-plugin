@@ -400,6 +400,16 @@ class API {
         return this.request(`/api/admin/wordcloud?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
     }
     
+    // ========== 系统API ==========
+    
+    /**
+     * 获取系统版本信息
+     * @returns {Promise} 系统版本信息
+     */
+    async getSystemVersion() {
+        return this.request('/api/system/version');
+    }
+    
     // ========== 验证码API ==========
     
     /**

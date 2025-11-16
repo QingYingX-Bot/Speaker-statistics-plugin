@@ -8,6 +8,7 @@ export default class Home {
         this.groups = [];
         this.currentGroupId = 'all';
         this.userData = null;
+        this.viewUserId = null; // 查看的用户ID（如果从URL参数传入）
     }
     
     async render() {
@@ -56,30 +57,12 @@ export default class Home {
     
     renderStatCards() {
         return `
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">今日发言</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary leading-tight" id="todayCount">-</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">总发言</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight" id="totalCount">-</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">总字数</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight" id="totalWords">-</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">活跃天数</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight" id="activeDays">-</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">连续天数</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight" id="continuousDays">-</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all flex flex-col justify-between">
-                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">排名</div>
-                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight" id="rank">-</div>
-            </div>
+            ${Card.renderStat({ label: '今日发言', value: '<span id="todayCount" class="text-primary">-</span>', id: 'todayCountCard' })}
+            ${Card.renderStat({ label: '总发言', value: '<span id="totalCount">-</span>', id: 'totalCountCard' })}
+            ${Card.renderStat({ label: '总字数', value: '<span id="totalWords">-</span>', id: 'totalWordsCard' })}
+            ${Card.renderStat({ label: '活跃天数', value: '<span id="activeDays">-</span>', id: 'activeDaysCard' })}
+            ${Card.renderStat({ label: '连续天数', value: '<span id="continuousDays">-</span>', id: 'continuousDaysCard' })}
+            ${Card.renderStat({ label: '排名', value: '<span id="rank">-</span>', id: 'rankCard' })}
         `;
     }
     
@@ -143,15 +126,22 @@ export default class Home {
     }
     
     async mounted() {
+        // 从URL参数获取要查看的用户ID
+        const params = router.getQueryParams();
+        this.viewUserId = params.userId || null;
+        
         await this.loadGroups();
         this.setupEventListeners();
     }
     
     async loadGroups() {
         try {
+            // 使用 viewUserId 或 app.userId
+            const targetUserId = this.viewUserId || this.app.userId;
+            
             // 并行执行：加载群列表和初始化统计数据
             const [groupsResponse] = await Promise.all([
-                api.getUserGroups(this.app.userId).catch(err => {
+                api.getUserGroups(targetUserId).catch(err => {
                     console.error('加载群列表失败:', err);
                     return { success: false, data: [] };
                 })
@@ -218,7 +208,9 @@ export default class Home {
             // 先显示加载状态
             this.renderStats({ loading: true });
             
-            const response = await api.getUserStats(this.app.userId, groupId);
+            // 使用 viewUserId 或 app.userId
+            const targetUserId = this.viewUserId || this.app.userId;
+            const response = await api.getUserStats(targetUserId, groupId);
             this.userData = response.data;
             this.renderStats();
         } catch (error) {
@@ -241,7 +233,9 @@ export default class Home {
             const allStats = await Promise.all(
                 this.groups.map(async (group) => {
                     try {
-                        const response = await api.getUserStats(this.app.userId, group.group_id);
+                        // 使用 viewUserId 或 app.userId
+                        const targetUserId = this.viewUserId || this.app.userId;
+                        const response = await api.getUserStats(targetUserId, group.group_id);
                         if (response.success && response.data) {
                             return response.data;
                         }
@@ -291,7 +285,10 @@ export default class Home {
                 if (rankingResponse.success && rankingResponse.data) {
                     // 找到当前用户在排行榜中的位置
                     userIndex = rankingResponse.data.findIndex(
-                        user => String(user.user_id || user.userId) === String(this.app.userId)
+                        user => {
+                            const targetUserId = this.viewUserId || this.app.userId;
+                            return String(user.user_id || user.userId) === String(targetUserId);
+                        }
                     );
                     
                     if (userIndex !== -1) {
@@ -331,8 +328,8 @@ export default class Home {
     
     aggregateStats(statsArray) {
         const today = new Date().toISOString().split('T')[0];
-        const currentWeek = window.TimeUtils ? window.TimeUtils.getCurrentWeekKey() : this.getCurrentWeekKey();
-        const currentMonth = window.TimeUtils ? window.TimeUtils.getCurrentMonthKey() : this.getCurrentMonthKey();
+        const currentWeek = TimeUtils.getCurrentWeekKey();
+        const currentMonth = TimeUtils.getCurrentMonthKey();
         
         // 初始化聚合数据
         let totalCount = 0;
@@ -568,23 +565,4 @@ export default class Home {
         }
     }
     
-    // 获取当前周键（格式：YYYY-WW，使用ISO周数）
-    getCurrentWeekKey() {
-        const now = new Date();
-        const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-        const year = d.getUTCFullYear();
-        return `${year}-W${weekNo.toString().padStart(2, '0')}`;
-    }
-    
-    // 获取当前月键（格式：YYYY-MM）
-    getCurrentMonthKey() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        return `${year}-${month}`;
-    }
 }

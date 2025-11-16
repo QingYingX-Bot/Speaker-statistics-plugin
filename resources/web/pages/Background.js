@@ -145,10 +145,7 @@ export default class Background {
                                     </div>
                                     <!-- 加载状态 -->
                                     <div id="cropperLoading" class="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 hidden z-20">
-                                        <div class="text-center">
-                                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                                            <div class="text-xs text-gray-500 dark:text-gray-400">加载中...</div>
-                                        </div>
+                                        ${Loading.render({ text: '加载中...', size: 'medium', className: 'text-xs' })}
                                     </div>
                                 </div>
                             </div>
@@ -210,9 +207,9 @@ export default class Background {
                         card.classList.remove('border-gray-200', 'dark:border-gray-700', 'bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
                         card.classList.add('border-primary', 'bg-primary/10', 'text-primary');
                     } else {
-                        card.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
+                    card.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
                         card.classList.add('border-gray-200', 'dark:border-gray-700', 'bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
-                    }
+            }
                 }
             });
             
@@ -378,20 +375,20 @@ export default class Background {
         // 清理旧的图片 URL
         if (this.currentImageUrl) {
             URL.revokeObjectURL(this.currentImageUrl);
-        }
-        
+                    }
+                    
         // 创建新的图片 URL
         this.currentImageUrl = URL.createObjectURL(file);
         
         // 设置图片源
         cropperImage.src = this.currentImageUrl;
         cropperImage.classList.remove('hidden');
-        
+                    
         // 隐藏空状态
         if (emptyCropper) {
             emptyCropper.style.display = 'none';
-        }
-        
+                    }
+                    
         // 等待图片加载
         cropperImage.onload = () => {
             // 初始化 cropper
@@ -406,7 +403,7 @@ export default class Background {
                 if (isMobile) {
                     container.style.minHeight = '250px';
                     container.style.maxHeight = '50vh';
-                } else {
+                    } else {
                     container.style.minHeight = '400px';
                     container.style.maxHeight = '70vh';
                 }
@@ -435,20 +432,20 @@ export default class Background {
                 minCropBoxWidth: isMobile ? 50 : 100,
                 minCropBoxHeight: isMobile ? 50 : 100,
                 ready: () => {
-                    loadingEl.classList.add('hidden');
+                            loadingEl.classList.add('hidden');
                     this.updateButtonStates(true);
                     
                     // 移动端提示
                     if (isMobile) {
                         Toast.show('提示：双指缩放，单指拖拽', 'info', 3000);
-                    }
+                        }
                 }
-            });
-        };
+                });
+            };
         
         cropperImage.onerror = () => {
-            loadingEl.classList.add('hidden');
-            Toast.show('图片加载失败', 'error');
+                loadingEl.classList.add('hidden');
+                Toast.show('图片加载失败', 'error');
             if (emptyCropper) {
                 emptyCropper.style.display = 'flex';
             }
@@ -516,22 +513,22 @@ export default class Background {
             
             // 转换为 blob
             canvas.toBlob(async (blob) => {
-                try {
+                        try {
                     if (!blob) {
                         throw new Error('无法生成图片文件');
                     }
                     
-                    const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
-                    await api.uploadBackground(this.app.userId, file, this.backgroundType, secretKey);
-                    Toast.show('背景设置成功！', 'success');
-                    loadingEl.classList.add('hidden');
-                    // 重新加载当前背景预览
-                    this.loadCurrentBackground();
-                } catch (error) {
-                    loadingEl.classList.add('hidden');
-                    Toast.show('上传失败: ' + error.message, 'error');
-                }
-            }, 'image/jpeg', 0.9);
+                            const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
+                            await api.uploadBackground(this.app.userId, file, this.backgroundType, secretKey);
+                            Toast.show('背景设置成功！', 'success');
+                            loadingEl.classList.add('hidden');
+                            // 重新加载当前背景预览
+                            this.loadCurrentBackground();
+                        } catch (error) {
+                            loadingEl.classList.add('hidden');
+                            Toast.show('上传失败: ' + error.message, 'error');
+                        }
+                    }, 'image/jpeg', 0.9);
         } catch (error) {
             loadingEl.classList.add('hidden');
             Toast.show('处理失败: ' + error.message, 'error');

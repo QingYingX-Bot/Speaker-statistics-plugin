@@ -930,8 +930,8 @@ class DatabaseService {
             autoDisplayAt = null;
         } else if (!autoDisplayAt) {
             // 自动设置但未提供时间，使用当前时间
-            autoDisplayAt = now;
-        }
+                autoDisplayAt = now;
+            }
         
         // 确保 autoDisplayAt 是字符串或 null
         if (autoDisplayAt instanceof Date) {

@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService.js';
 import { AuthMiddleware } from './middleware/AuthMiddleware.js';
 import { ApiResponse } from './utils/ApiResponse.js';
 import { globalConfig } from '../../core/ConfigManager.js';
+import { TimeUtils } from '../../core/utils/TimeUtils.js';
 
 /**
  * 管理员相关API路由
@@ -159,22 +160,21 @@ export class AdminApi {
                     };
                 }));
 
-                // 获取今日统计
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                // date_key 格式为 YYYY-MM-DD
-                const todayDateKey = today.toISOString().split('T')[0];
-                
+                // 获取今日统计（使用 UTC+8 时区，与数据库中 date_key 的生成方式一致）
+                const todayUTC8 = TimeUtils.getUTC8Date();
+                todayUTC8.setHours(0, 0, 0, 0);
+                // date_key 格式为 YYYY-MM-DD（UTC+8）
+                const todayDateKey = TimeUtils.formatDate(todayUTC8);
+                // 使用 = 精确匹配今天的日期，确保数据一致性
                 const todayMessages = await this.dataService.dbService.get(
-                    'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key >= $1',
+                    'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1',
                     todayDateKey
                 );
                 
                 // 获取活跃群数（最近7天有消息的群）
-                const sevenDaysAgo = new Date();
-                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                sevenDaysAgo.setHours(0, 0, 0, 0);
-                const sevenDaysAgoDateKey = sevenDaysAgo.toISOString().split('T')[0];
+                const sevenDaysAgoUTC8 = new Date(todayUTC8);
+                sevenDaysAgoUTC8.setDate(sevenDaysAgoUTC8.getDate() - 7);
+                const sevenDaysAgoDateKey = TimeUtils.formatDate(sevenDaysAgoUTC8);
                 
                 const activeGroups = await this.dataService.dbService.get(
                     'SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1',
@@ -193,15 +193,15 @@ export class AdminApi {
                     dailyStats = [];
                 }
                 
-                // 确保有7天的数据，缺失的日期补0
+                // 确保有7天的数据，缺失的日期补0（使用 UTC+8 时区，与数据库中 date_key 的生成方式一致）
                 const dailyStatsMap = new Map(dailyStats.map(item => [item.date, parseInt(item.count || 0, 10)]));
                 const completeDailyStats = [];
                 for (let i = 6; i >= 0; i--) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    const dateKey = date.toISOString().split('T')[0];
+                    const dateUTC8 = new Date(todayUTC8);
+                    dateUTC8.setDate(dateUTC8.getDate() - i);
+                    const dateKey = TimeUtils.formatDate(dateUTC8);
                     completeDailyStats.push({
-                        date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
+                        date: dateUTC8.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
                         count: dailyStatsMap.get(dateKey) || 0
                     });
                 }
@@ -317,78 +317,99 @@ export class AdminApi {
                 }
                 
                 // 获取今日新增用户数（从 user_stats 表的 created_at 字段）
-                // 根据数据库类型使用不同的查询方式
+                // 根据数据库类型使用不同的查询方式，使用=精确匹配今天
                 let todayNewUsers;
                 try {
-                    // 尝试 PostgreSQL 方式（使用 DATE 函数）
-                    todayNewUsers = await this.dataService.dbService.get(
-                        'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at) >= $1',
-                        todayDateKey
-                    );
-                } catch (error) {
-                    // 如果失败，尝试 SQLite 方式（使用日期字符串比较）
-                    try {
+                    const dbType = this.dataService.dbService.getDatabaseType();
+                    if (dbType === 'postgresql') {
+                        // PostgreSQL 查询
                         todayNewUsers = await this.dataService.dbService.get(
-                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at) >= $1',
+                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE \'Asia/Shanghai\') = $1',
                             todayDateKey
                         );
-                    } catch (error2) {
-                        // 如果还是失败，使用字符串比较（SQLite datetime 格式）
-                        const todayStart = `${todayDateKey} 00:00:00`;
+                    } else {
+                        // SQLite 查询
                         todayNewUsers = await this.dataService.dbService.get(
-                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE created_at >= $1',
-                            todayStart
+                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, \'localtime\') = $1',
+                            todayDateKey
+                        );
+                    }
+                } catch (error) {
+                    // 如果失败，使用字符串比较（SQLite datetime 格式）
+                    try {
+                        const todayStart = `${todayDateKey} 00:00:00`;
+                        const todayEnd = `${todayDateKey} 23:59:59`;
+                        todayNewUsers = await this.dataService.dbService.get(
+                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE created_at >= $1 AND created_at <= $2',
+                            [todayStart, todayEnd]
                         ).catch(() => ({ count: 0 }));
+                    } catch (error2) {
+                        todayNewUsers = { count: 0 };
                     }
                 }
 
-                // 获取近7天的群组增长趋势（按日期统计新增群组数）
-                let groupGrowthStats = [];
+                // 获取近7天的新增用户趋势（按日期统计新增用户数）
+                let newUserStats = [];
                 try {
-                    // 使用 group_info 表的 created_at 字段统计每日新增群组数
+                    // 使用 user_stats 表的 created_at 字段统计每日新增用户数
                     // 根据数据库类型选择相应的查询语句
                     const dbType = this.dataService.dbService.getDatabaseType();
                     
                     if (dbType === 'postgresql') {
                         // PostgreSQL 查询
-                        groupGrowthStats = await this.dataService.dbService.all(`
+                        newUserStats = await this.dataService.dbService.all(`
                             SELECT 
-                                DATE(created_at) as date,
-                                COUNT(*) as count
-                            FROM group_info
-                            WHERE DATE(created_at) >= $1
-                            GROUP BY DATE(created_at)
-                            ORDER BY DATE(created_at) ASC
+                                DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date,
+                                COUNT(DISTINCT user_id) as count
+                            FROM user_stats
+                            WHERE DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $1
+                            GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai')
+                            ORDER BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ASC
                         `, sevenDaysAgoDateKey).catch(() => []);
                     } else {
                         // SQLite 查询
-                        groupGrowthStats = await this.dataService.dbService.all(`
+                        newUserStats = await this.dataService.dbService.all(`
                             SELECT 
-                                date(created_at) as date,
-                                COUNT(*) as count
-                            FROM group_info
-                            WHERE date(created_at) >= $1
-                            GROUP BY date(created_at)
-                            ORDER BY date(created_at) ASC
+                                date(created_at, 'localtime') as date,
+                                COUNT(DISTINCT user_id) as count
+                            FROM user_stats
+                            WHERE date(created_at, 'localtime') >= $1
+                            GROUP BY date(created_at, 'localtime')
+                            ORDER BY date(created_at, 'localtime') ASC
                         `, sevenDaysAgoDateKey).catch(() => []);
                     }
                 } catch (error) {
-                    globalConfig.error('获取群组增长趋势失败:', error);
-                    groupGrowthStats = [];
+                    globalConfig.error('获取新增用户趋势失败:', error);
+                    newUserStats = [];
                 }
                 
-                // 确保有7天的数据，缺失的日期补0
-                const groupGrowthMap = new Map(groupGrowthStats.map(item => [item.date, parseInt(item.count || 0, 10)]));
-                const completeGroupGrowthStats = [];
+                // 确保有7天的数据，缺失的日期补0（使用 UTC+8 时区，确保数据一致性）
+                // 将查询结果转换为标准日期格式的Map（处理可能的日期格式差异）
+                const newUserMap = new Map();
+                newUserStats.forEach(item => {
+                    // 处理日期格式：可能是 'YYYY-MM-DD' 或 Date 对象
+                    let dateStr = item.date;
+                    if (dateStr instanceof Date) {
+                        dateStr = TimeUtils.formatDate(dateStr);
+                    } else if (typeof dateStr === 'string') {
+                        // 确保日期格式为 YYYY-MM-DD
+                        dateStr = dateStr.split('T')[0]; // 处理可能的 datetime 格式
+                    }
+                    const count = parseInt(item.count || 0, 10);
+                    newUserMap.set(dateStr, count);
+                });
+                
+                const completeNewUserStats = [];
                 for (let i = 6; i >= 0; i--) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    const dateKey = date.toISOString().split('T')[0];
-                    completeGroupGrowthStats.push({
-                        date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
-                        count: groupGrowthMap.get(dateKey) || 0
+                    const dateUTC8 = new Date(todayUTC8);
+                    dateUTC8.setDate(dateUTC8.getDate() - i);
+                    const dateKey = TimeUtils.formatDate(dateUTC8);
+                    completeNewUserStats.push({
+                        date: dateUTC8.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
+                        count: newUserMap.get(dateKey) || 0
                     });
                 }
+                
 
                 ApiResponse.success(res, {
                     totalGroups: totalGroups?.count || 0,
@@ -401,7 +422,7 @@ export class AdminApi {
                     allGroupStats: formattedAllGroupStats, // 所有群组数据，用于消息密度散点图
                     dailyStats: completeDailyStats,
                     hourlyStats: completeHourlyStats,
-                    groupGrowthStats: completeGroupGrowthStats // 群组增长趋势数据
+                    newUserStats: completeNewUserStats // 新增用户趋势数据（近7天）
                 });
             }, '获取统计概览失败')
         );

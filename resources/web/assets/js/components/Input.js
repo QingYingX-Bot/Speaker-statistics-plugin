@@ -36,7 +36,7 @@ export class Input {
             <label class="block text-sm font-medium text-gray-700 mb-2" for="${id}">${label}</label>
         ` : '';
         
-        const inputClasses = `w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-200 text-gray-800 placeholder-gray-400 ${className}`.trim();
+        const inputClasses = `w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-200 text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500 ${className}`.trim();
         
         return `
             <div class="mb-4">
@@ -83,7 +83,7 @@ export class Input {
         
         const input = document.createElement('input');
         input.type = type;
-        input.className = `w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-200 text-gray-800 placeholder-gray-400 ${className}`.trim();
+        input.className = `w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-200 text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500 ${className}`.trim();
         if (id) input.id = id;
         if (name) input.name = name;
         if (placeholder) input.placeholder = placeholder;

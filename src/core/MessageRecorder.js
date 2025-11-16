@@ -287,8 +287,8 @@ class MessageRecorder {
         }
         
         // 保存最新消息（用于成就检查，只保留1分钟）
-        this.recentMessageTexts.set(key, {
-            text: text,
+            this.recentMessageTexts.set(key, {
+                text: text,
             timestamp: now
         });
         

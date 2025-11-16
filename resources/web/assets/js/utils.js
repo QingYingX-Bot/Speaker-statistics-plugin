@@ -22,8 +22,9 @@ class Toast {
             this.timeoutId = null;
         }
         
-        // 先移除 show 类，确保动画可以重新触发
+        // 先移除 show 类和 data-type，确保动画可以重新触发
         toast.classList.remove('show');
+        toast.removeAttribute('data-type');
         
         // 等待一小段时间确保动画重置
         setTimeout(() => {
@@ -37,14 +38,21 @@ class Toast {
             icon.textContent = iconMap[type] || 'ℹ️';
             messageEl.textContent = message;
             
+            // 设置类型属性（用于颜色区分）
+            toast.setAttribute('data-type', type);
+            
             // 添加 show 类显示 Toast
             toast.classList.add('show');
+            
+            // 移动端自动调整显示时长（稍长一些，方便阅读）
+            const isMobile = window.innerWidth < 640;
+            const adjustedDuration = isMobile ? Math.max(duration, 2500) : duration;
             
             // 设置自动隐藏
             this.timeoutId = setTimeout(() => {
                 toast.classList.remove('show');
                 this.timeoutId = null;
-            }, duration);
+            }, adjustedDuration);
         }, 50);
     }
     
@@ -61,10 +69,13 @@ class Toast {
 
 // 格式化数字
 function formatNumber(num) {
-    if (num >= 10000) {
-        return (num / 10000).toFixed(1) + '万';
+    if (num === null || num === undefined) return '0';
+    const numValue = Number(num);
+    if (isNaN(numValue)) return '0';
+    if (numValue >= 10000) {
+        return (numValue / 10000).toFixed(1) + '万';
     }
-    return num.toLocaleString();
+    return numValue.toLocaleString();
 }
 
 // 格式化日期
@@ -122,6 +133,29 @@ function formatRelativeTime(dateString) {
     if (hours > 0) return `${hours}小时前`;
     if (minutes > 0) return `${minutes}分钟前`;
     return '刚刚';
+}
+
+// HTML转义（防止XSS攻击）
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+// 掩码群组ID（显示前4位和后4位，中间用****代替）
+function maskGroupId(groupId) {
+    if (!groupId) return '-';
+    const idStr = String(groupId);
+    if (idStr.length <= 8) return idStr;
+    return idStr.substring(0, 4) + '****' + idStr.substring(idStr.length - 4);
+}
+
+// 获取用户头像URL
+function getAvatarUrl(userId) {
+    if (!userId) return '';
+    // 使用QQ头像API
+    return `https://q.qlogo.cn/g?b=qq&s=0&nk=${userId}`;
 }
 
 // 获取URL参数
@@ -248,6 +282,9 @@ window.Toast = Toast;
 window.formatNumber = formatNumber;
 window.formatDate = formatDate;
 window.formatRelativeTime = formatRelativeTime;
+window.escapeHtml = escapeHtml;
+window.maskGroupId = maskGroupId;
+window.getAvatarUrl = getAvatarUrl;
 window.getUrlParam = getUrlParam;
 window.setUrlParam = setUrlParam;
 window.debounce = debounce;

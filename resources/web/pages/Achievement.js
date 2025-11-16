@@ -40,12 +40,7 @@ export default class Achievement {
                     
                     <!-- 成就内容 -->
                     <div id="achievementContent" style="min-height: 200px; transition: opacity 0.3s ease-in-out;">
-                        <div class="flex items-center justify-center py-20">
-                            <div class="text-center">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-                                <p class="text-gray-500 dark:text-gray-400 text-sm">加载中...</p>
-                            </div>
-                        </div>
+                        <!-- 内容将由 loadAchievements 方法加载 -->
                     </div>
                 </div>
             </div>
@@ -326,12 +321,7 @@ export default class Achievement {
         
         // 显示加载状态
         content.innerHTML = `
-            <div class="flex items-center justify-center py-20" style="min-height: 200px;">
-                <div class="text-center">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-                    <p class="text-gray-500 text-sm">加载中...</p>
-                </div>
-            </div>
+            ${Loading.render({ text: '加载中...', size: 'medium', className: 'py-20' })}
         `;
         
         // 立即显示加载状态（淡入）
@@ -418,12 +408,11 @@ export default class Achievement {
         await new Promise(resolve => setTimeout(resolve, 200));
         
         if (this.achievements.length === 0) {
-            content.innerHTML = `
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-16 text-center" style="min-height: 200px;">
-                    <div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">🎖️</div>
-                    <div class="text-gray-500 dark:text-gray-400 text-sm">暂无成就数据</div>
-                </div>
-            `;
+            content.innerHTML = EmptyState.renderCard({ 
+                message: '暂无成就数据',
+                icon: '<div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">🎖️</div>',
+                className: 'p-16'
+            });
             // 淡入空状态
             requestAnimationFrame(() => {
                 content.style.opacity = '1';

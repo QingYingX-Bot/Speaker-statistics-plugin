@@ -28,7 +28,7 @@ export class AdminUsers {
     
     updateUsersList() {
         const usersListEl = document.getElementById('usersList');
-        const userCountEl = document.getElementById('userCount');
+        const userListCountEl = document.getElementById('userListCount');
         
         let filteredUsers = [...this.admin.users];
         
@@ -41,22 +41,21 @@ export class AdminUsers {
             });
         }
         
-        if (this.admin.userSortBy === 'name') {
+        // 默认按名称排序（与群管理一致）
             filteredUsers.sort((a, b) => {
                 const nameA = (a.username || a.userId || '').toLowerCase();
                 const nameB = (b.username || b.userId || '').toLowerCase();
                 return nameA.localeCompare(nameB);
             });
-        } else if (this.admin.userSortBy === 'role') {
-            filteredUsers.sort((a, b) => {
-                const roleA = a.role === 'admin' ? 0 : 1;
-                const roleB = b.role === 'admin' ? 0 : 1;
-                return roleA - roleB;
-            });
-        }
         
-        if (userCountEl) {
-            userCountEl.textContent = `${filteredUsers.length}`;
+        // 更新统计信息显示（与群管理格式一致）
+        if (userListCountEl) {
+            const countSpan = userListCountEl.querySelector('span.text-primary');
+            if (countSpan) {
+                countSpan.textContent = filteredUsers.length;
+            } else {
+                userListCountEl.innerHTML = `共 <span class="text-primary dark:text-primary">${filteredUsers.length}</span> 个用户`;
+            }
         }
         
         if (usersListEl) {
@@ -132,7 +131,7 @@ export class AdminUsers {
         
         const groupsListEl = document.getElementById('userGroupsList');
         if (groupsListEl) {
-            groupsListEl.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>加载中...</p></div>';
+            groupsListEl.innerHTML = Loading.render({ text: '加载中...', size: 'small', className: 'py-8' });
         }
         
         try {

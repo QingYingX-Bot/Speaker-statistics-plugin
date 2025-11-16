@@ -100,8 +100,12 @@ export class Navigation {
      * @returns {string} HTML字符串
      */
     render(userId, isAdmin, currentRoute = '/') {
+        // 获取用户名（优先从 localStorage 获取）
+        const userName = userId ? (localStorage.getItem(`userName_${userId}`) || null) : null;
+        const displayName = userName || userId || '未登录';
+        
         return this.position === 'left' 
-            ? this.renderLeftNav(userId, isAdmin, currentRoute)
+            ? this.renderLeftNav(displayName, userId, isAdmin, currentRoute)
             : this.renderTopNav(userId, isAdmin, currentRoute);
     }
 
@@ -148,35 +152,35 @@ export class Navigation {
         return `
             <nav class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50" id="navbar">
                 <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-                    <div class="flex items-center justify-between h-16">
-                        <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-between h-14 sm:h-16">
+                        <div class="flex items-center gap-2 sm:gap-3">
                             <button class="md:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300" id="mobileMenuBtn" aria-label="菜单">
-                                ${this.renderIcon(this.icons.menu, 'w-6 h-6')}
+                                ${this.renderIcon(this.icons.menu, 'w-5 h-5 sm:w-6 sm:h-6')}
                             </button>
-                            <span class="text-2xl">📊</span>
-                            <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">发言统计</span>
+                            <span class="text-xl sm:text-2xl">📊</span>
+                            <span class="text-base sm:text-xl font-semibold text-gray-900 dark:text-gray-100">发言统计</span>
                         </div>
-                        <div class="hidden md:flex items-center gap-2" id="navbarMenu">
+                        <div class="hidden md:flex items-center gap-1 lg:gap-2" id="navbarMenu">
                             ${navLinks}
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary w-[160px]" id="userInfoBtn" title="用户信息">
-                                ${this.renderIcon(this.icons.user, 'w-4 h-4 flex-shrink-0')}
+                        <div class="flex items-center gap-1 sm:gap-2">
+                            <button class="hidden sm:flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary w-[120px] sm:w-[160px]" id="userInfoBtn" title="用户信息">
+                                ${this.renderIcon(this.icons.user, 'w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0')}
                                 <span id="userId" class="flex-1 min-w-0 text-left overflow-hidden text-ellipsis whitespace-nowrap">${userId || '未登录'}</span>
                             </button>
-                            <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="navPositionToggleBtn" title="切换到左侧导航栏">
-                                ${this.renderIcon(this.icons.layout, 'w-5 h-5')}
+                            <button class="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="navPositionToggleBtn" title="切换到左侧导航栏">
+                                ${this.renderIcon(this.icons.layout, 'w-4 h-4 sm:w-5 sm:h-5')}
                             </button>
-                            <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="themeToggleBtn" title="切换主题">
-                                <svg class="w-5 h-5 hidden dark:block" id="themeIconSun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <button class="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="themeToggleBtn" title="切换主题">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5 hidden dark:block" id="themeIconSun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${this.icons.sun}"></path>
                                 </svg>
-                                <svg class="w-5 h-5 dark:hidden" id="themeIconMoon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5 dark:hidden" id="themeIconMoon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${this.icons.moon}"></path>
                                 </svg>
                             </button>
-                            <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="settingsBtn" title="设置">
-                                ${this.renderIcon(this.icons.settings, 'w-5 h-5')}
+                            <button class="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="settingsBtn" title="设置">
+                                ${this.renderIcon(this.icons.settings, 'w-4 h-4 sm:w-5 sm:h-5')}
                             </button>
                         </div>
                     </div>
@@ -188,28 +192,40 @@ export class Navigation {
 
     /**
      * 渲染左侧导航栏
-     * @param {string} userId 用户ID
+     * @param {string} displayName 显示名称（用户名或用户ID）
+     * @param {string} userId 用户ID（用于移动端菜单等）
      * @param {boolean} isAdmin 是否为管理员
      * @param {string} currentRoute 当前路由
      * @returns {string} HTML字符串
      */
-    renderLeftNav(userId, isAdmin, currentRoute) {
+    renderLeftNav(displayName, userId, isAdmin, currentRoute) {
         const navItems = this.getNavItems(isAdmin);
         const navLinks = this.renderNavLinks(navItems, currentRoute, 'left');
 
         return `
-            <aside class="fixed top-0 left-0 bottom-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm z-50 flex flex-col" id="leftSidebar">
-                <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <span class="text-2xl">📊</span>
-                    <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">发言统计</span>
+            <!-- 移动端遮罩层 -->
+            <div id="leftSidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 z-40 hidden lg:hidden transition-opacity duration-300" style="display: none;"></div>
+            
+            <aside class="fixed top-0 left-0 bottom-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 shadow-sm z-50 flex flex-col transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out" id="leftSidebar">
+                <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">📊</span>
+                        <span class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">发言统计</span>
+                    </div>
+                    <!-- 移动端关闭按钮 -->
+                    <button class="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300" id="leftSidebarCloseBtn" aria-label="关闭菜单">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
                 <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                     ${navLinks}
                 </nav>
-                <div class="p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                     <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        ${this.renderIcon(this.icons.user, 'w-4 h-4 text-gray-400 flex-shrink-0')}
-                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate flex-1" id="leftNavUserId">${userId || '未登录'}</span>
+                        ${this.renderIcon(this.icons.user, 'w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0')}
+                        <span class="text-xs text-gray-600 dark:text-gray-400 truncate flex-1" id="leftNavUserId">${displayName}</span>
                     </div>
                     <div class="grid grid-cols-4 gap-2">
                         <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary flex items-center justify-center" id="userInfoBtn" title="用户信息">
@@ -232,6 +248,7 @@ export class Navigation {
                     </div>
                 </div>
             </aside>
+            
             ${this.renderMobileMenu(navItems, currentRoute, userId)}
         `;
     }
@@ -251,6 +268,15 @@ export class Navigation {
                 <div class="px-4 py-3 space-y-1">
                     ${mobileNavLinks}
                 </div>
+                <!-- 移动端用户信息（仅在顶部导航栏模式下显示） -->
+                ${this.position === 'top' ? `
+                <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        ${this.renderIcon(this.icons.user, 'w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0')}
+                        <span class="text-sm text-gray-600 dark:text-gray-400 truncate flex-1">${userId || '未登录'}</span>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
     }
@@ -265,11 +291,35 @@ export class Navigation {
         this.position = position;
         localStorage.setItem('navPosition', position);
         
+        const pageHeaderBar = document.getElementById('pageHeaderBar');
+        
         // 更新 body 类名
         if (position === 'left') {
             document.body.classList.add('nav-left');
+            const sidebar = document.getElementById('leftSidebar');
+            
+            // 根据屏幕大小决定是否显示侧边栏
+            if (window.innerWidth >= 1024) {
+                // 大屏幕：显示侧边栏
+                if (sidebar) sidebar.classList.remove('-translate-x-full');
+                if (pageHeaderBar) pageHeaderBar.style.display = 'none';
+            } else {
+                // 小屏幕：隐藏侧边栏，显示标题栏
+                if (sidebar) sidebar.classList.add('-translate-x-full');
+                if (pageHeaderBar) {
+                    pageHeaderBar.style.display = 'block';
+                    // 更新页面标题
+                    if (window.router && typeof window.router.updatePageHeader === 'function') {
+                        window.router.updatePageHeader();
+                    }
+                }
+            }
         } else {
             document.body.classList.remove('nav-left');
+            // 隐藏页面标题栏
+            if (pageHeaderBar) pageHeaderBar.style.display = 'none';
+            // 关闭左侧导航栏（如果打开）
+            this.closeLeftSidebar();
         }
     }
 
@@ -329,6 +379,103 @@ export class Navigation {
         this.initNavPositionToggle();
         this.initThemeToggle();
         this.initSettingsButton();
+        this.initUserInfoButton();
+        this.initLeftSidebarToggle();
+    }
+    
+    /**
+     * 初始化左侧导航栏的移动端切换
+     */
+    initLeftSidebarToggle() {
+        // 左侧导航栏打开/关闭按钮
+        const toggleBtn = document.getElementById('leftSidebarToggleBtn');
+        const closeBtn = document.getElementById('leftSidebarCloseBtn');
+        const sidebar = document.getElementById('leftSidebar');
+        const overlay = document.getElementById('leftSidebarOverlay');
+        
+        // 打开侧边栏
+        if (toggleBtn && sidebar && overlay) {
+            toggleBtn.addEventListener('click', () => {
+                this.openLeftSidebar();
+            });
+        }
+        
+        // 关闭侧边栏
+        if (closeBtn && sidebar && overlay) {
+            closeBtn.addEventListener('click', () => {
+                this.closeLeftSidebar();
+            });
+        }
+        
+        // 点击遮罩层关闭
+        if (overlay && sidebar) {
+            overlay.addEventListener('click', () => {
+                this.closeLeftSidebar();
+            });
+        }
+        
+        // 监听窗口大小变化，在大屏幕上自动显示侧边栏，小屏幕自动隐藏
+        const handleResize = () => {
+            if (window.innerWidth >= 1024 && sidebar) {
+                // 大屏幕：显示侧边栏
+                sidebar.classList.remove('-translate-x-full');
+                if (overlay) overlay.style.display = 'none';
+                if (toggleBtn) toggleBtn.style.display = 'none';
+            } else if (window.innerWidth < 1024 && sidebar) {
+                // 小屏幕：隐藏侧边栏
+                sidebar.classList.add('-translate-x-full');
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    overlay.classList.add('opacity-0');
+                }
+                if (toggleBtn) toggleBtn.style.display = 'block';
+            }
+        };
+        
+        window.addEventListener('resize', handleResize);
+        handleResize(); // 初始检查
+    }
+    
+    /**
+     * 打开左侧导航栏（移动端）
+     */
+    openLeftSidebar() {
+        const sidebar = document.getElementById('leftSidebar');
+        const overlay = document.getElementById('leftSidebarOverlay');
+        const toggleBtn = document.getElementById('leftSidebarToggleBtn');
+        
+        if (sidebar) {
+            sidebar.classList.remove('-translate-x-full');
+        }
+        if (overlay) {
+            overlay.style.display = 'block';
+            setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+        }
+        if (toggleBtn) {
+            toggleBtn.style.display = 'none';
+        }
+    }
+    
+    /**
+     * 关闭左侧导航栏（移动端）
+     */
+    closeLeftSidebar() {
+        const sidebar = document.getElementById('leftSidebar');
+        const overlay = document.getElementById('leftSidebarOverlay');
+        const toggleBtn = document.getElementById('leftSidebarToggleBtn');
+        
+        if (sidebar) {
+            sidebar.classList.add('-translate-x-full');
+        }
+        if (overlay) {
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
+        if (toggleBtn) {
+            toggleBtn.style.display = 'block';
+        }
     }
 
     /**
@@ -411,6 +558,24 @@ export class Navigation {
                 }
             });
         }
+    }
+
+    /**
+     * 初始化用户信息按钮（跳转到个人中心）
+     */
+    initUserInfoButton() {
+        const userInfoBtns = document.querySelectorAll('#userInfoBtn');
+        userInfoBtns.forEach(btn => {
+            if (!btn.dataset.listenerBound) {
+                btn.dataset.listenerBound = 'true';
+                btn.addEventListener('click', () => {
+                    // 跳转到个人中心页面
+                    if (window.router) {
+                        window.router.navigate('/profile');
+                    }
+                });
+            }
+        });
     }
 }
 

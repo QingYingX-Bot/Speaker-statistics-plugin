@@ -17,17 +17,17 @@ export class Card {
         const classAttr = className ? `class="${className}"` : '';
         
         return `
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-200 hover:shadow-md" ${idAttr} ${classAttr}>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-md" ${idAttr} ${classAttr}>
                 ${title ? `
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                        <h2 class="text-xl font-semibold text-gray-800">${title}</h2>
+                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+                        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">${title}</h2>
                     </div>
                 ` : ''}
-                <div class="px-6 py-5 text-gray-700">
+                <div class="px-6 py-5 text-gray-700 dark:text-gray-300">
                     ${content}
                 </div>
                 ${footer ? `
-                    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
+                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-end gap-3">
                         ${footer}
                     </div>
                 ` : ''}
@@ -44,14 +44,16 @@ export class Card {
      * @param {string} options.className 额外CSS类名（可选）
      * @returns {string} HTML字符串
      */
-    static renderStat({ label, value, id = '', className = '' }) {
+    static renderStat({ label, value, id = '', className = '', icon = '' }) {
         const idAttr = id ? `id="${id}"` : '';
         const classAttr = className ? `class="stat-card ${className}"` : 'class="stat-card"';
+        const iconHtml = icon ? `<div class="mb-2">${icon}</div>` : '';
         
         return `
-            <div class="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 text-center border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col items-center justify-center min-h-[130px]" ${idAttr} ${classAttr}>
-                <div class="text-sm font-medium text-gray-600 mb-2">${label}</div>
-                <div class="text-2xl font-bold text-gray-800">${value}</div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-5 lg:p-6 border border-gray-200 dark:border-gray-700 hover:border-primary/50 dark:hover:border-primary/50 hover:shadow-md transition-all duration-200 flex flex-col items-center justify-center" ${idAttr} ${classAttr}>
+                ${iconHtml}
+                <div class="text-xs sm:text-sm lg:text-base text-gray-500 dark:text-gray-400 mb-2">${label}</div>
+                <div class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight">${value}</div>
             </div>
         `;
     }

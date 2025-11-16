@@ -178,37 +178,37 @@ class App {
         return new Promise((resolve) => {
             window.Modal.show('身份确认', `
                 <div class="space-y-4">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <div class="flex items-start gap-3">
-                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                             <div class="flex-1">
-                                <p class="text-sm font-medium text-blue-800 mb-2">请确认您的身份</p>
-                                <p class="text-xs text-blue-700 mb-3">请确认以下信息是否正确，然后输入您的秘钥进行验证</p>
-                                <div class="mt-3 pt-3 border-t border-blue-200">
-                                    <p class="text-xs text-blue-600 mb-1">用户ID:</p>
-                                    <p class="text-xl font-bold text-blue-800">${this.userId}</p>
+                                <p class="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">请确认您的身份</p>
+                                <p class="text-xs text-blue-700 dark:text-blue-400 mb-3">请确认以下信息是否正确，然后输入您的秘钥进行验证</p>
+                                <div class="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                                    <p class="text-xs text-blue-600 dark:text-blue-400 mb-1">用户ID:</p>
+                                    <p class="text-xl font-bold text-blue-800 dark:text-blue-300">${this.userId}</p>
                                     ${userName ? `
-                                    <p class="text-xs text-blue-600 mb-1 mt-3">用户名:</p>
-                                    <p class="text-lg font-semibold text-blue-800">${userName}</p>
+                                    <p class="text-xs text-blue-600 dark:text-blue-400 mb-1 mt-3">用户名:</p>
+                                    <p class="text-lg font-semibold text-blue-800 dark:text-blue-300">${userName}</p>
                                     ` : ''}
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">请输入您的秘钥</label>
-                        <input type="password" id="secretKeyConfirmInput" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="请输入秘钥进行验证">
-                        <div class="mt-2 text-xs text-gray-500">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">请输入您的秘钥</label>
+                        <input type="password" id="secretKeyConfirmInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入秘钥进行验证">
+                        <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             秘钥用于验证您的身份，请妥善保管
                         </div>
                     </div>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium" id="confirmSecretKeyBtn">确认验证</button>
-                <button class="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium border border-orange-300" id="notMyAccountBtn">这不是我账号</button>
-                <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
+                <button class="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors text-sm font-medium border border-orange-300 dark:border-orange-700" id="notMyAccountBtn">这不是我账号</button>
+                <button class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium" onclick="Modal.hide()">稍后处理</button>
             `);
             
             setTimeout(() => {
@@ -851,13 +851,26 @@ class App {
         
         // 更新桌面端和移动端显示
         const displayText = userName || this.userId;
-        if (userIdEl) userIdEl.textContent = displayText;
-        if (mobileUserIdEl) mobileUserIdEl.textContent = displayText;
         
-        // 更新左侧导航栏的用户ID显示
+        // 只更新导航栏中的 userId 元素（避免影响 Profile 页面中的 userId 元素）
+        // 检查 userIdEl 是否在导航栏中（通过检查父元素是否包含导航相关的类或 ID）
+        if (userIdEl) {
+            const isInNav = userIdEl.closest('nav') || userIdEl.closest('#userInfoBtn');
+            if (isInNav) {
+                userIdEl.textContent = displayText;
+            }
+        }
+        
+        if (mobileUserIdEl) {
+            mobileUserIdEl.textContent = displayText;
+    }
+    
+        // 更新左侧导航栏的用户名显示（优先显示用户名）
         const leftNavUserId = document.getElementById('leftNavUserId');
         if (leftNavUserId) {
-            leftNavUserId.textContent = displayText;
+            // 优先使用用户名，如果没有用户名则使用用户ID
+            const displayName = userName || this.userId || '未登录';
+            leftNavUserId.textContent = displayName;
         }
     }
     
@@ -941,11 +954,16 @@ class App {
             });
         }
         
-        // 用户信息按钮
+        // 用户信息按钮 - 点击跳转到个人中心
         const userInfoBtn = document.getElementById('userInfoBtn');
         if (userInfoBtn && !userInfoBtn.dataset.listenerBound) {
             userInfoBtn.dataset.listenerBound = 'true';
-            // 可以添加用户信息弹窗
+            userInfoBtn.addEventListener('click', () => {
+                // 跳转到个人中心页面
+                if (router) {
+                    router.navigate('/profile');
+                }
+            });
         }
         
         // 导航栏位置切换按钮（如果 Navigation 组件没有绑定，这里作为备用）
@@ -1051,6 +1069,11 @@ class App {
         // 设置页面
         router.register('/settings', () => {
             this.loadPage('Settings');
+        });
+        
+        // 个人中心页面
+        router.register('/profile', () => {
+            this.loadPage('Profile');
         });
     }
     

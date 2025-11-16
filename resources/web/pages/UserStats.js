@@ -26,10 +26,7 @@ export default class UserStats {
                 </div>
                 
                 <div id="statsContent">
-                    <div class="loading-spinner">
-                        <div class="spinner"></div>
-                        <p>加载中...</p>
-                    </div>
+                    ${Loading.render({ text: '加载中...', size: 'medium', className: 'py-20' })}
                 </div>
             </div>
         `;
@@ -78,7 +75,7 @@ export default class UserStats {
     
     async loadStats(groupId) {
         const content = document.getElementById('statsContent');
-        content.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><p>加载中...</p></div>';
+        content.innerHTML = Loading.render({ text: '加载中...', size: 'medium', className: 'py-20' });
         
         try {
             const response = await api.getUserStats(this.app.userId, groupId);

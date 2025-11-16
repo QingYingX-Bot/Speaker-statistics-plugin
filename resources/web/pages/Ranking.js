@@ -11,15 +11,6 @@ export default class Ranking {
         this.rankings = [];
     }
     
-    /**
-     * 获取用户头像URL
-     * @param {string|number} userId 用户ID（QQ号）
-     * @returns {string} 头像URL
-     */
-    getAvatarUrl(userId) {
-        if (!userId) return '';
-        return `http://q.qlogo.cn/headimg_dl?dst_uin=${userId}&spec=640&img_type=jpg`;
-    }
     
     async render() {
         return `
@@ -71,12 +62,7 @@ export default class Ranking {
                     
                     <!-- 排行榜内容 -->
                     <div id="rankingContent">
-                        <div class="flex items-center justify-center py-20">
-                            <div class="text-center">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-                                <p class="text-gray-500 dark:text-gray-400 text-sm">加载中...</p>
-                            </div>
-                        </div>
+                        <!-- 内容将由 loadRanking 方法加载 -->
                     </div>
                 </div>
             </div>
@@ -223,14 +209,7 @@ export default class Ranking {
         content.style.opacity = '0.6';
         content.style.transition = 'opacity 0.2s ease';
         
-        content.innerHTML = `
-            <div class="flex items-center justify-center py-20">
-                <div class="text-center">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-                    <p class="text-gray-500 text-sm">加载中...</p>
-                </div>
-            </div>
-        `;
+        content.innerHTML = Loading.render({ text: '加载中...', size: 'medium', className: 'py-20' });
         
         // 恢复不透明度
         requestAnimationFrame(() => {
@@ -268,12 +247,10 @@ export default class Ranking {
         if (!content) return;
         
         if (this.rankings.length === 0) {
-            content.innerHTML = `
-                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-16 text-center">
-                    <div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">📊</div>
-                    <div class="text-gray-500 dark:text-gray-400 text-sm">暂无排行榜数据</div>
-                </div>
-            `;
+            content.innerHTML = EmptyState.renderCard({ 
+                message: '暂无排行榜数据',
+                icon: '<div class="text-4xl mb-3 text-gray-400 dark:text-gray-500">📊</div>'
+            });
             return;
         }
         
@@ -293,7 +270,7 @@ export default class Ranking {
         
         this.rankings.forEach((item, index) => {
             const rank = index + 1;
-            const avatarUrl = this.getAvatarUrl(item.user_id);
+            const avatarUrl = getAvatarUrl(item.user_id);
             const displayName = item.nickname || `用户${item.user_id}`;
             
             // 前三名特殊样式
@@ -320,7 +297,7 @@ export default class Ranking {
             }
             
             html += `
-                <div class="bg-white dark:bg-gray-800 rounded-lg border ${cardClass} p-3">
+                <div class="bg-white dark:bg-gray-800 rounded-lg border ${cardClass} p-3" data-user-id="${item.user_id}">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2.5 flex-1 min-w-0">
                             <span class="${rankBadgeClass} flex-shrink-0">${rank}</span>
@@ -372,7 +349,7 @@ export default class Ranking {
         
         this.rankings.forEach((item, index) => {
             const rank = index + 1;
-            const avatarUrl = this.getAvatarUrl(item.user_id);
+            const avatarUrl = getAvatarUrl(item.user_id);
             const displayName = item.nickname || `用户${item.user_id}`;
             
             // 前三名特殊样式（简约版）
@@ -399,7 +376,7 @@ export default class Ranking {
             }
             
             html += `
-                <tr class="${rowClass} transition-colors">
+                <tr class="${rowClass} transition-colors" data-user-id="${item.user_id}">
                     <td class="px-4 py-2.5">
                         <span class="${rankBadgeClass}">${rank}</span>
                     </td>

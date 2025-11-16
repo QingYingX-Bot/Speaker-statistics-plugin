@@ -68,9 +68,6 @@ export class AdminOverview {
         
         // 更新图表
         this.updateCharts();
-        
-        // 更新系统设置页面的统计
-        this.updateSettingsStats();
     }
     
     initCharts() {
@@ -116,13 +113,13 @@ export class AdminOverview {
             }
         }
         
-        // 初始化群组增长趋势图
+        // 初始化新增用户趋势图
         const groupGrowthEl = document.getElementById('groupGrowthChart');
         if (groupGrowthEl && !this.groupGrowthChart) {
             try {
                 this.groupGrowthChart = echarts.init(groupGrowthEl);
             } catch (error) {
-                console.error('初始化群组增长趋势图失败:', error);
+                console.error('初始化新增用户趋势图失败:', error);
             }
         }
         
@@ -182,22 +179,29 @@ export class AdminOverview {
                     textStyle: { color: textColor }
                 },
                 grid: {
-                    left: '3%',
+                    left: '8%',
                     right: '4%',
-                    bottom: '3%',
-                    containLabel: true
+                    bottom: '10%',
+                    top: '10%',
+                    containLabel: false
                 },
                 xAxis: {
                     type: 'category',
                     boundaryGap: false,
                     data: dates,
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor }
+                    axisLabel: { 
+                        color: textColor,
+                        fontSize: 11
+                    }
                 },
                 yAxis: {
                     type: 'value',
                     axisLine: { lineStyle: { color: gridColor } },
-                    axisLabel: { color: textColor },
+                    axisLabel: { 
+                        color: textColor,
+                        fontSize: 11
+                    },
                     splitLine: { lineStyle: { color: gridColor, opacity: 0.1 } }
                 },
                 series: [{
@@ -206,7 +210,17 @@ export class AdminOverview {
                     smooth: true,
                     data: messages,
                     itemStyle: { color: '#4A90E2' },
-                    areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(74, 144, 226, 0.3)' }, { offset: 1, color: 'rgba(74, 144, 226, 0.05)' }] } }
+                    areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(74, 144, 226, 0.3)' }, { offset: 1, color: 'rgba(74, 144, 226, 0.05)' }] } },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: (params) => {
+                            return formatNumber(params.value);
+                        },
+                        fontSize: 11,
+                        color: textColor,
+                        fontWeight: 500
+                    }
                 }]
             });
         }
@@ -263,47 +277,50 @@ export class AdminOverview {
                     }
                 },
                 legend: {
-                    orient: 'vertical',
-                    left: 'left',
-                    top: 'middle',
-                    itemGap: 12,
-                    itemWidth: 14,
-                    itemHeight: 14,
+                    orient: window.innerWidth < 1024 ? 'horizontal' : 'vertical',
+                    left: window.innerWidth < 1024 ? 'center' : 'left',
+                    top: window.innerWidth < 1024 ? 'top' : 'middle',
+                    bottom: window.innerWidth < 1024 ? 'auto' : 'auto',
+                    itemGap: window.innerWidth < 1024 ? 6 : 12,
+                    itemWidth: 10,
+                    itemHeight: 10,
                     textStyle: { 
                         color: textColor,
-                        fontSize: 12,
+                        fontSize: window.innerWidth < 1024 ? 9 : 12,
                         rich: {
                             name: {
-                                width: 140,
+                                width: window.innerWidth < 1024 ? 80 : 140,
                                 overflow: 'truncate',
                                 ellipsis: '...'
                             },
                             value: {
-                                width: 60,
+                                width: window.innerWidth < 1024 ? 40 : 60,
                                 align: 'right',
                                 color: isDark ? '#9CA3AF' : '#6B7280',
-                                fontWeight: 600
+                                fontWeight: 600,
+                                fontSize: window.innerWidth < 1024 ? 9 : 12
                             },
                             percent: {
-                                width: 50,
+                                width: window.innerWidth < 1024 ? 35 : 50,
                                 align: 'right',
                                 color: isDark ? '#6B7280' : '#9CA3AF',
-                                fontSize: 11
+                                fontSize: window.innerWidth < 1024 ? 8 : 11
                             }
                         }
                     },
                     formatter: (name) => {
                         const item = dataWithPercent.find(d => d.name === name);
                         if (!item) return name;
-                        const displayName = name.length > 16 ? name.substring(0, 16) + '...' : name;
+                        const maxLen = window.innerWidth < 1024 ? 10 : 16;
+                        const displayName = name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
                         return `{name|${displayName}} {value|${formatNumber(item.value)}} {percent|${item.percent}%}`;
                     }
                 },
                 series: [{
                     name: '消息数',
                     type: 'pie',
-                    radius: ['45%', '75%'],
-                    center: ['60%', '50%'],
+                    radius: window.innerWidth < 1024 ? ['35%', '65%'] : ['45%', '75%'],
+                    center: window.innerWidth < 1024 ? ['50%', '60%'] : ['60%', '50%'],
                     avoidLabelOverlap: true,
                     itemStyle: {
                         borderRadius: 8,
@@ -312,7 +329,7 @@ export class AdminOverview {
                         shadowColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     label: {
-                        show: true,
+                        show: window.innerWidth >= 1024, // 小屏幕隐藏外部标签
                         position: 'outside',
                         formatter: (params) => {
                             if (params.percent < 3) return ''; // 小于3%的不显示标签
@@ -341,7 +358,7 @@ export class AdminOverview {
                         }
                     },
                     labelLine: {
-                        show: true,
+                        show: window.innerWidth >= 1024, // 小屏幕隐藏标签线
                         length: 15,
                         length2: 10,
                         lineStyle: {
@@ -366,8 +383,8 @@ export class AdminOverview {
                     // 中心总计显示
                     name: '总计',
                     type: 'pie',
-                    radius: ['0%', '35%'],
-                    center: ['60%', '50%'],
+                    radius: ['0%', window.innerWidth < 1024 ? '25%' : '35%'],
+                    center: window.innerWidth < 1024 ? ['50%', '60%'] : ['60%', '50%'],
                     itemStyle: {
                         color: 'transparent'
                     },
@@ -443,24 +460,25 @@ export class AdminOverview {
                     textStyle: { color: textColor }
                 },
                 grid: {
-                    left: '10%',
-                    right: '8%',
-                    bottom: '10%',
-                    top: '10%',
+                    left: window.innerWidth < 768 ? '12%' : '10%',
+                    right: window.innerWidth < 768 ? '8%' : '8%',
+                    bottom: window.innerWidth < 768 ? '15%' : '10%',
+                    top: window.innerWidth < 768 ? '15%' : '10%',
                     containLabel: false
                 },
                 xAxis: {
                     type: 'value',
                     name: '用户数',
                     nameLocation: 'middle',
-                    nameGap: 30,
+                    nameGap: window.innerWidth < 768 ? 25 : 30,
                     nameTextStyle: {
                         color: textColor,
-                        fontSize: 12
+                        fontSize: window.innerWidth < 768 ? 11 : 12
                     },
                     axisLine: { lineStyle: { color: gridColor } },
                     axisLabel: { 
                         color: textColor,
+                        fontSize: window.innerWidth < 768 ? 10 : 11,
                         formatter: (value) => {
                             if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
                             return value;
@@ -475,14 +493,15 @@ export class AdminOverview {
                     type: 'value',
                     name: '消息数',
                     nameLocation: 'middle',
-                    nameGap: 50,
+                    nameGap: window.innerWidth < 768 ? 40 : 50,
                     nameTextStyle: {
                         color: textColor,
-                        fontSize: 12
+                        fontSize: window.innerWidth < 768 ? 11 : 12
                     },
                     axisLine: { lineStyle: { color: gridColor } },
                     axisLabel: { 
                         color: textColor,
+                        fontSize: window.innerWidth < 768 ? 10 : 11,
                         formatter: (value) => {
                             if (value >= 10000) return (value / 10000).toFixed(1) + '万';
                             if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
@@ -533,14 +552,16 @@ export class AdminOverview {
             });
         }
         
-        // 更新群组增长趋势图
+        // 更新新增用户趋势图
         if (this.groupGrowthChart) {
-            const groupGrowthStats = this.admin.overview.groupGrowthStats || [];
-            const dates = groupGrowthStats.map(item => item.date);
-            const counts = groupGrowthStats.map(item => item.count);
+            const newUserStats = this.admin.overview.newUserStats || [];
+            const dates = newUserStats.map(item => item.date);
+            const counts = newUserStats.map(item => item.count);
             
-            // 计算最大值，用于Y轴范围
-            const maxCount = Math.max(...counts, 1);
+            // 计算最大值，用于Y轴范围（至少为1，如果有数据则使用实际最大值）
+            const maxCount = counts.length > 0 && Math.max(...counts) > 0 
+                ? Math.max(...counts) 
+                : 1;
             
             this.groupGrowthChart.setOption({
                 backgroundColor: 'transparent',
@@ -553,15 +574,15 @@ export class AdminOverview {
                     textStyle: { color: textColor },
                     formatter: (params) => {
                         const param = params[0];
-                        return `${param.axisValue}<br/>新增群组: <strong>${formatNumber(param.value)}</strong>`;
+                        return `${param.axisValue}<br/>新增用户: <strong>${formatNumber(param.value)}</strong>`;
                     }
                 },
                 grid: {
-                    left: '3%',
+                    left: '8%',
                     right: '4%',
-                    bottom: '3%',
+                    bottom: '10%',
                     top: '10%',
-                    containLabel: true
+                    containLabel: false
                 },
                 xAxis: {
                     type: 'category',
@@ -569,7 +590,8 @@ export class AdminOverview {
                     axisLine: { lineStyle: { color: gridColor } },
                     axisLabel: { 
                         color: textColor,
-                        fontSize: 11
+                        fontSize: 11,
+                        rotate: 0
                     },
                     boundaryGap: false
                 },
@@ -578,6 +600,7 @@ export class AdminOverview {
                     axisLine: { lineStyle: { color: gridColor } },
                     axisLabel: { 
                         color: textColor,
+                        fontSize: 11,
                         formatter: (value) => {
                             return value;
                         }
@@ -586,61 +609,52 @@ export class AdminOverview {
                         lineStyle: { color: gridColor, opacity: 0.1 },
                         show: true
                     },
-                    minInterval: 1
+                    min: 0,
+                    minInterval: 1,
+                    // 如果最大值很小，设置合适的最大值
+                    max: maxCount > 10 ? null : Math.max(maxCount + 2, 5)
                 },
                 series: [{
-                    name: '新增群组',
+                    name: '新增用户',
                     type: 'line',
                     data: counts,
                     smooth: true,
                     symbol: 'circle',
                     symbolSize: 6,
                     lineStyle: {
-                        color: '#F59E0B',
+                        color: '#9333EA',
                         width: 2
                     },
                     itemStyle: {
-                        color: '#F59E0B',
+                        color: '#9333EA',
                         borderColor: isDark ? '#1F2937' : '#FFFFFF',
                         borderWidth: 2
                     },
                     areaStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
-                            { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+                            { offset: 0, color: 'rgba(147, 51, 234, 0.3)' },
+                            { offset: 1, color: 'rgba(147, 51, 234, 0.05)' }
                         ])
                     },
                     emphasis: {
                         itemStyle: {
                             shadowBlur: 10,
-                            shadowColor: 'rgba(245, 158, 11, 0.5)',
+                            shadowColor: 'rgba(147, 51, 234, 0.5)',
                             scale: true
                         }
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: (params) => {
+                            return formatNumber(params.value);
+                        },
+                        fontSize: 11,
+                        color: textColor,
+                        fontWeight: 500
                     }
                 }]
             });
-        }
-    }
-    
-    updateSettingsStats() {
-        // 更新管理员和用户数量
-        const adminCountEl = document.getElementById('adminCount');
-        const settingsUserCountEl = document.getElementById('settingsUserCount');
-        
-        if (this.admin.users && this.admin.users.length > 0) {
-            const adminCount = this.admin.users.filter(u => u.role === 'admin').length;
-            const normalUserCount = this.admin.users.filter(u => u.role !== 'admin').length;
-            
-            if (adminCountEl) adminCountEl.textContent = adminCount;
-            if (settingsUserCountEl) settingsUserCountEl.textContent = normalUserCount;
-        }
-        
-        // 更新系统信息
-        if (typeof process !== 'undefined' && process.versions) {
-            const nodeVersionEl = document.getElementById('nodeVersion');
-            if (nodeVersionEl) {
-                nodeVersionEl.textContent = process.versions.node || '-';
-            }
         }
     }
 }

@@ -1,5 +1,11 @@
 import { getDataService } from '../../core/DataService.js';
 import { ApiResponse } from './utils/ApiResponse.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * 统计数据相关API路由
@@ -95,6 +101,32 @@ export class StatsApi {
                 
                 ApiResponse.success(res, groups);
             }, '获取用户群列表失败')
+        );
+
+        // 获取系统版本信息
+        this.app.get('/api/system/version',
+            ApiResponse.asyncHandler(async (req, res) => {
+                try {
+                    // 读取 package.json 文件
+                    const packagePath = path.resolve(__dirname, '../../../package.json');
+                    const packageData = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+                    
+                    ApiResponse.success(res, {
+                        name: packageData.name || 'speaker-statistics-plugin',
+                        version: packageData.version || '1.0.0',
+                        author: packageData.author || '',
+                        description: packageData.description || ''
+                    });
+                } catch (error) {
+                    // 如果读取失败，返回默认值
+                    ApiResponse.success(res, {
+                        name: 'speaker-statistics-plugin',
+                        version: '1.0.0',
+                        author: '',
+                        description: ''
+                    });
+                }
+            }, '获取系统版本信息失败')
         );
     }
 }

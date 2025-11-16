@@ -32,11 +32,21 @@
 
     <!-- 主内容区 -->
     <div id="mainContent" class="main-content">
-        <div id="pageContent" class="page-content">
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-                <p>加载中...</p>
+        <!-- 固定页面标题栏（仅在左侧导航栏模式下显示） -->
+        <div id="pageHeaderBar" class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-40 hidden lg:hidden" style="display: none;">
+            <div class="flex items-center gap-3 px-4 py-3">
+                <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300" id="leftSidebarToggleBtn" aria-label="打开菜单">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <div class="flex-1">
+                    <h1 id="pageTitle" class="text-lg font-semibold text-gray-900 dark:text-gray-100">页面标题</h1>
+                </div>
             </div>
+        </div>
+        <div id="pageContent" class="page-content">
+            <!-- 页面内容将由路由系统动态加载 -->
         </div>
     </div>
 
