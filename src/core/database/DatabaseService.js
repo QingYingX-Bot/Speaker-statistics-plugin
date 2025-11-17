@@ -474,6 +474,98 @@ class DatabaseService {
     }
 
     /**
+     * 批量获取所有群组的用户统计数据（优化总统计查询）
+     * @returns {Promise<Map<string, Array>>} 群ID到用户列表的映射
+     */
+    async getAllGroupsUsersBatch() {
+        const rows = await this.all('SELECT * FROM user_stats ORDER BY group_id, total_count DESC');
+        const groupsMap = new Map();
+        
+        for (const row of rows) {
+            const groupId = row.group_id;
+            if (!groupsMap.has(groupId)) {
+                groupsMap.set(groupId, []);
+            }
+            groupsMap.get(groupId).push(row);
+        }
+        
+        return groupsMap;
+    }
+
+    /**
+     * 批量获取所有群组的日统计数据（优化总统计查询）
+     * @param {string} dateKey 日期键
+     * @returns {Promise<Map<string, Array>>} 群ID到日统计列表的映射
+     */
+    async getAllGroupsDailyStatsBatch(dateKey) {
+        const rows = await this.all(
+            `SELECT ds.*, us.nickname, us.last_speaking_time 
+             FROM daily_stats ds
+             LEFT JOIN user_stats us ON ds.group_id = us.group_id AND ds.user_id = us.user_id
+             WHERE ds.date_key = $1 
+             AND (ds.message_count > 0 OR ds.word_count > 0)
+             ORDER BY ds.group_id, ds.message_count DESC`,
+            dateKey
+        );
+        const groupsMap = new Map();
+        
+        for (const row of rows) {
+            const groupId = row.group_id;
+            if (!groupsMap.has(groupId)) {
+                groupsMap.set(groupId, []);
+            }
+            groupsMap.get(groupId).push(row);
+        }
+        
+        return groupsMap;
+    }
+
+    /**
+     * 批量获取所有群组的月统计数据（优化总统计查询）
+     * @param {string} monthKey 月份键
+     * @returns {Promise<Map<string, Array>>} 群ID到月统计列表的映射
+     */
+    async getAllGroupsMonthlyStatsBatch(monthKey) {
+        const rows = await this.all(
+            `SELECT ms.*, us.nickname, us.last_speaking_time 
+             FROM monthly_stats ms
+             LEFT JOIN user_stats us ON ms.group_id = us.group_id AND ms.user_id = us.user_id
+             WHERE ms.month_key = $1 
+             AND (ms.message_count > 0 OR ms.word_count > 0)
+             ORDER BY ms.group_id, ms.message_count DESC`,
+            monthKey
+        );
+        const groupsMap = new Map();
+        
+        for (const row of rows) {
+            const groupId = row.group_id;
+            if (!groupsMap.has(groupId)) {
+                groupsMap.set(groupId, []);
+            }
+            groupsMap.get(groupId).push(row);
+        }
+        
+        return groupsMap;
+    }
+
+    /**
+     * 批量获取所有群组信息（优化总统计查询）
+     * @returns {Promise<Map<string, string>>} 群ID到群名称的映射
+     */
+    async getAllGroupsInfoBatch() {
+        const rows = await this.all('SELECT group_id, group_name FROM group_info');
+        const groupsMap = new Map();
+        
+        for (const row of rows) {
+            if (row.group_name) {
+                groupsMap.set(row.group_id, row.group_name);
+            }
+        }
+        
+        return groupsMap;
+    }
+
+    /**
      * 删除群组所有数据
      * @param {string} groupId 群号
      * @returns {Promise<boolean>} 是否成功
@@ -546,6 +638,7 @@ class DatabaseService {
                     user_id,
                     COUNT(DISTINCT date_key) as active_days
                 FROM daily_stats
+                WHERE message_count > 0 OR word_count > 0
                 GROUP BY user_id
             )
             SELECT 

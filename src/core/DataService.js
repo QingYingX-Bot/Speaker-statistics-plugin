@@ -92,6 +92,8 @@ class DataService {
         this.dbService = getDatabaseService();
         this.cache = new LRUCache(500, 10 * 60 * 1000); // 500个条目，10分钟TTL
         this.groupStatsCache = new LRUCache(200, 30 * 1000); // 群统计缓存，30秒TTL
+        this.rankingCache = new LRUCache(50, 2 * 60 * 1000); // 排行榜缓存，2分钟TTL
+        this.globalStatsCache = new LRUCache(10, 3 * 60 * 1000); // 全局统计缓存，3分钟TTL
         this.messageRecorder = null; // 消息记录器引用（由外部设置）
         
         // 确保数据库已初始化
@@ -194,6 +196,9 @@ class DataService {
             continuous_days: parseInt(userData.continuous_days || 0, 10),
             last_speaking_time: userData.last_speaking_time || null
         });
+        
+        // 数据更新后清除相关缓存
+        this.clearCache(groupId, userId);
 
         // 保存时间维度统计数据
         const timeInfo = TimeUtils.getCurrentDateTime();
@@ -647,10 +652,21 @@ class DataService {
                     // 总榜：所有群聊所有时间的数据
                     // 如果 groupId 为 null 或 'all'，查询所有群聊；否则查询当前群聊
                     const queryAllGroups = !groupId || groupId === 'all';
+                    
+                    // 使用缓存优化总榜查询（仅对全局总榜使用缓存）
+                    if (queryAllGroups) {
+                        const cacheKey = `ranking:total:all:${limit}`;
+                        const cached = this.rankingCache.get(cacheKey);
+                        if (cached) {
+                            return cached;
+                        }
+                    }
+                    
                     const topUsers = queryAllGroups 
                         ? await this.dbService.getTopUsersAllGroups(limit, 'total_count')
                         : await this.dbService.getTopUsers(groupId, limit, 'total_count');
-                    return topUsers.map(user => ({
+                    
+                    const result = topUsers.map(user => ({
                         user_id: user.user_id,
                         nickname: user.nickname,
                         count: parseInt(user.total_count || 0, 10),
@@ -659,6 +675,14 @@ class DataService {
                         continuous_days: parseInt(user.continuous_days || 0, 10),
                         last_speaking_time: user.last_speaking_time || null
                     }));
+                    
+                    // 缓存全局总榜结果
+                    if (queryAllGroups) {
+                        const cacheKey = `ranking:total:all:${limit}`;
+                        this.rankingCache.set(cacheKey, result);
+                    }
+                    
+                    return result;
 
                 case 'daily':
                     // 日榜：使用批量查询优化性能
@@ -930,26 +954,39 @@ class DataService {
      */
     async getGlobalStats(page = 1, pageSize = 9) {
         try {
-            const groupIds = await this.getGroupIds();
+            // 使用缓存优化全局统计查询
+            const cacheKey = `globalStats:${page}:${pageSize}`;
+            const cached = this.globalStatsCache.get(cacheKey);
+            if (cached) {
+                return cached;
+            }
             
-            let totalGroups = 0;
-            let totalUsersSet = new Set(); // 使用 Set 来避免重复计算用户
-            let totalMessages = 0;
-            let totalWords = 0;
-            let todayActive = 0;
-            let monthActive = new Set();
-            let todayActiveSet = new Set();
-
             const timeInfo = TimeUtils.getCurrentDateTime();
             const todayKey = timeInfo.formattedDate;
             const monthKey = timeInfo.monthKey;
 
+            // 优化：使用批量查询替代 N+1 查询，大幅提升性能
+            const [allUsersMap, allDailyStatsMap, allMonthlyStatsMap, allGroupIds, allGroupsInfoMap] = await Promise.all([
+                this.dbService.getAllGroupsUsersBatch(),
+                this.dbService.getAllGroupsDailyStatsBatch(todayKey),
+                this.dbService.getAllGroupsMonthlyStatsBatch(monthKey),
+                this.getGroupIds(),
+                this.dbService.getAllGroupsInfoBatch()
+            ]);
+
+            let totalGroups = 0;
+            let totalUsersSet = new Set(); // 使用 Set 来避免重复计算用户
+            let totalMessages = 0;
+            let totalWords = 0;
+            let todayActiveSet = new Set();
+            let monthActive = new Set();
+
             const groupStatsList = [];
 
-            // 遍历所有群组，计算统计数据
-            for (const groupId of groupIds) {
+            // 遍历所有群组，计算统计数据（使用批量查询结果）
+            for (const groupId of allGroupIds) {
                 try {
-                    const users = await this.dbService.getAllGroupUsers(groupId);
+                    const users = allUsersMap.get(groupId) || [];
                     if (users.length === 0) continue;
 
                     totalGroups++;
@@ -961,11 +998,9 @@ class DataService {
                     let groupMessages = 0;
                     let groupWords = 0;
 
-                    // 优化：批量查询今日和本月统计数据，避免 N+1 查询
-                    const [dailyStatsList, monthlyStatsList] = await Promise.all([
-                        this.dbService.getDailyStatsByGroupAndDate(groupId, todayKey),
-                        this.dbService.getMonthlyStatsByGroupAndMonth(groupId, monthKey)
-                    ]);
+                    // 从批量查询结果中获取统计数据
+                    const dailyStatsList = allDailyStatsMap.get(groupId) || [];
+                    const monthlyStatsList = allMonthlyStatsMap.get(groupId) || [];
                     
                     // 创建统计数据的 Map 以便快速查找
                     const dailyStatsMap = new Map(dailyStatsList.map(s => [s.user_id, s]));
@@ -997,9 +1032,8 @@ class DataService {
                     const groupTodayActive = dailyStatsList.length;
                     const groupMonthActive = monthlyStatsList.length;
 
-                    // 获取群名称（优先从数据库，其次从Bot获取）
-                    const groupInfo = await this.dbService.getGroupInfo(groupId);
-                    let groupName = groupInfo?.group_name;
+                    // 从批量查询结果中获取群名称（优化：避免 N+1 查询）
+                    let groupName = allGroupsInfoMap.get(groupId);
                     
                     // 如果数据库中没有，尝试从Bot.gl获取
                     if (!groupName && typeof Bot !== 'undefined' && Bot.gl) {
@@ -1008,6 +1042,8 @@ class DataService {
                             groupName = botGroupInfo.group_name;
                             // 保存到数据库（异步，不阻塞）
                             this.dbService.saveGroupInfo(groupId, groupName).catch(() => {});
+                            // 更新内存中的映射，避免后续重复查询
+                            allGroupsInfoMap.set(groupId, groupName);
                         }
                     }
                     
@@ -1059,7 +1095,7 @@ class DataService {
                 this.error('获取最早统计时间失败:', error);
             }
 
-            return {
+            const result = {
                 totalGroups: totalGroups,
                 totalUsers: totalUsersSet.size, // 使用 Set 的大小作为唯一用户数
                 totalMessages: totalMessages,
@@ -1073,6 +1109,11 @@ class DataService {
                 earliestTime: earliestTime,
                 statsDurationHours: statsDurationHours
             };
+            
+            // 缓存结果
+            this.globalStatsCache.set(cacheKey, result);
+            
+            return result;
         } catch (error) {
             this.error('获取全局统计数据失败:', error);
             return {
@@ -1131,6 +1172,9 @@ class DataService {
             keysToDelete.forEach(key => this.cache.delete(key));
         }
         
+        // 清除排行榜和全局统计缓存（数据更新后需要重新查询）
+        this.rankingCache.clear();
+        this.globalStatsCache.clear();
         this.groupStatsCache.delete(String(groupId));
     }
 }

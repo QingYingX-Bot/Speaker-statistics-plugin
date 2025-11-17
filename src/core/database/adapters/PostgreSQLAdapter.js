@@ -372,6 +372,8 @@ export class PostgreSQLAdapter extends BaseAdapter {
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_continuous_days ON user_stats(continuous_days DESC);`);
         // 复合索引：优化总榜查询（按用户ID聚合后排序）
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_user_total_count ON user_stats(user_id, total_count DESC);`);
+        // 复合索引：优化总统计批量查询（按群ID分组后排序）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_total_count ON user_stats(group_id, total_count DESC);`);
 
         // 日统计表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_user_date ON daily_stats(group_id, user_id, date_key);`);
@@ -381,6 +383,10 @@ export class PostgreSQLAdapter extends BaseAdapter {
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_id ON daily_stats(user_id);`);
         // 日期和用户ID复合索引（优化活跃天数统计）
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date_key);`);
+        // 覆盖索引：优化总榜 active_days 计算（包含过滤条件）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date_count ON daily_stats(user_id, date_key) WHERE message_count > 0 OR word_count > 0;`);
+        // 复合索引：优化总统计批量查询（按日期过滤后按群ID和消息数排序）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date_group_count ON daily_stats(date_key, group_id, message_count DESC);`);
 
         // 周统计表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_user_week ON weekly_stats(group_id, user_id, week_key);`);
@@ -391,6 +397,8 @@ export class PostgreSQLAdapter extends BaseAdapter {
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_user_month ON monthly_stats(group_id, user_id, month_key);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month ON monthly_stats(month_key);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_month ON monthly_stats(group_id, month_key);`);
+        // 复合索引：优化总统计批量查询（按月份过滤后按群ID和消息数排序）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month_group_count ON monthly_stats(month_key, group_id, message_count DESC);`);
 
         // 年统计表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_group_user_year ON yearly_stats(group_id, user_id, year_key);`);
