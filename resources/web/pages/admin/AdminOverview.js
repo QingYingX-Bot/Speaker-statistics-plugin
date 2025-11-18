@@ -9,6 +9,108 @@ export class AdminOverview {
         this.messageDensityChart = null;
         this.groupGrowthChart = null;
         this.chartResizeHandler = null;
+        this.themeObserver = null;
+        this.initThemeObserver();
+    }
+    
+    /**
+     * 初始化主题变化监听器
+     */
+    initThemeObserver() {
+        // 使用 MutationObserver 监听 document.documentElement 的 classList 变化
+        if (typeof MutationObserver !== 'undefined') {
+            let themeChangeTimer = null;
+            this.themeObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        // 防抖处理，避免频繁触发
+                        if (themeChangeTimer) {
+                            clearTimeout(themeChangeTimer);
+                        }
+                        
+                        themeChangeTimer = setTimeout(() => {
+                            // 只有在图表已初始化且数据已加载时才重新生成图表
+                            if (this.admin.overview && 
+                                this.messageTrendChart && 
+                                this.groupActivityChart && 
+                                this.messageDensityChart && 
+                                this.groupGrowthChart) {
+                                
+                                // 销毁所有图表实例
+                                if (this.groupActivityChart) {
+                                    try {
+                                        this.groupActivityChart.dispose();
+                                    } catch (e) {}
+                                    this.groupActivityChart = null;
+                                }
+                                if (this.messageTrendChart) {
+                                    try {
+                                        this.messageTrendChart.dispose();
+                                    } catch (e) {}
+                                    this.messageTrendChart = null;
+                                }
+                                if (this.messageDensityChart) {
+                                    try {
+                                        this.messageDensityChart.dispose();
+                                    } catch (e) {}
+                                    this.messageDensityChart = null;
+                                }
+                                if (this.groupGrowthChart) {
+                                    try {
+                                        this.groupGrowthChart.dispose();
+                                    } catch (e) {}
+                                    this.groupGrowthChart = null;
+                                }
+                                
+                                // 重新初始化并更新图表
+                                this.updateCharts();
+                            }
+                        }, 150);
+                    }
+                });
+            });
+            
+            // 开始观察
+            this.themeObserver.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    }
+    
+    /**
+     * 清理资源
+     */
+    destroy() {
+        // 停止主题监听
+        if (this.themeObserver) {
+            this.themeObserver.disconnect();
+            this.themeObserver = null;
+        }
+        
+        // 销毁所有图表
+        if (this.messageTrendChart) {
+            this.messageTrendChart.dispose();
+            this.messageTrendChart = null;
+        }
+        if (this.groupActivityChart) {
+            this.groupActivityChart.dispose();
+            this.groupActivityChart = null;
+        }
+        if (this.messageDensityChart) {
+            this.messageDensityChart.dispose();
+            this.messageDensityChart = null;
+        }
+        if (this.groupGrowthChart) {
+            this.groupGrowthChart.dispose();
+            this.groupGrowthChart = null;
+        }
+        
+        // 移除窗口大小监听
+        if (this.chartResizeHandler) {
+            window.removeEventListener('resize', this.chartResizeHandler);
+            this.chartResizeHandler = null;
+        }
     }
     
     async loadOverview() {
@@ -83,7 +185,7 @@ export class AdminOverview {
             return;
         }
         
-        // 初始化消息趋势图
+        // 初始化消息趋势图（如果不存在或已被销毁，则重新创建）
         const messageTrendEl = document.getElementById('messageTrendChart');
         if (messageTrendEl && !this.messageTrendChart) {
             try {
@@ -93,7 +195,7 @@ export class AdminOverview {
             }
         }
         
-        // 初始化群组活跃度分布图
+        // 初始化群组活跃度分布图（如果不存在或已被销毁，则重新创建）
         const groupActivityEl = document.getElementById('groupActivityChart');
         if (groupActivityEl && !this.groupActivityChart) {
             try {
@@ -103,7 +205,7 @@ export class AdminOverview {
             }
         }
         
-        // 初始化消息密度散点图
+        // 初始化消息密度散点图（如果不存在或已被销毁，则重新创建）
         const messageDensityEl = document.getElementById('messageDensityChart');
         if (messageDensityEl && !this.messageDensityChart) {
             try {
@@ -113,7 +215,7 @@ export class AdminOverview {
             }
         }
         
-        // 初始化新增用户趋势图
+        // 初始化新增用户趋势图（如果不存在或已被销毁，则重新创建）
         const groupGrowthEl = document.getElementById('groupGrowthChart');
         if (groupGrowthEl && !this.groupGrowthChart) {
             try {
@@ -139,21 +241,68 @@ export class AdminOverview {
         }
     }
     
+    /**
+     * 获取当前主题颜色配置
+     */
+    getThemeColors() {
+        // 强制重新读取主题状态
+        const htmlElement = document.documentElement;
+        const isDark = htmlElement.classList.contains('dark');
+        
+        // 深色模式使用纯白色，浅色模式使用纯黑色
+        return {
+            isDark,
+            textColor: isDark ? '#FFFFFF' : '#000000',
+            gridColor: isDark ? '#4B5563' : '#E5E7EB',
+            tooltipBg: isDark ? '#1F2937' : '#FFFFFF',
+            borderColor: isDark ? '#1F2937' : '#FFFFFF'
+        };
+    }
+    
     updateCharts() {
         if (!this.admin.overview) return;
         
         // 检查 echarts 是否已加载
         if (typeof echarts === 'undefined') {
+            // 如果 ECharts 未加载，延迟重试
+            setTimeout(() => {
+                if (typeof echarts !== 'undefined') {
+                    this.updateCharts();
+                }
+            }, 500);
+            return;
+        }
+        
+        // 检查图表容器元素是否存在
+        const messageTrendEl = document.getElementById('messageTrendChart');
+        const groupActivityEl = document.getElementById('groupActivityChart');
+        const messageDensityEl = document.getElementById('messageDensityChart');
+        const groupGrowthEl = document.getElementById('groupGrowthChart');
+        
+        // 如果容器元素不存在，延迟重试
+        if (!messageTrendEl || !groupActivityEl || !messageDensityEl || !groupGrowthEl) {
+            setTimeout(() => {
+                this.updateCharts();
+            }, 200);
             return;
         }
         
         // 初始化图表（如果还未初始化）
         this.initCharts();
         
-        // 获取当前主题
-        const isDark = document.documentElement.classList.contains('dark');
-        const textColor = isDark ? '#E5E7EB' : '#374151';
-        const gridColor = isDark ? '#374151' : '#E5E7EB';
+        // 确保所有图表都已初始化
+        if (!this.messageTrendChart || !this.groupActivityChart || 
+            !this.messageDensityChart || !this.groupGrowthChart) {
+            // 如果图表未初始化，延迟重试
+            setTimeout(() => {
+                this.updateCharts();
+            }, 200);
+            return;
+        }
+        
+        // 获取当前主题颜色配置
+        const theme = this.getThemeColors();
+        const { textColor, gridColor, tooltipBg, borderColor, isDark } = theme;
         
         // 更新消息趋势图
         if (this.messageTrendChart) {
@@ -169,14 +318,18 @@ export class AdminOverview {
                 ? dailyStats.map(item => item.count)
                 : Array(7).fill(0);
             
-            this.messageTrendChart.setOption({
+            const messageTrendOption = {
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 tooltip: {
                     trigger: 'axis',
-                    backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                    backgroundColor: tooltipBg,
                     borderColor: gridColor,
-                    textStyle: { color: textColor }
+                    textStyle: { color: textColor },
+                    formatter: (params) => {
+                        const param = params[0];
+                        return `<div style="color: ${textColor} !important;">${param.axisValue}<br/>消息数: <strong style="color: ${textColor} !important;">${formatNumber(param.value)}</strong></div>`;
+                    }
                 },
                 grid: {
                     left: '8%',
@@ -222,7 +375,10 @@ export class AdminOverview {
                         fontWeight: 500
                     }
                 }]
-            });
+            };
+            
+            // 使用 notMerge: true 强制完全替换配置
+            this.messageTrendChart.setOption(messageTrendOption, true);
         }
         
         // 更新群组活跃度分布图（饼图）
@@ -248,13 +404,13 @@ export class AdminOverview {
                 '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'
             ];
             
-            this.groupActivityChart.setOption({
+            const groupActivityOption = {
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 color: colors,
                 tooltip: {
                     trigger: 'item',
-                    backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                    backgroundColor: tooltipBg,
                     borderColor: gridColor,
                     borderWidth: 1,
                     padding: [12, 16],
@@ -266,61 +422,24 @@ export class AdminOverview {
                         const value = params.value;
                         const percent = params.percent;
                         return `
-                            <div style="font-weight: 600; margin-bottom: 4px;">${params.name}</div>
+                            <div style="font-weight: 600; margin-bottom: 4px; color: ${textColor} !important;">${params.name}</div>
                             <div style="color: ${params.color}; margin: 4px 0;">
-                                消息数: <strong>${formatNumber(value)}</strong>
+                                消息数: <strong style="color: ${textColor} !important;">${formatNumber(value)}</strong>
                             </div>
-                            <div style="color: ${textColor}; opacity: 0.8;">
+                            <div style="color: ${textColor} !important;">
                                 占比: <strong>${percent}%</strong>
                             </div>
                         `;
                     }
                 },
                 legend: {
-                    orient: window.innerWidth < 1024 ? 'horizontal' : 'vertical',
-                    left: window.innerWidth < 1024 ? 'center' : 'left',
-                    top: window.innerWidth < 1024 ? 'top' : 'middle',
-                    bottom: window.innerWidth < 1024 ? 'auto' : 'auto',
-                    itemGap: window.innerWidth < 1024 ? 6 : 12,
-                    itemWidth: 10,
-                    itemHeight: 10,
-                    textStyle: { 
-                        color: textColor,
-                        fontSize: window.innerWidth < 1024 ? 9 : 12,
-                        rich: {
-                            name: {
-                                width: window.innerWidth < 1024 ? 80 : 140,
-                                overflow: 'truncate',
-                                ellipsis: '...'
-                            },
-                            value: {
-                                width: window.innerWidth < 1024 ? 40 : 60,
-                                align: 'right',
-                                color: isDark ? '#9CA3AF' : '#6B7280',
-                                fontWeight: 600,
-                                fontSize: window.innerWidth < 1024 ? 9 : 12
-                            },
-                            percent: {
-                                width: window.innerWidth < 1024 ? 35 : 50,
-                                align: 'right',
-                                color: isDark ? '#6B7280' : '#9CA3AF',
-                                fontSize: window.innerWidth < 1024 ? 8 : 11
-                            }
-                        }
-                    },
-                    formatter: (name) => {
-                        const item = dataWithPercent.find(d => d.name === name);
-                        if (!item) return name;
-                        const maxLen = window.innerWidth < 1024 ? 10 : 16;
-                        const displayName = name.length > maxLen ? name.substring(0, maxLen) + '...' : name;
-                        return `{name|${displayName}} {value|${formatNumber(item.value)}} {percent|${item.percent}%}`;
-                    }
+                    show: false
                 },
                 series: [{
                     name: '消息数',
                     type: 'pie',
                     radius: window.innerWidth < 1024 ? ['35%', '65%'] : ['45%', '75%'],
-                    center: window.innerWidth < 1024 ? ['50%', '60%'] : ['60%', '50%'],
+                    center: ['50%', '50%'],
                     avoidLabelOverlap: true,
                     itemStyle: {
                         borderRadius: 8,
@@ -329,7 +448,7 @@ export class AdminOverview {
                         shadowColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.1)'
                     },
                     label: {
-                        show: window.innerWidth >= 1024, // 小屏幕隐藏外部标签
+                        show: true, // 始终显示外部标签
                         position: 'outside',
                         formatter: (params) => {
                             if (params.percent < 3) return ''; // 小于3%的不显示标签
@@ -346,19 +465,19 @@ export class AdminOverview {
                             },
                             value: {
                                 fontSize: 12,
-                                color: isDark ? '#9CA3AF' : '#6B7280',
+                                color: textColor,
                                 fontWeight: 600,
                                 lineHeight: 16
                             },
                             percent: {
                                 fontSize: 10,
-                                color: isDark ? '#6B7280' : '#9CA3AF',
+                                color: textColor,
                                 lineHeight: 16
                             }
                         }
                     },
                     labelLine: {
-                        show: window.innerWidth >= 1024, // 小屏幕隐藏标签线
+                        show: true, // 始终显示标签线
                         length: 15,
                         length2: 10,
                         lineStyle: {
@@ -375,7 +494,8 @@ export class AdminOverview {
                         },
                         label: {
                             fontSize: 13,
-                            fontWeight: 600
+                            fontWeight: 600,
+                            color: textColor
                         }
                     },
                     data: dataWithPercent
@@ -384,7 +504,7 @@ export class AdminOverview {
                     name: '总计',
                     type: 'pie',
                     radius: ['0%', window.innerWidth < 1024 ? '25%' : '35%'],
-                    center: window.innerWidth < 1024 ? ['50%', '60%'] : ['60%', '50%'],
+                    center: ['50%', '50%'],
                     itemStyle: {
                         color: 'transparent'
                     },
@@ -397,7 +517,7 @@ export class AdminOverview {
                         rich: {
                             total: {
                                 fontSize: 14,
-                                color: isDark ? '#9CA3AF' : '#6B7280',
+                                color: textColor,
                                 fontWeight: 500,
                                 lineHeight: 20
                             },
@@ -409,14 +529,17 @@ export class AdminOverview {
                             },
                             count: {
                                 fontSize: 12,
-                                color: isDark ? '#6B7280' : '#9CA3AF',
+                                color: textColor,
                                 lineHeight: 18
                             }
                         }
                     },
                     data: [{ value: total, name: '' }]
                 }]
-            });
+            };
+            
+            // 使用 notMerge: true 强制完全替换配置
+            this.groupActivityChart.setOption(groupActivityOption, true);
         }
         
         // 更新消息密度散点图
@@ -441,7 +564,7 @@ export class AdminOverview {
             // 计算气泡大小范围
             const maxAvg = Math.max(...scatterData.map(item => item.avgMessagesPerUser), 1);
             
-            this.messageDensityChart.setOption({
+            const messageDensityOption = {
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 tooltip: {
@@ -449,13 +572,13 @@ export class AdminOverview {
                     formatter: (params) => {
                         const data = params.data;
                         return `
-                            <div style="font-weight: 600; margin-bottom: 4px;">${data.name}</div>
-                            <div style="margin: 2px 0;">用户数: <strong>${formatNumber(data.userCount)}</strong></div>
-                            <div style="margin: 2px 0;">消息数: <strong>${formatNumber(data.messageCount)}</strong></div>
-                            <div style="margin: 2px 0;">平均消息/用户: <strong>${formatNumber(data.avgMessagesPerUser)}</strong></div>
+                            <div style="font-weight: 600; margin-bottom: 4px; color: ${textColor} !important;">${data.name}</div>
+                            <div style="margin: 2px 0; color: ${textColor} !important;">用户数: <strong>${formatNumber(data.userCount)}</strong></div>
+                            <div style="margin: 2px 0; color: ${textColor} !important;">消息数: <strong>${formatNumber(data.messageCount)}</strong></div>
+                            <div style="margin: 2px 0; color: ${textColor} !important;">平均消息/用户: <strong>${formatNumber(data.avgMessagesPerUser)}</strong></div>
                         `;
                     },
-                    backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                    backgroundColor: tooltipBg,
                     borderColor: gridColor,
                     textStyle: { color: textColor }
                 },
@@ -549,7 +672,10 @@ export class AdminOverview {
                         show: false
                     }
                 }]
-            });
+            };
+            
+            // 使用 notMerge: true 强制完全替换配置
+            this.messageDensityChart.setOption(messageDensityOption, true);
         }
         
         // 更新新增用户趋势图
@@ -563,18 +689,18 @@ export class AdminOverview {
                 ? Math.max(...counts) 
                 : 1;
             
-            this.groupGrowthChart.setOption({
+            const groupGrowthOption = {
                 backgroundColor: 'transparent',
                 textStyle: { color: textColor },
                 tooltip: {
                     trigger: 'axis',
                     axisPointer: { type: 'line' },
-                    backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                    backgroundColor: tooltipBg,
                     borderColor: gridColor,
                     textStyle: { color: textColor },
                     formatter: (params) => {
                         const param = params[0];
-                        return `${param.axisValue}<br/>新增用户: <strong>${formatNumber(param.value)}</strong>`;
+                        return `<div style="color: ${textColor} !important;">${param.axisValue}<br/>新增用户: <strong style="color: ${textColor} !important;">${formatNumber(param.value)}</strong></div>`;
                     }
                 },
                 grid: {
@@ -654,7 +780,10 @@ export class AdminOverview {
                         fontWeight: 500
                     }
                 }]
-            });
+            };
+            
+            // 使用 notMerge: true 强制完全替换配置
+            this.groupGrowthChart.setOption(groupGrowthOption, true);
         }
     }
 }

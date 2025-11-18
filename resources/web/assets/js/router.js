@@ -18,13 +18,8 @@ class Router {
     
     // 获取当前路由
     getCurrentRoute() {
-        // 优先使用保存的初始 hash
-        let hash = this.initialHash;
-        
-        // 如果初始 hash 为空，尝试从当前 URL 读取
-        if (!hash || hash === '') {
-            hash = window.location.hash;
-        }
+        // 总是从当前 URL 读取 hash（确保路由切换时能获取最新值）
+        let hash = window.location.hash;
         
         // 处理 hash 路由
         // 如果 hash 是 '#/' 或空，返回根路由 '/'
@@ -73,7 +68,6 @@ class Router {
     
     // 初始化路由
     init() {
-        // 保存初始 hash（在初始化时保存，确保能捕获到重定向后的 hash）
         // 如果当前 hash 为空，等待一下再读取（给后端重定向时间）
         if (this.initialHash === null) {
             this.initialHash = window.location.hash;
@@ -83,13 +77,6 @@ class Router {
                 // 等待下一个事件循环，给重定向时间完成
                 setTimeout(() => {
                     this.initialHash = window.location.hash;
-                    // 如果还是为空，使用 getCurrentRoute 的路径推断逻辑
-                    if (!this.initialHash || this.initialHash === '') {
-                        const route = this.getCurrentRoute();
-                        if (route !== '/') {
-                            this.initialHash = `#${route}`;
-                        }
-                    }
                     // 继续初始化流程
                     this._continueInit();
                 }, 10);

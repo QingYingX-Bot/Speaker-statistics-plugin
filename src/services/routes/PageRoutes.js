@@ -47,8 +47,8 @@ export class PageRoutes {
                 if (req.path.startsWith('/api/')) {
                     return next();
                 }
-                // 如果是已知的token路径格式（8位十六进制字符串），跳过静态文件处理
-                if (/^\/[a-f0-9]{8}$/.test(req.path)) {
+                // 如果是已知的token路径格式（8位十六进制字符串，带或不带末尾斜杠），跳过静态文件处理
+                if (/^\/[a-f0-9]{8}\/?$/.test(req.path)) {
                     return next();
                 }
                 // 其他情况使用静态文件中间件
@@ -68,11 +68,17 @@ export class PageRoutes {
         });
         
         // 带token的根路径（8位十六进制字符串，匹配token格式）
+        // 支持 /token 和 /token/ 两种格式（Express会自动处理末尾斜杠）
         this.app.get('/:token', (req, res) => {
-            const token = req.params.token;
+            let token = req.params.token;
+            
+            // 移除末尾的斜杠（如果有，Express可能已经处理，但为了保险还是处理一下）
+            if (token && token.endsWith('/')) {
+                token = token.slice(0, -1);
+            }
             
             // 检查是否是token格式（8位十六进制字符串）
-            if (!/^[a-f0-9]{8}$/.test(token)) {
+            if (!token || !/^[a-f0-9]{8}$/.test(token)) {
                 // 不是token格式，返回404
                 return res.status(404).send('页面未找到');
             }

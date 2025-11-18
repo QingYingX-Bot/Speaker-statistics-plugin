@@ -531,5 +531,5 @@ psql -h localhost -U speech_user -d speech_statistics < backup_20241219.sql
 
 ---
 
-**最后更新**：2024-12-19
+**最后更新**：2025-11-17
 

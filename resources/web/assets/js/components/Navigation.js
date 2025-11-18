@@ -125,8 +125,9 @@ export class Navigation {
             const flexShrink = type === 'left' ? 'flex-shrink-0' : '';
             const spanClass = (type === 'left' || type === 'mobile') ? 'class="font-medium"' : '';
             
+            // 使用 JavaScript:void(0) 避免页面跳转，通过 data-route 属性处理路由
             return `
-                <a href="#${item.route}" 
+                <a href="javascript:void(0)" 
                    class="nav-link ${baseClass} ${activeClass}" 
                    data-route="${item.route}">
                     <svg class="${iconSize} ${flexShrink}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,12 +376,54 @@ export class Navigation {
      * 初始化导航栏事件
      */
     init() {
+        this.initNavLinks();
         this.initMobileMenu();
         this.initNavPositionToggle();
         this.initThemeToggle();
         this.initSettingsButton();
         this.initUserInfoButton();
         this.initLeftSidebarToggle();
+    }
+    
+    /**
+     * 初始化导航链接点击事件（使用事件委托，避免token丢失）
+     */
+    initNavLinks() {
+        // 移除旧的事件监听器（如果存在）
+        if (this._navLinkHandler) {
+            document.removeEventListener('click', this._navLinkHandler, true);
+        }
+        
+        // 创建新的事件处理器
+        this._navLinkHandler = (e) => {
+            // 使用 closest 方法查找最近的 .nav-link 元素
+            const navLink = e.target.closest('.nav-link');
+            if (!navLink) return;
+            
+            const route = navLink.getAttribute('data-route');
+            if (!route) return;
+            
+            // 阻止默认行为和事件冒泡
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 使用router.navigate进行路由切换（保持当前URL中的token）
+            if (window.router && typeof window.router.navigate === 'function') {
+                try {
+                    window.router.navigate(route);
+                } catch (error) {
+                    console.error('路由导航失败:', error);
+                    // 降级方案：直接设置 hash
+                    window.location.hash = route;
+                }
+            } else {
+                // 如果 router 未初始化，直接设置 hash
+                window.location.hash = route;
+            }
+        };
+        
+        // 绑定事件监听器（使用 capture 阶段，确保优先处理）
+        document.addEventListener('click', this._navLinkHandler, true);
     }
     
     /**
@@ -513,11 +556,11 @@ export class Navigation {
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         if (themeToggleBtn && !themeToggleBtn.dataset.listenerBound) {
             themeToggleBtn.dataset.listenerBound = 'true';
-            themeToggleBtn.addEventListener('click', () => {
+            themeToggleBtn.addEventListener('click', (e) => {
                 if (window.app && typeof window.app.toggleTheme === 'function') {
-                    window.app.toggleTheme();
+                    window.app.toggleTheme(e);
                 } else {
-                    this.toggleThemeFallback();
+                    this.toggleThemeFallback(e);
                 }
             });
         }
@@ -526,10 +569,11 @@ export class Navigation {
     /**
      * 主题切换备用方法（当 app.toggleTheme 不可用时）
      */
-    toggleThemeFallback() {
+    toggleThemeFallback(event) {
         const isDark = document.documentElement.classList.contains('dark');
         const favicon = document.querySelector('link[rel="icon"]');
         
+        // 直接切换主题，依靠CSS过渡效果实现平滑切换
         if (isDark) {
             document.documentElement.classList.remove('dark');
             localStorage.setItem('theme', 'light');

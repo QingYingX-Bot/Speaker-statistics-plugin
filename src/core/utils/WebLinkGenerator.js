@@ -37,9 +37,10 @@ export class WebLinkGenerator {
     static generateLink(token, hashRoute = '') {
         const config = this.getServerConfig();
         const baseUrl = `${config.protocol}://${config.domain || config.host}:${config.port}`;
-        // 生成带token的基础URL，hash路由直接附加在URL后面
+        // 生成带token的基础URL，格式：{baseUrl}/{token}/#/{route}
+        // token后面必须有斜杠，然后是hash路由
         const hash = hashRoute ? `#${hashRoute}` : '#/';
-        return `${baseUrl}/${token}${hash}`;
+        return `${baseUrl}/${token}/${hash}`;
     }
 
     /**

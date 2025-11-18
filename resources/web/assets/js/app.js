@@ -929,7 +929,7 @@ class App {
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         if (themeToggleBtn && !themeToggleBtn.dataset.listenerBound) {
             themeToggleBtn.dataset.listenerBound = 'true';
-            themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+            themeToggleBtn.addEventListener('click', (e) => this.toggleTheme(e));
         }
         
         // 设置按钮
@@ -969,12 +969,13 @@ class App {
     }
     
     /**
-     * 切换主题
+     * 切换主题（带平滑动画效果）
      */
-    toggleTheme() {
+    toggleTheme(event) {
         const isDark = document.documentElement.classList.contains('dark');
         const favicon = document.querySelector('link[rel="icon"]');
         
+        // 直接切换主题，依靠CSS过渡效果实现平滑切换
         if (isDark) {
             document.documentElement.classList.remove('dark');
             localStorage.setItem('theme', 'light');
@@ -985,12 +986,47 @@ class App {
             if (favicon) favicon.href = '/assets/favicon-dark.ico';
         }
         
+        // 更新导航栏激活状态
         if (this.navigation) {
             const currentRoute = router?.getCurrentRoute() || '/';
             requestAnimationFrame(() => {
                 this.navigation.updateActive(currentRoute);
             });
         }
+        
+        // 更新图表（主题切换后重新生成图表以更新颜色）
+        // 使用双重 requestAnimationFrame 确保 DOM 和样式完全更新后再更新图表
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    if (window.app && window.app.currentPage && window.app.currentPage.overviewModule) {
+                        // 强制重新生成图表：先销毁所有图表实例，然后重新创建
+                        const overviewModule = window.app.currentPage.overviewModule;
+                        
+                        // 销毁所有图表实例
+                        if (overviewModule.groupActivityChart) {
+                            overviewModule.groupActivityChart.dispose();
+                            overviewModule.groupActivityChart = null;
+                        }
+                        if (overviewModule.messageTrendChart) {
+                            overviewModule.messageTrendChart.dispose();
+                            overviewModule.messageTrendChart = null;
+                        }
+                        if (overviewModule.messageDensityChart) {
+                            overviewModule.messageDensityChart.dispose();
+                            overviewModule.messageDensityChart = null;
+                        }
+                        if (overviewModule.groupGrowthChart) {
+                            overviewModule.groupGrowthChart.dispose();
+                            overviewModule.groupGrowthChart = null;
+                        }
+                        
+                        // 重新初始化并更新图表
+                        overviewModule.updateCharts();
+                    }
+                }, 200);
+            });
+        });
     }
     
     // ========== 路由相关 ==========
