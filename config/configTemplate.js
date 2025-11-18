@@ -54,6 +54,19 @@ const configTemplate = {
         domain: "localhost"
     },
 
+    // Web服务器配置
+    webServer: {
+        // Umami 追踪脚本配置
+        umami: {
+            // 是否启用 Umami 追踪
+            enabled: false,
+            // Umami 脚本 URL（例如：https://your-umami-instance.com/script.js）
+            scriptUrl: "",
+            // Umami 网站 ID
+            websiteId: ""
+        }
+    },
+
     // 数据库配置
     database: {
         // 数据库类型：'postgresql' 或 'sqlite'

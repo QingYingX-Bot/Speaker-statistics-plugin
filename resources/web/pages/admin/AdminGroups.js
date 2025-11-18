@@ -362,25 +362,26 @@ export class AdminGroups {
             const nickname = user.nickname || userId;
             
             // 排名样式
+            const rank = index + 1;
             let rankBadgeClass = '';
             let rankBadgeContent = '';
             let cardClass = '';
             
             if (index === 0) {
                 rankBadgeClass = 'ranking-badge ranking-badge-gold';
-                rankBadgeContent = '🥇';
+                rankBadgeContent = rank.toString();
                 cardClass = 'ranking-card ranking-card-gold';
             } else if (index === 1) {
                 rankBadgeClass = 'ranking-badge ranking-badge-silver';
-                rankBadgeContent = '🥈';
+                rankBadgeContent = rank.toString();
                 cardClass = 'ranking-card ranking-card-silver';
             } else if (index === 2) {
                 rankBadgeClass = 'ranking-badge ranking-badge-bronze';
-                rankBadgeContent = '🥉';
+                rankBadgeContent = rank.toString();
                 cardClass = 'ranking-card ranking-card-bronze';
             } else {
                 rankBadgeClass = 'ranking-badge ranking-badge-default';
-                rankBadgeContent = `#${index + 1}`;
+                rankBadgeContent = rank.toString();
                 cardClass = 'ranking-card ranking-card-default';
             }
             
@@ -536,6 +537,7 @@ export class AdminGroups {
         div.textContent = text;
         return div.innerHTML;
     }
+    
     
     /**
      * 初始化事件监听

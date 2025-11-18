@@ -3,6 +3,7 @@ import fs from 'fs';
 import express from 'express';
 import { PathResolver } from '../../core/utils/PathResolver.js';
 import { TokenManager } from '../auth/TokenManager.js';
+import { globalConfig } from '../../core/ConfigManager.js';
 
 /**
  * 页面路由
@@ -95,9 +96,53 @@ export class PageRoutes {
     sendIndexPage(res) {
         const indexPath = path.join(PathResolver.getWebDir(), 'index.html');
         if (fs.existsSync(indexPath)) {
-            res.sendFile(indexPath);
+            let html = fs.readFileSync(indexPath, 'utf8');
+            
+            // 注入 Umami 追踪脚本
+            html = this.injectUmamiScript(html);
+            
+            res.send(html);
         } else {
             res.status(404).send('页面未找到');
+        }
+    }
+
+    /**
+     * 注入 Umami 追踪脚本
+     * @param {string} html HTML内容
+     * @returns {string} 注入脚本后的HTML
+     */
+    injectUmamiScript(html) {
+        try {
+            const umamiConfig = globalConfig.getConfig('webServer.umami');
+            
+            // 检查是否启用 Umami
+            if (!umamiConfig || !umamiConfig.enabled) {
+                // 如果未启用，移除占位符注释
+                return html.replace(/<!-- Umami Tracking Script -->[\s\S]*?<!-- End Umami Tracking Script -->/g, '');
+            }
+            
+            // 检查必要的配置项
+            if (!umamiConfig.scriptUrl || !umamiConfig.websiteId) {
+                return html.replace(/<!-- Umami Tracking Script -->[\s\S]*?<!-- End Umami Tracking Script -->/g, '');
+            }
+            
+            // 生成 Umami 脚本标签
+            const umamiScript = `<script defer src="${umamiConfig.scriptUrl}" data-website-id="${umamiConfig.websiteId}"></script>`;
+            
+            // 替换占位符或插入到 </head> 之前
+            if (html.includes('<!-- Umami Tracking Script -->')) {
+                // 如果存在占位符，替换占位符之间的内容
+                return html.replace(/<!-- Umami Tracking Script -->[\s\S]*?<!-- End Umami Tracking Script -->/g, 
+                    `<!-- Umami Tracking Script -->\n    ${umamiScript}\n    <!-- End Umami Tracking Script -->`);
+            } else {
+                // 如果不存在占位符，插入到 </head> 之前
+                return html.replace('</head>', `    ${umamiScript}\n</head>`);
+            }
+        } catch (error) {
+            // 如果出错，返回原始 HTML
+            global.logger?.error?.('[发言统计] 注入 Umami 脚本失败:', error);
+            return html;
         }
     }
 }

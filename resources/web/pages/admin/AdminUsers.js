@@ -1,11 +1,17 @@
 /**
- * 管理页面 - 用户管理模块
+ * 管理页面 - 用户管理模块（重写版）
+ * 支持PC端和移动端响应式设计
  */
 export class AdminUsers {
     constructor(admin) {
         this.admin = admin;
+        this.filteredUsers = [];
+        this.isMobileDetailOpen = false;
     }
     
+    /**
+     * 加载用户列表
+     */
     async loadUsers() {
         if (!this.admin.secretKey) {
             console.warn('秘钥未设置，无法加载用户列表');
@@ -16,7 +22,9 @@ export class AdminUsers {
             const response = await api.getAdminUsers(this.admin.app.userId, this.admin.secretKey);
             if (response.success && response.data) {
                 this.admin.users = response.data;
-                this.updateUsersList();
+                this.applyFilters();
+            } else {
+                Toast.show('加载用户列表失败', 'error');
             }
         } catch (error) {
             console.error('加载用户列表失败:', error);
@@ -26,105 +34,190 @@ export class AdminUsers {
         }
     }
     
-    updateUsersList() {
-        const usersListEl = document.getElementById('usersList');
-        const userListCountEl = document.getElementById('userListCount');
+    /**
+     * 应用搜索筛选
+     */
+    applyFilters() {
+        let filtered = [...this.admin.users];
         
-        let filteredUsers = [...this.admin.users];
-        
+        // 搜索筛选
         if (this.admin.userSearchQuery) {
-            filteredUsers = filteredUsers.filter(user => {
+            const query = this.admin.userSearchQuery.toLowerCase();
+            filtered = filtered.filter(user => {
                 const name = (user.username || user.userId || '').toLowerCase();
                 const id = String(user.userId || '').toLowerCase();
                 const role = (user.role || '').toLowerCase();
-                return name.includes(this.admin.userSearchQuery) || id.includes(this.admin.userSearchQuery) || role.includes(this.admin.userSearchQuery);
+                return name.includes(query) || id.includes(query) || role.includes(query);
             });
         }
         
-        // 默认按名称排序（与群管理一致）
-            filteredUsers.sort((a, b) => {
-                const nameA = (a.username || a.userId || '').toLowerCase();
-                const nameB = (b.username || b.userId || '').toLowerCase();
-                return nameA.localeCompare(nameB);
-            });
+        // 默认按名称排序
+        filtered.sort((a, b) => {
+            const nameA = (a.username || a.userId || '').toLowerCase();
+            const nameB = (b.username || b.userId || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
         
-        // 更新统计信息显示（与群管理格式一致）
-        if (userListCountEl) {
-            const countSpan = userListCountEl.querySelector('span.text-primary');
-            if (countSpan) {
-                countSpan.textContent = filteredUsers.length;
-            } else {
-                userListCountEl.innerHTML = `共 <span class="text-primary dark:text-primary">${filteredUsers.length}</span> 个用户`;
-            }
-        }
-        
-        if (usersListEl) {
-            if (filteredUsers.length === 0) {
-                usersListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-12">暂无匹配的用户</p>';
-            } else {
-                usersListEl.innerHTML = filteredUsers.map(user => {
-                    const isSelected = this.admin.selectedUserId === user.userId;
-                    return `
-                        <div 
-                            class="user-card flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
-                                isSelected 
-                                    ? 'border-primary bg-primary/5 dark:bg-primary/10 dark:border-primary' 
-                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
-                            }"
-                            data-user-id="${user.userId}"
-                        >
-                            <div class="flex items-center space-x-3 flex-1 min-w-0">
-                                <div class="w-9 h-9 ${user.role === 'admin' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'} rounded-full flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold ${user.role === 'admin' ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}">${user.role === 'admin' ? 'A' : 'U'}</span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <p class="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">${user.username || user.userId}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                                        ${user.role === 'admin' ? '管理员' : '普通用户'}
-                                        ${user.createdAt ? ` · ${user.createdAt.split(' ')[0]}` : ''}
-                                    </p>
-                                </div>
-                            </div>
-                            ${isSelected ? `
-                                <svg class="w-4 h-4 text-primary dark:text-primary flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                </svg>
-                            ` : `
-                                <span class="px-2 py-0.5 text-xs font-medium rounded flex-shrink-0 ${
-                                    user.role === 'admin' 
-                                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
-                                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                }">
-                                    ${user.role === 'admin' ? '管理员' : '用户'}
-                                </span>
-                            `}
-                        </div>
-                    `;
-                }).join('');
-                
-                usersListEl.querySelectorAll('.user-card').forEach(card => {
-                    card.addEventListener('click', () => {
-                        const userId = card.dataset.userId;
-                        this.selectUser(userId);
-                    });
-                });
-            }
-        }
+        this.filteredUsers = filtered;
+        this.updateUsersList();
     }
     
+    /**
+     * 更新用户列表显示
+     */
+    updateUsersList() {
+        const usersListEl = document.getElementById('usersList');
+        const userListCountEl = document.getElementById('userListCount');
+        if (!usersListEl) return;
+        
+        // 更新计数
+        if (userListCountEl) {
+            const countSpan = userListCountEl.querySelector('span');
+            if (countSpan) {
+                countSpan.textContent = `${this.filteredUsers.length}`;
+            }
+        }
+        
+        // 空状态
+        if (this.filteredUsers.length === 0) {
+            usersListEl.innerHTML = `
+                <div class="text-center py-12 px-4">
+                    <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                        <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">暂无匹配的用户</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // 渲染用户列表
+        const isMobile = window.innerWidth < 1024;
+        usersListEl.innerHTML = this.filteredUsers.map(user => {
+            // 移动端不显示选中状态
+            const isSelected = !isMobile && this.admin.selectedUserId === user.userId;
+            const userName = user.username || user.userId || '未知用户';
+            const roleText = user.role === 'admin' ? '管理员' : '普通用户';
+            const roleClass = user.role === 'admin' ? 'user-role-admin' : 'user-role-user';
+            
+            return `
+                <div 
+                    class="user-list-item ${isSelected ? 'user-list-item-selected' : ''}"
+                    data-user-id="${user.userId}"
+                >
+                    <div class="user-list-item-content">
+                        <div class="user-list-item-icon ${roleClass}">
+                            <span class="user-list-item-icon-text">${user.role === 'admin' ? 'A' : 'U'}</span>
+                        </div>
+                        <div class="user-list-item-info">
+                            <div class="user-list-item-name">${this.escapeHtml(userName)}</div>
+                            <div class="user-list-item-meta">
+                                <span class="user-list-item-role ${roleClass}">${roleText}</span>
+                                ${user.createdAt ? `<span class="user-list-item-date">${user.createdAt.split(' ')[0]}</span>` : ''}
+                            </div>
+                        </div>
+                        ${isSelected ? `
+                            <div class="user-list-item-check">
+                                <svg fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        ` : `
+                            <div class="user-list-item-arrow">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // 绑定点击事件
+        usersListEl.querySelectorAll('.user-list-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const userId = item.dataset.userId;
+                this.selectUser(userId);
+            });
+        });
+    }
+    
+    /**
+     * 选择用户
+     */
     async selectUser(userId) {
         if (!userId || !this.admin.secretKey) return;
         
+        const isMobile = window.innerWidth < 1024;
+        
+        // 保存选中状态（移动端和PC端都需要，用于刷新功能）
         this.admin.selectedUserId = userId;
-        this.updateUsersList();
-        await this.loadUserDetail(userId);
+        
+        if (isMobile) {
+            // 移动端打开详情面板
+            this.openMobileDetail();
+            await this.loadUserDetail(userId);
+        } else {
+            // PC端更新列表显示选中状态
+            this.updateUsersList();
+            await this.loadUserDetail(userId);
+        }
     }
     
+    /**
+     * 打开移动端详情
+     */
+    openMobileDetail() {
+        const detailPanel = document.getElementById('userDetailPanel');
+        if (detailPanel && window.innerWidth < 1024) {
+            detailPanel.classList.remove('hidden');
+            this.isMobileDetailOpen = true;
+            // 防止背景滚动
+            document.body.style.overflow = 'hidden';
+        }
+    }
+    
+    /**
+     * 关闭移动端详情
+     */
+    closeMobileDetail() {
+        const detailPanel = document.getElementById('userDetailPanel');
+        if (detailPanel && window.innerWidth < 1024) {
+            detailPanel.classList.add('hidden');
+            this.isMobileDetailOpen = false;
+            // 恢复背景滚动
+            document.body.style.overflow = '';
+            // 清除选中状态
+            this.admin.selectedUserId = null;
+            this.admin.selectedUserData = null;
+            this.updateUsersList();
+            this.updateUserDetail();
+        }
+    }
+    
+    /**
+     * 初始化移动端布局
+     */
+    initMobileLayout() {
+        if (window.innerWidth < 1024) {
+            const detailPanel = document.getElementById('userDetailPanel');
+            if (detailPanel && !this.admin.selectedUserId) {
+                detailPanel.classList.add('hidden');
+            }
+        }
+    }
+    
+    /**
+     * 加载用户详情
+     */
     async loadUserDetail(userId) {
         if (!this.admin.secretKey) return;
         
         const detailContent = document.getElementById('userDetailContent');
-        const emptyState = document.querySelector('#userDetailPanel > .text-center');
+        const emptyState = document.querySelector('#userDetailPanel > .empty-state');
         
         if (detailContent) detailContent.classList.add('hidden');
         if (emptyState) emptyState.classList.remove('hidden');
@@ -189,6 +282,11 @@ export class AdminUsers {
                     totalWords
                 };
                 this.updateUserDetail();
+                
+                // 确保权限选择器正确初始化
+                requestAnimationFrame(() => {
+                    this.ensureRoleSelectInitialized();
+                });
             }
         } catch (error) {
             console.error('加载用户详情失败:', error);
@@ -196,10 +294,13 @@ export class AdminUsers {
         }
     }
     
+    /**
+     * 更新用户详情显示
+     */
     updateUserDetail() {
         const detailPanel = document.getElementById('userDetailPanel');
         const detailContent = document.getElementById('userDetailContent');
-        const emptyState = detailPanel?.querySelector('.text-center');
+        const emptyState = detailPanel?.querySelector('.empty-state');
         
         if (!this.admin.selectedUserData) {
             if (detailContent) detailContent.classList.add('hidden');
@@ -212,35 +313,74 @@ export class AdminUsers {
         if (detailContent) detailContent.classList.remove('hidden');
         if (emptyState) emptyState.classList.add('hidden');
         
+        // 更新标题和用户ID
         const titleEl = document.getElementById('userDetailTitle');
         const userIdEl = document.getElementById('userDetailId');
         const userIdCardEl = document.getElementById('userDetailIdCard');
-        const roleBadgeEl = document.getElementById('userDetailRoleBadge');
+        
+        if (titleEl) titleEl.textContent = user?.username || user?.userId || '未知用户';
+        if (userIdEl) {
+            const userIdText = this.admin.selectedUserData.userId || '-';
+            userIdEl.textContent = `用户ID: ${userIdText}`;
+        }
+        if (userIdCardEl) userIdCardEl.textContent = this.admin.selectedUserData.userId;
+        
+        // 更新统计概览
+        this.updateStatsOverview();
+        
+        // 更新角色徽章
+        this.updateRoleBadge();
+        
+        // 更新时间信息
+        this.updateTimeInfo();
+        
+        // 更新角色选择器
+        this.updateRoleSelect();
+        
+        // 更新群列表
+        this.updateGroupsList();
+    }
+    
+    /**
+     * 更新统计概览卡片
+     */
+    updateStatsOverview() {
+        // 更新统计数据到现有的HTML元素
         const groupCountEl = document.getElementById('userGroupCount');
         const totalMessagesEl = document.getElementById('userTotalMessages');
         const totalWordsEl = document.getElementById('userTotalWords');
+        
+        if (groupCountEl) {
+            groupCountEl.textContent = formatNumber(this.admin.selectedUserData.groups?.length || 0);
+        }
+        if (totalMessagesEl) {
+            totalMessagesEl.textContent = formatNumber(this.admin.selectedUserData.totalMessages || 0);
+        }
+        if (totalWordsEl) {
+            totalWordsEl.textContent = formatNumber(this.admin.selectedUserData.totalWords || 0);
+        }
+    }
+    
+    /**
+     * 更新角色徽章
+     */
+    updateRoleBadge() {
+        const roleBadgeEl = document.getElementById('userDetailRoleBadge');
+        if (!roleBadgeEl) return;
+        
+        const user = this.admin.selectedUserData.user;
+        const isAdmin = user?.role === 'admin';
+        roleBadgeEl.textContent = isAdmin ? '管理员' : '普通用户';
+        roleBadgeEl.className = `user-role-badge ${isAdmin ? 'user-role-badge-admin' : 'user-role-badge-user'}`;
+    }
+    
+    /**
+     * 更新时间信息
+     */
+    updateTimeInfo() {
         const createdAtEl = document.getElementById('userCreatedAt');
         const updatedAtEl = document.getElementById('userUpdatedAt');
-        const roleSelectEl = document.getElementById('userRoleSelect');
-        const groupsCountEl = document.getElementById('userGroupsCount');
-        
-        if (titleEl) titleEl.textContent = user?.username || user?.userId || '未知用户';
-        if (userIdEl) userIdEl.textContent = `用户ID: ${this.admin.selectedUserData.userId}`;
-        if (userIdCardEl) userIdCardEl.textContent = this.admin.selectedUserData.userId;
-        
-        if (roleBadgeEl) {
-            const isAdmin = user?.role === 'admin';
-            roleBadgeEl.textContent = isAdmin ? '管理员' : '普通用户';
-            roleBadgeEl.className = `px-4 py-2 text-sm font-semibold rounded-full ${
-                isAdmin 
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' 
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-            }`;
-        }
-        
-        if (groupCountEl) groupCountEl.textContent = formatNumber(this.admin.selectedUserData.groups?.length || 0);
-        if (totalMessagesEl) totalMessagesEl.textContent = formatNumber(this.admin.selectedUserData.totalMessages || 0);
-        if (totalWordsEl) totalWordsEl.textContent = formatNumber(this.admin.selectedUserData.totalWords || 0);
+        const user = this.admin.selectedUserData.user;
         
         if (createdAtEl) {
             const createdAt = user?.createdAt || '-';
@@ -250,73 +390,134 @@ export class AdminUsers {
             const updatedAt = user?.updatedAt || '-';
             updatedAtEl.textContent = updatedAt !== '-' ? updatedAt.split(' ')[0] : '-';
         }
+    }
+    
+    /**
+     * 确保权限选择器已初始化
+     */
+    ensureRoleSelectInitialized() {
+        const roleSelectEl = document.getElementById('userRoleSelect');
+        if (!roleSelectEl) return;
         
-        if (roleSelectEl) {
-            roleSelectEl.value = user?.role || 'user';
-            // 更新自定义下拉框显示
-            if (window.updateCustomSelect && roleSelectEl.classList.contains('select-custom')) {
-                window.updateCustomSelect(roleSelectEl);
+        // 如果CustomSelect未初始化，尝试初始化
+        if (!roleSelectEl._customSelectInstance && window.CustomSelect && roleSelectEl.classList.contains('select-custom')) {
+            try {
+                roleSelectEl._customSelectInstance = new window.CustomSelect(roleSelectEl);
+            } catch (error) {
+                console.warn('初始化权限选择器失败:', error);
             }
         }
         
-        const groupsListEl = document.getElementById('userGroupsList');
-        if (groupsListEl) {
-            if (this.admin.selectedUserData.groups && this.admin.selectedUserData.groups.length > 0) {
-                if (groupsCountEl) {
-                    groupsCountEl.textContent = `共 ${this.admin.selectedUserData.groups.length} 个群`;
-                }
-                
-                groupsListEl.innerHTML = this.admin.selectedUserData.groups.map((group, index) => {
-                    const stats = group.stats || {};
-                    const messageCount = parseInt(stats.total_count || 0, 10);
-                    const wordCount = parseInt(stats.total_words || 0, 10);
-                    const rank = stats.rank || null;
-                    const hasData = messageCount > 0 || wordCount > 0;
-                    
-                    return `
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center space-x-2 flex-1 min-w-0">
-                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-6">${index + 1}.</span>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">${group.group_name || `群${group.group_id}`}</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">${group.group_id}</p>
-                                    </div>
-                                </div>
-                                ${rank !== null && rank !== undefined ? `
-                                    <span class="px-2 py-0.5 text-xs font-medium rounded flex-shrink-0 ${
-                                        rank === 1 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' 
-                                        : rank === 2 ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                        : rank === 3 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                    }">
-                                        #${rank}
-                                    </span>
-                                ` : ''}
-                            </div>
-                            
-                            <div class="flex items-center space-x-4 text-xs">
-                                <div class="flex items-center space-x-1">
-                                    <span class="text-gray-500 dark:text-gray-400">消息:</span>
-                                    <span class="font-semibold ${hasData ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}">${formatNumber(messageCount)}</span>
-                                </div>
-                                <div class="flex items-center space-x-1">
-                                    <span class="text-gray-500 dark:text-gray-400">字数:</span>
-                                    <span class="font-semibold ${hasData ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}">${formatNumber(wordCount)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                if (groupsCountEl) {
-                    groupsCountEl.textContent = '';
-                }
-                groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-12">该用户不在任何群中</p>';
-            }
+        // 更新值
+        this.updateRoleSelect();
+    }
+    
+    /**
+     * 更新角色选择器
+     */
+    updateRoleSelect() {
+        const roleSelectEl = document.getElementById('userRoleSelect');
+        if (!roleSelectEl) return;
+        
+        const user = this.admin.selectedUserData?.user;
+        if (!user) return;
+        
+        const newValue = user.role || 'user';
+        
+        // 更新原生select的值
+        if (roleSelectEl.value !== newValue) {
+            roleSelectEl.value = newValue;
+            // 触发change事件，让CustomSelect自动更新
+            roleSelectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // 如果CustomSelect已初始化，手动更新显示
+        if (roleSelectEl._customSelectInstance) {
+            roleSelectEl._customSelectInstance.updateButtonText();
+            roleSelectEl._customSelectInstance.highlightSelected();
         }
     }
     
+    /**
+     * 更新群列表
+     */
+    updateGroupsList() {
+        const groupsListEl = document.getElementById('userGroupsList');
+        const groupsCountEl = document.getElementById('userGroupsCount');
+        
+        if (!groupsListEl) return;
+        
+        if (this.admin.selectedUserData.groups && this.admin.selectedUserData.groups.length > 0) {
+            if (groupsCountEl) {
+                groupsCountEl.textContent = `共 ${this.admin.selectedUserData.groups.length} 个群`;
+            }
+            
+            groupsListEl.innerHTML = this.admin.selectedUserData.groups.map((group, index) => {
+                const stats = group.stats || {};
+                const messageCount = parseInt(stats.total_count || 0, 10);
+                const wordCount = parseInt(stats.total_words || 0, 10);
+                const rank = stats.rank || null;
+                const hasData = messageCount > 0 || wordCount > 0;
+                const groupName = group.group_name || `群${group.group_id}`;
+                
+                // 排名样式
+                let rankBadgeClass = '';
+                let rankBadgeContent = '';
+                
+                if (rank === 1) {
+                    rankBadgeClass = 'user-group-rank-badge user-group-rank-badge-gold';
+                    rankBadgeContent = rank.toString();
+                } else if (rank === 2) {
+                    rankBadgeClass = 'user-group-rank-badge user-group-rank-badge-silver';
+                    rankBadgeContent = rank.toString();
+                } else if (rank === 3) {
+                    rankBadgeClass = 'user-group-rank-badge user-group-rank-badge-bronze';
+                    rankBadgeContent = rank.toString();
+                } else if (rank !== null && rank !== undefined) {
+                    rankBadgeClass = 'user-group-rank-badge user-group-rank-badge-default';
+                    rankBadgeContent = rank.toString();
+                }
+                
+                return `
+                    <div class="user-group-item">
+                        <div class="user-group-item-header">
+                            <div class="user-group-item-info">
+                                <span class="user-group-item-index">${index + 1}.</span>
+                                <div class="user-group-item-details">
+                                    <div class="user-group-item-name">${this.escapeHtml(groupName)}</div>
+                                    <div class="user-group-item-id">${group.group_id}</div>
+                                </div>
+                            </div>
+                            ${rankBadgeContent ? `
+                                <div class="${rankBadgeClass}">
+                                    ${rankBadgeContent}
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="user-group-item-stats">
+                            <div class="user-group-item-stat">
+                                <span class="user-group-item-stat-label">消息:</span>
+                                <span class="user-group-item-stat-value ${hasData ? '' : 'user-group-item-stat-value-empty'}">${formatNumber(messageCount)}</span>
+                            </div>
+                            <div class="user-group-item-stat">
+                                <span class="user-group-item-stat-label">字数:</span>
+                                <span class="user-group-item-stat-value ${hasData ? '' : 'user-group-item-stat-value-empty'}">${formatNumber(wordCount)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            if (groupsCountEl) {
+                groupsCountEl.textContent = '';
+            }
+            groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-12">该用户不在任何群中</p>';
+        }
+    }
+    
+    /**
+     * 更新用户权限
+     */
     async updateUserRole() {
         if (!this.admin.selectedUserId) {
             Toast.show('请先选择一个用户', 'error');
@@ -348,7 +549,7 @@ export class AdminUsers {
         const confirmed = await new Promise((resolve) => {
             window.Modal.show('确认修改权限', `
                 <div class="space-y-3">
-                    <p class="text-gray-700 dark:text-gray-300">确定要将用户 <strong class="text-primary">${userName}</strong> 的权限修改为 <strong class="text-primary">${roleText}</strong> 吗？</p>
+                    <p class="text-gray-700 dark:text-gray-300">确定要将用户 <strong class="text-primary">${this.escapeHtml(userName)}</strong> 的权限修改为 <strong class="text-primary">${roleText}</strong> 吗？</p>
                 </div>
             `, `
                 <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition font-medium" id="confirmUpdateRoleBtn">确认修改</button>
@@ -389,6 +590,9 @@ export class AdminUsers {
         }
     }
     
+    /**
+     * 清除用户数据
+     */
     async clearUserData() {
         if (!this.admin.selectedUserId) {
             Toast.show('请先选择一个用户', 'error');
@@ -405,7 +609,7 @@ export class AdminUsers {
         const confirmed = await new Promise((resolve) => {
             window.Modal.show('确认清除', `
                 <div class="space-y-3">
-                    <p class="text-gray-700 dark:text-gray-300">确定要清除用户 <strong class="text-red-600 dark:text-red-400">${userName}</strong> 的所有统计数据吗？</p>
+                    <p class="text-gray-700 dark:text-gray-300">确定要清除用户 <strong class="text-red-600 dark:text-red-400">${this.escapeHtml(userName)}</strong> 的所有统计数据吗？</p>
                     <p class="text-sm text-red-600 dark:text-red-400 font-medium">⚠️ 此操作不可恢复！</p>
                 </div>
             `, `
@@ -433,5 +637,104 @@ export class AdminUsers {
             Toast.show('清除失败: ' + (error.message || '未知错误'), 'error');
         }
     }
+    
+    /**
+     * HTML转义
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    
+    /**
+     * 初始化事件监听
+     */
+    initEventListeners() {
+        // 搜索输入
+        const searchInput = document.getElementById('userSearchInput');
+        const clearBtn = document.getElementById('userSearchClearBtn');
+        
+        if (searchInput) {
+            // 输入事件
+            searchInput.addEventListener('input', (e) => {
+                const value = e.target.value;
+                this.admin.userSearchQuery = value.toLowerCase();
+                this.applyFilters();
+                
+                // 显示/隐藏清除按钮
+                if (clearBtn) {
+                    if (value) {
+                        clearBtn.classList.remove('hidden');
+                        clearBtn.style.display = 'block';
+                    } else {
+                        clearBtn.classList.add('hidden');
+                        clearBtn.style.display = 'none';
+                    }
+                }
+            });
+            
+            // 清除按钮
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    searchInput.value = '';
+                    this.admin.userSearchQuery = '';
+                    this.applyFilters();
+                    clearBtn.classList.add('hidden');
+                    clearBtn.style.display = 'none';
+                    searchInput.focus();
+                });
+            }
+        }
+        
+        // 更新权限按钮
+        const updateRoleBtn = document.getElementById('updateUserRoleBtn');
+        if (updateRoleBtn) {
+            updateRoleBtn.addEventListener('click', () => {
+                this.updateUserRole();
+            });
+        }
+        
+        // 清除用户数据按钮
+        const clearUserBtn = document.getElementById('clearUserDataBtn');
+        if (clearUserBtn) {
+            clearUserBtn.addEventListener('click', () => {
+                this.clearUserData();
+            });
+        }
+        
+        // 移动端返回按钮
+        const backBtn = document.getElementById('userDetailBackBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                this.closeMobileDetail();
+            });
+        }
+        
+        // 窗口大小变化时调整布局
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (window.innerWidth >= 1024) {
+                    // 桌面端：恢复背景滚动，移除隐藏类
+                    document.body.style.overflow = '';
+                    const detailPanel = document.getElementById('userDetailPanel');
+                    if (detailPanel) {
+                        detailPanel.classList.remove('hidden');
+                    }
+                    this.isMobileDetailOpen = false;
+                } else {
+                    // 移动端：清除选中状态，初始化布局
+                    this.admin.selectedUserId = null;
+                    this.updateUsersList();
+                    this.initMobileLayout();
+                }
+            }, 100);
+        });
+        
+        // 初始化移动端布局
+        this.initMobileLayout();
+    }
 }
-

@@ -1,0 +1,353 @@
+/* ==================== 布局样式 ==================== */
+
+/* 主内容区布局 */
+.main-content {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-gray);
+    overflow: hidden;
+}
+
+/* 顶部导航栏模式 */
+body:not(.nav-left) .main-content {
+    padding-top: 56px; /* 移动端导航栏高度 */
+}
+
+@media (min-width: 640px) {
+    body:not(.nav-left) .main-content {
+        padding-top: 64px; /* 桌面端导航栏高度 */
+    }
+}
+
+/* 左侧导航栏模式 */
+body.nav-left .main-content {
+    padding-left: 0; /* 移动端不添加左侧padding */
+    padding-top: 0; /* 移动端标题栏会占用顶部空间 */
+}
+
+@media (min-width: 1024px) {
+    body.nav-left .main-content {
+        padding-left: 256px; /* 桌面端左侧导航栏宽度 */
+        padding-top: 0; /* 桌面端不需要顶部padding */
+    }
+}
+
+/* 小屏幕下，左侧导航栏模式需要为固定标题栏留出空间 */
+@media (max-width: 1023px) {
+    body.nav-left .main-content {
+        padding-top: 56px; /* 为固定标题栏留出空间 */
+    }
+}
+
+.page-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.5rem;
+    background: var(--bg-gray);
+    -webkit-overflow-scrolling: touch;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.page-header p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* 导航栏 */
+.navbar {
+    background: var(--bg-white);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    z-index: 1000;
+    padding: 0 20px;
+    height: 64px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.navbar-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.brand-icon {
+    font-size: 1.5rem;
+}
+
+.navbar-menu {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-id {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* 导航链接样式 */
+.nav-link {
+    text-decoration: none;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    background: transparent;
+}
+
+/* 顶部导航栏 */
+.nav-link-top {
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    gap: 0.5rem;
+}
+
+.nav-link-top:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent;
+}
+
+.dark .nav-link-top:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-top:not(.active):hover {
+    background: rgb(243 244 246);
+    color: var(--primary-color);
+}
+
+.dark .nav-link-top:not(.active):hover {
+    background: rgb(31 41 55);
+    color: var(--primary-color);
+}
+
+.nav-link-top:not(.active) svg {
+    color: rgb(75 85 99);
+}
+
+.dark .nav-link-top:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+.nav-link-top.active {
+    background: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(74, 144, 226, 0.2);
+}
+
+.nav-link-top.active:hover {
+    background: var(--primary-hover) !important;
+    color: white !important;
+}
+
+.nav-link-top.active svg {
+    color: white !important;
+}
+
+/* 左侧导航栏 */
+.nav-link-left {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    gap: 0.75rem;
+}
+
+.nav-link-left:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent !important;
+}
+
+.dark .nav-link-left:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-left:not(.active):hover {
+    background: rgb(243 244 246) !important;
+    color: var(--primary-color);
+}
+
+.dark .nav-link-left:not(.active):hover {
+    background: rgb(31 41 55) !important;
+    color: var(--primary-color);
+}
+
+.nav-link-left:not(.active) svg {
+    color: rgb(75 85 99);
+}
+
+.dark .nav-link-left:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+.nav-link-left.active {
+    background: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+    font-weight: 600;
+}
+
+.nav-link-left.active:hover {
+    background: rgba(74, 144, 226, 0.15) !important;
+    color: var(--primary-color) !important;
+}
+
+.nav-link-left.active svg {
+    color: var(--primary-color) !important;
+}
+
+/* 移动端导航栏 */
+.nav-link-mobile {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    gap: 0.75rem;
+}
+
+.nav-link-mobile:not(.active) {
+    color: rgb(55 65 81);
+    background: transparent !important;
+}
+
+.dark .nav-link-mobile:not(.active) {
+    color: rgb(209 213 219);
+}
+
+.nav-link-mobile:not(.active) svg {
+    color: rgb(156 163 175);
+}
+
+.dark .nav-link-mobile:not(.active) svg {
+    color: rgb(107 114 128);
+}
+
+.nav-link-mobile.active {
+    background: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+}
+
+.nav-link-mobile.active svg {
+    color: var(--primary-color) !important;
+}
+
+/* 移动端菜单样式 */
+#mobileMenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-out;
+    opacity: 0;
+}
+
+#mobileMenu:not(.hidden) {
+    opacity: 1;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-in;
+}
+
+.mobile-nav-link {
+    position: relative;
+}
+
+.mobile-nav-link.bg-primary {
+    background-color: rgba(74, 144, 226, 0.1) !important;
+    color: var(--primary-color) !important;
+}
+
+.mobile-nav-link.bg-primary svg {
+    color: var(--primary-color) !important;
+}
+
+/* 管理页面导航栏样式 */
+.admin-tab-btn {
+    position: relative;
+    margin-bottom: -1px;
+}
+
+.admin-tab-btn.active {
+    z-index: 1;
+}
+
+.admin-tab-btn:not(.active):hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .admin-tab-btn:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+    .main-content {
+        padding-top: 56px;
+    }
+    
+    body.nav-left .main-content {
+        padding-top: 0;
+    }
+
+    .page-content {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-container {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 10px 0;
+    }
+
+    .navbar-menu {
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 1023px) {
+    .admin-tab-btn {
+        min-width: fit-content;
+    }
+}
+

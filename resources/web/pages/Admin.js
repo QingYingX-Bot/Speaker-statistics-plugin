@@ -470,9 +470,9 @@ export default class Admin {
                                         
                                         <!-- 右侧：用户详情 -->
                             <div class="flex-1 overflow-hidden flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 h-full lg:h-auto">
-                                <div id="userDetailPanel" class="flex-1 overflow-y-auto min-h-0">
+                                <div id="userDetailPanel" class="flex-1 overflow-y-auto min-h-0 lg:!block hidden">
                                     <!-- 空状态 -->
-                                    <div class="text-center py-16 px-4">
+                                    <div class="empty-state flex flex-col items-center justify-center h-full min-h-[400px] px-4">
                                         <div class="w-20 h-20 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
                                             <svg class="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -488,12 +488,22 @@ export default class Admin {
                                         <div class="sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 flex-shrink-0">
                                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                                 <div class="flex-1 min-w-0 flex items-center gap-3">
-                                                <div class="flex-1 min-w-0">
+                                                    <!-- 移动端返回按钮 -->
+                                                    <button 
+                                                        id="userDetailBackBtn" 
+                                                        class="lg:hidden mt-1 p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 flex-shrink-0"
+                                                        aria-label="返回"
+                                                    >
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                                        </svg>
+                                                    </button>
+                                                    <div class="flex-1 min-w-0">
                                                         <h3 id="userDetailTitle" class="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 truncate"></h3>
-                                                    <p id="userDetailId" class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1"></p>
-                                                </div>
+                                                        <p id="userDetailId" class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1"></p>
+                                                    </div>
                                                     <span id="userDetailRoleBadge" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold rounded-full flex-shrink-0"></span>
-                                            </div>
+                                                </div>
                                                 <div class="flex items-center gap-2 flex-wrap">
                                                     <div class="relative flex-1 sm:flex-none">
                                                     <select 
@@ -786,74 +796,8 @@ export default class Admin {
         // 群管理模块事件监听器
         this.groupsModule.initEventListeners();
         
-        // 用户搜索
-        const userSearchInput = document.getElementById('userSearchInput');
-        const userSearchClearBtn = document.getElementById('userSearchClearBtn');
-        
-        if (userSearchInput) {
-            userSearchInput.addEventListener('input', (e) => {
-                const value = e.target.value;
-                this.userSearchQuery = value.toLowerCase();
-                this.usersModule.updateUsersList();
-                
-                // 显示/隐藏清除按钮
-                if (userSearchClearBtn) {
-                    if (value) {
-                        userSearchClearBtn.classList.remove('hidden');
-                        userSearchClearBtn.style.display = 'block';
-                    } else {
-                        userSearchClearBtn.classList.add('hidden');
-                        userSearchClearBtn.style.display = 'none';
-                    }
-                }
-            });
-            
-            // 清除按钮
-            if (userSearchClearBtn) {
-                userSearchClearBtn.addEventListener('click', () => {
-                    userSearchInput.value = '';
-                    this.userSearchQuery = '';
-                this.usersModule.updateUsersList();
-                    userSearchClearBtn.classList.add('hidden');
-                    userSearchClearBtn.style.display = 'none';
-                    userSearchInput.focus();
-            });
-            }
-        }
-        
-        // 刷新统计按钮
-        const refreshStatsBtn = document.getElementById('refreshGroupStatsBtn');
-        if (refreshStatsBtn) {
-            refreshStatsBtn.addEventListener('click', () => this.groupsModule.refreshGroupStats());
-        }
-        
-        // 刷新排名按钮
-        const refreshRankingBtn = document.getElementById('refreshRankingBtn');
-        if (refreshRankingBtn) {
-            refreshRankingBtn.addEventListener('click', () => {
-                if (this.selectedGroupId) {
-                    this.groupsModule.loadGroupRanking(this.selectedGroupId);
-                }
-            });
-        }
-        
-        // 清除统计按钮
-        const clearStatsBtn = document.getElementById('clearGroupStatsBtn');
-        if (clearStatsBtn) {
-            clearStatsBtn.addEventListener('click', () => this.groupsModule.clearGroupStats());
-        }
-        
-        // 清除用户数据按钮
-        const clearUserDataBtn = document.getElementById('clearUserDataBtn');
-        if (clearUserDataBtn) {
-            clearUserDataBtn.addEventListener('click', () => this.usersModule.clearUserData());
-        }
-        
-        // 更新用户权限按钮
-        const updateUserRoleBtn = document.getElementById('updateUserRoleBtn');
-        if (updateUserRoleBtn) {
-            updateUserRoleBtn.addEventListener('click', () => this.usersModule.updateUserRole());
-        }
+        // 用户管理模块事件监听器
+        this.usersModule.initEventListeners();
     }
     
     async switchTab(tabName) {
@@ -916,12 +860,22 @@ export default class Admin {
                 }
                 this.groupsModule.closeMobileDetail();
             }
-        } else if (tabName === 'Users' && this.users.length === 0) {
-            await this.usersModule.loadUsers();
+        } else if (tabName === 'Users') {
+            if (this.users.length === 0) {
+                await this.usersModule.loadUsers();
+            }
+            // 确保移动端详情面板初始状态正确
+            if (window.innerWidth < 1024) {
+                const detailPanel = document.getElementById('userDetailPanel');
+                if (detailPanel && !this.selectedUserId) {
+                    detailPanel.classList.add('hidden');
+                }
+                this.usersModule.initMobileLayout();
+            }
         }
         
         // 初始化当前标签页的下拉框
-            this.initCustomSelectsForActiveTab();
+        this.initCustomSelectsForActiveTab();
     }
     
     async loadData() {

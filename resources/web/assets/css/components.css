@@ -1,3 +1,5 @@
+/* ==================== 通用组件样式 ==================== */
+
 /* 按钮组件 */
 .btn {
     padding: 10px 20px;
@@ -49,6 +51,97 @@
     cursor: not-allowed;
 }
 
+/* 主要按钮（与 common.css 中的 btn-primary 保持一致） */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-primary:active {
+    opacity: 0.9;
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;   
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 危险按钮（与 common.css 中的 btn-danger 保持一致） */
+.btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    background: #dc2626;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+}
+
+.btn-danger:active {
+    opacity: 0.9;
+}
+
+.dark .btn-danger {
+    background: #ef4444;
+}
+
+.dark .btn-danger:hover {
+    background: #dc2626;
+}
+
+/* 图标按钮（次要） */
+.btn-icon-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    color: rgb(75, 85, 99);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.btn-icon-secondary:hover {
+    color: var(--primary-color);
+    background: rgb(243, 244, 246);
+}
+
+.btn-icon-secondary:active {
+    opacity: 0.8;
+}
+
+.dark .btn-icon-secondary {
+    color: rgb(156, 163, 175);
+}
+
+.dark .btn-icon-secondary:hover {
+    color: var(--primary-color);
+    background: rgb(31, 41, 55);
+}
+
 /* 卡片组件 */
 .card {
     background: var(--bg-white);
@@ -77,56 +170,7 @@
     color: var(--text-secondary);
 }
 
-/* 统计卡片 - 优化后统一大小，使用Tailwind CSS类 */
-.stat-card {
-    background: var(--bg-gray);
-    padding: 20px 18px;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 130px;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
-    margin-bottom: 0;
-}
-
-.stat-card:hover {
-    box-shadow: var(--shadow-md);
-}
-
-.stat-card .stat-value {
-    font-size: 32px;
-    font-weight: bold;
-    margin: 10px 0;
-    background: linear-gradient(45deg, #2c3e50, #3498db);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: var(--text-primary); /* 降级方案 */
-    line-height: 1.2;
-}
-
-.dark .stat-card .stat-value {
-    background: linear-gradient(45deg, #e5e7eb, #60a5fa);
-    -webkit-text-fill-color: transparent;
-    color: var(--text-primary);
-}
-
-.stat-card .stat-label {
-    font-size: 14px;
-    color: var(--text-secondary);
-    font-weight: 600;
-    letter-spacing: 0.2px;
-    margin-bottom: 6px;
-}
-
-.stat-card.span-2 {
-    grid-column: span 2;
-}
+/* 注意：统计卡片样式已移至 admin.css，此处保留兼容性样式 */
 
 /* 表格组件 */
 .table {
@@ -257,13 +301,7 @@
     background: var(--bg-gray);
 }
 
-/* 空状态 */
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-secondary);
-}
-
+/* 注意：空状态样式已移至 utilities.css，此处保留兼容性样式 */
 .empty-state-icon {
     font-size: 4rem;
     margin-bottom: 20px;

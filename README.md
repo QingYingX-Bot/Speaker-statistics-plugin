@@ -314,6 +314,28 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 > - SQLite 适合小型部署，无需安装数据库服务器
 > - PostgreSQL 适合生产环境，性能更好，支持高并发
 
+### Web服务器配置
+
+**Umami 追踪脚本配置（可选）：**
+```json
+{
+  "webServer": {
+    "umami": {
+      "enabled": true,
+      "scriptUrl": "https://your-umami-instance.com/script.js",
+      "websiteId": "your-website-id"
+    }
+  }
+}
+```
+
+> 💡 **说明**：
+> - `enabled`: 是否启用 Umami 追踪（默认：`false`）
+> - `scriptUrl`: Umami 脚本 URL，例如：`https://cloud.umami.is/script.js`
+> - `websiteId`: Umami 网站 ID，在 Umami 后台创建网站后获取
+> - 启用后，脚本会自动注入到所有 Web 页面的 `<head>` 标签中
+> - 未启用或配置不完整时，不会注入任何脚本
+
 ### 配置文件结构
 
 ```
@@ -352,6 +374,7 @@ data/
 - ✅ 全局设置（调试日志、通知开关等）
 - ✅ 显示设置（转发、图片、显示人数等）
 - ✅ 数据库配置（PostgreSQL/SQLite）
+- ✅ Web服务器配置（Umami 追踪脚本）
 - ✅ 用户自定义成就管理（增删改查）
 - ✅ 群专属成就管理
 

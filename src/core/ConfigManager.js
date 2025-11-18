@@ -204,6 +204,19 @@ class ConfigManager {
                     ...mergedConfig.backgroundServer
                 };
             }
+            if (mergedConfig.webServer && defaultConfig.webServer) {
+                mergedConfig.webServer = {
+                    ...defaultConfig.webServer,
+                    ...mergedConfig.webServer
+                };
+                // 深度合并 umami 配置
+                if (mergedConfig.webServer.umami && defaultConfig.webServer.umami) {
+                    mergedConfig.webServer.umami = {
+                        ...defaultConfig.webServer.umami,
+                        ...mergedConfig.webServer.umami
+                    };
+                }
+            }
             if (mergedConfig.dataStorage && defaultConfig.dataStorage) {
                 mergedConfig.dataStorage = {
                     ...defaultConfig.dataStorage,
