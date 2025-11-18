@@ -25,59 +25,76 @@ export class AchievementCard {
     }) {
         const idAttr = id ? `id="${id}"` : '';
         
-        // 稀有度颜色映射
-        const rarityColors = {
-            'Common': 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600',
-            'Uncommon': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700',
-            'Rare': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700',
-            'Epic': 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700',
-            'Legendary': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700',
-            'Special': 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 border-pink-300 dark:border-pink-700',
-            'Festival': 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700'
+        // 稀有度颜色映射（文字颜色）
+        const rarityTextColors = {
+            'Common': 'text-gray-400 dark:text-gray-400',
+            'Uncommon': 'text-blue-400 dark:text-blue-400',
+            'Rare': 'text-blue-500 dark:text-blue-500',
+            'Epic': 'text-purple-400 dark:text-purple-400',
+            'Legendary': 'text-yellow-400 dark:text-yellow-400',
+            'Mythic': 'text-orange-400 dark:text-orange-400',
+            'Special': 'text-pink-400 dark:text-pink-400',
+            'Festival': 'text-red-400 dark:text-red-400'
+        };
+        
+        // 稀有度中文映射
+        const rarityNames = {
+            'Common': '普通',
+            'Uncommon': '不普通',
+            'Rare': '稀有',
+            'Epic': '史诗',
+            'Legendary': '传说',
+            'Mythic': '神话',
+            'Special': '特殊',
+            'Festival': '节日'
         };
         
         const escapeHtml = window.escapeHtml || ((str) => str.replace(/[&<>"']/g, (m) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m])));
-        const colorClass = rarityColors[rarity] || rarityColors['Common'];
+        
+        // 规范化稀有度值（首字母大写，其余小写）
+        const normalizedRarity = rarity ? (rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase()) : 'Common';
+        
+        const rarityColor = rarityTextColors[normalizedRarity] || rarityTextColors['Common'];
         const safeName = escapeHtml(name || '未知成就');
         const safeDescription = escapeHtml(description || '');
-        const safeRarity = escapeHtml(rarity);
+        const safeRarity = escapeHtml(rarityNames[normalizedRarity] || rarityNames['Common']);
         
-        // 格式化日期
+        // 格式化日期为中文格式：2025年11月17日
         let formattedDate = '';
         if (obtainedDate) {
             try {
-                formattedDate = new Date(obtainedDate).toLocaleDateString('zh-CN', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
-                });
+                const date = new Date(obtainedDate);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                formattedDate = `${year}年${month}月${day}日`;
             } catch (e) {
                 formattedDate = obtainedDate;
             }
         }
         
         return `
-            <div class="bg-white dark:bg-gray-800 rounded-lg border-2 ${colorClass} p-4 hover:shadow-md transition-all ${className}" ${idAttr}>
-                <div class="flex items-start justify-between mb-2">
-                    <div class="flex-1 min-w-0">
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate mb-1">
-                            ${safeName}
-                        </h4>
-                        ${description ? `
-                        <p class="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2">
-                            ${safeDescription}
-                        </p>
-                        ` : ''}
-                    </div>
-                </div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="px-2 py-0.5 rounded ${colorClass} font-medium">
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all ${className}" ${idAttr}>
+                <h4 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
+                    ${safeName}
+                </h4>
+                ${description ? `
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    ${safeDescription}
+                </p>
+                ` : ''}
+                <div class="flex items-center justify-between mb-2 w-full">
+                    <span class="text-xs font-medium ${rarityColor} flex-shrink-0">
                         ${safeRarity}
                     </span>
-                    ${formattedDate ? `<span class="text-gray-500 dark:text-gray-400">${formattedDate}</span>` : ''}
+                    ${formattedDate ? `
+                    <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
+                        ${formattedDate}
+                    </span>
+                    ` : ''}
                 </div>
                 ${groupName ? `
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 truncate">
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
                     ${escapeHtml(groupName)}
                 </p>
                 ` : ''}
@@ -113,7 +130,7 @@ export class AchievementCard {
         ).join('');
         
         return `
-            <div class="grid ${gridCols} gap-4 ${className}">
+            <div class="grid ${gridCols} gap-3 sm:gap-4 ${className}">
                 ${cardsHtml}
             </div>
         `;

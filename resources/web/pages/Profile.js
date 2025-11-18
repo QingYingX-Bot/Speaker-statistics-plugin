@@ -87,12 +87,12 @@ export default class Profile {
                         
                         <!-- 最近成就 -->
                         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">最近成就</h3>
+                            <div class="flex items-center justify-between mb-4 sm:mb-5">
+                                <h3 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">最近成就</h3>
                                 ${this.userAchievements && this.userAchievements.length > 0 ? `<span class="text-xs text-gray-500 dark:text-gray-400">共 ${this.userAchievements.length} 项</span>` : ''}
                             </div>
-                            <div id="achievementsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                <div class="col-span-full flex items-center justify-center min-h-[200px]">
+                            <div id="achievementsList">
+                                <div class="flex items-center justify-center min-h-[200px]">
                                     ${Loading.render({ text: '加载中...', size: 'small', className: 'py-8' })}
                                 </div>
                             </div>
@@ -662,7 +662,8 @@ export default class Profile {
                 groupName: achievement.group_name || (achievement.group_id ? maskGroupId(achievement.group_id) : '')
             })),
             {
-                gridCols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                gridCols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+                className: ''
             }
         );
     }

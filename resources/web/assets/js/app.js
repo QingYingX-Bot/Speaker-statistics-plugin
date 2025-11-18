@@ -798,13 +798,13 @@ class App {
      * 更新用户信息显示
      */
     async updateUserInfo() {
-        const userIdEl = document.getElementById('userId');
+        const topNavUserIdEl = document.getElementById('topNavUserId');
         const mobileUserIdEl = document.getElementById('mobileUserId');
         const adminLink = document.getElementById('adminLink');
         const mobileAdminLink = document.getElementById('mobileAdminLink');
         
         if (!this.userId) {
-            if (userIdEl) userIdEl.textContent = '未登录';
+            if (topNavUserIdEl) topNavUserIdEl.textContent = '未登录';
             if (mobileUserIdEl) mobileUserIdEl.textContent = '未登录';
             if (adminLink) adminLink.style.display = 'none';
             if (mobileAdminLink) mobileAdminLink.classList.add('hidden');
@@ -849,14 +849,12 @@ class App {
             }
         }
         
-        // 更新显示
+        // 更新显示（导航栏显示用户名，页面内容中的用户ID不受影响）
         const displayText = userName || this.userId;
         
-        if (userIdEl) {
-            const isInNav = userIdEl.closest('nav') || userIdEl.closest('#userInfoBtn');
-            if (isInNav) {
-                userIdEl.textContent = displayText;
-            }
+        // 更新顶部导航栏的用户名显示
+        if (topNavUserIdEl) {
+            topNavUserIdEl.textContent = displayText;
         }
         
         if (mobileUserIdEl) {

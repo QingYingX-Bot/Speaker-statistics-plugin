@@ -17,6 +17,7 @@ export class Navigation {
             { route: '/', label: '首页', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
             { route: '/ranking', label: '排行榜', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
             { route: '/achievements', label: '成就', icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z' },
+            { route: '/profile', label: '个人', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
             { route: '/background', label: '背景设置', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' }
         ];
         
@@ -107,7 +108,7 @@ export class Navigation {
         
         return this.position === 'left' 
             ? this.renderLeftNav(displayName, userId, isAdmin, currentRoute)
-            : this.renderTopNav(userId, isAdmin, currentRoute);
+            : this.renderTopNav(displayName, userId, isAdmin, currentRoute);
     }
 
     /**
@@ -142,12 +143,13 @@ export class Navigation {
 
     /**
      * 渲染顶部导航栏
+     * @param {string} displayName 显示名称（用户名或用户ID）
      * @param {string} userId 用户ID
      * @param {boolean} isAdmin 是否为管理员
      * @param {string} currentRoute 当前路由
      * @returns {string} HTML字符串
      */
-    renderTopNav(userId, isAdmin, currentRoute) {
+    renderTopNav(displayName, userId, isAdmin, currentRoute) {
         const navItems = this.getNavItems(isAdmin);
         const navLinks = this.renderNavLinks(navItems, currentRoute, 'top');
 
@@ -168,10 +170,10 @@ export class Navigation {
                             ${navLinks}
                         </div>
                         <div class="flex items-center gap-1 sm:gap-2">
-                            <button class="hidden sm:flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-primary w-[120px] sm:w-[160px]" id="userInfoBtn" title="用户信息">
-                                ${this.renderIcon(this.icons.user, 'w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0')}
-                                <span id="userId" class="flex-1 min-w-0 text-left overflow-hidden text-ellipsis whitespace-nowrap">${userId || '未登录'}</span>
-                            </button>
+                            <div class="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                ${this.renderIcon(this.icons.user, 'w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0')}
+                                <span id="topNavUserId" class="text-xs text-gray-600 dark:text-gray-400 truncate flex-1">${displayName || '未登录'}</span>
+                            </div>
                             <button class="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary" id="navPositionToggleBtn" title="切换到左侧导航栏">
                                 ${this.renderIcon(this.icons.layout, 'w-4 h-4 sm:w-5 sm:h-5')}
                             </button>
@@ -611,6 +613,8 @@ export class Navigation {
 
     /**
      * 初始化用户信息按钮（跳转到个人中心）
+     * 注意：顶部导航栏的用户信息已改为 div 显示，不再需要点击事件
+     * 左侧导航栏仍保留 userInfoBtn 按钮用于跳转
      */
     initUserInfoButton() {
         const userInfoBtns = document.querySelectorAll('#userInfoBtn');

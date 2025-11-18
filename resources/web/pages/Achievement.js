@@ -505,8 +505,24 @@ export default class Achievement {
             'Special': 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700'
         };
         
-        const emoji = rarityEmoji[achievement.rarity] || '🎖️';
-        const rarityColor = rarityColors[achievement.rarity] || rarityColors['Common'];
+        // 稀有度中文映射
+        const rarityNames = {
+            'Common': '普通',
+            'Uncommon': '不普通',
+            'Rare': '稀有',
+            'Epic': '史诗',
+            'Legendary': '传说',
+            'Mythic': '神话',
+            'Special': '特殊',
+            'Festival': '节日'
+        };
+        
+        // 规范化稀有度值（首字母大写，其余小写）
+        const normalizedRarity = achievement.rarity ? (achievement.rarity.charAt(0).toUpperCase() + achievement.rarity.slice(1).toLowerCase()) : 'Common';
+        
+        const emoji = rarityEmoji[normalizedRarity] || '🎖️';
+        const rarityColor = rarityColors[normalizedRarity] || rarityColors['Common'];
+        const rarityName = rarityNames[normalizedRarity] || rarityNames['Common'];
         const opacityClass = unlocked ? '' : 'opacity-60';
         
         // 检查是否当前显示的成就 - 使用currentDisplayAchievementId和is_display字段
@@ -676,7 +692,7 @@ export default class Achievement {
                             </div>
                         ` : ''}
                         <div class="inline-block px-2 py-0.5 rounded text-xs font-medium border ${rarityColor}">
-                            ${achievement.rarity || 'Common'}
+                            ${rarityName}
                         </div>
                     </div>
                 </div>
