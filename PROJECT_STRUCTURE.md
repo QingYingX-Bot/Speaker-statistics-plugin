@@ -138,10 +138,19 @@ Speaker-statistics-plugin/
 │       │   │       ├── README.md  # 组件使用文档
 │       │   │       ├── Navbar.js  # 导航栏组件
 │       │   │       ├── Sidebar.js # 侧边栏组件
-│       │   │       ├── Card.js    # 卡片组件
-│       │   │       ├── Modal.js   # 模态框组件
-│       │   │       ├── Button.js  # 按钮组件
-│       │   │       └── Input.js   # 输入框组件
+│       │   │       ├── Card.js        # 卡片组件
+│       │   │       ├── Modal.js       # 模态框组件
+│       │   │       ├── Button.js      # 按钮组件
+│       │   │       ├── Input.js       # 输入框组件
+│       │   │       ├── Select.js      # 下拉选择器组件
+│       │   │       ├── SearchInput.js # 搜索输入框组件
+│       │   │       ├── Badge.js       # 徽章组件
+│       │   │       ├── Tabs.js        # 标签页组件
+│       │   │       ├── RankCard.js    # 排名卡片组件
+│       │   │       ├── ChartCard.js   # 图表卡片组件
+│       │   │       ├── AchievementCard.js # 成就卡片组件
+│       │   │       ├── Loading.js     # 加载组件
+│       │   │       └── EmptyState.js  # 空状态组件
 │       │   └── favicon-*.ico      # 网站图标
 │       └── pages/                 # 页面组件
 │           ├── Home.js            # 首页

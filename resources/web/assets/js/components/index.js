@@ -11,6 +11,10 @@ export { EmptyState } from './EmptyState.js';
 export { RankCard } from './RankCard.js';
 export { AchievementCard } from './AchievementCard.js';
 export { ChartCard } from './ChartCard.js';
+export { Select } from './Select.js';
+export { SearchInput } from './SearchInput.js';
+export { Badge } from './Badge.js';
+export { Tabs } from './Tabs.js';
 
 // 创建全局组件实例
 import { Navigation } from './Navigation.js';
@@ -23,6 +27,10 @@ import { EmptyState } from './EmptyState.js';
 import { RankCard } from './RankCard.js';
 import { AchievementCard } from './AchievementCard.js';
 import { ChartCard } from './ChartCard.js';
+import { Select } from './Select.js';
+import { SearchInput } from './SearchInput.js';
+import { Badge } from './Badge.js';
+import { Tabs } from './Tabs.js';
 
 window.Navigation = Navigation;
 window.Modal = Modal;
@@ -34,3 +42,7 @@ window.EmptyState = EmptyState;
 window.RankCard = RankCard;
 window.AchievementCard = AchievementCard;
 window.ChartCard = ChartCard;
+window.Select = Select;
+window.SearchInput = SearchInput;
+window.Badge = Badge;
+window.Tabs = Tabs;

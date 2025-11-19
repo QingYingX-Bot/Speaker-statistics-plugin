@@ -1,6 +1,8 @@
 /**
  * 设置页面
  */
+import { Input } from '/assets/js/components/index.js';
+
 export default class Settings {
     constructor(app) {
         this.app = app;
@@ -441,7 +443,13 @@ export default class Settings {
         Modal.show('更换用户ID', `
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">请输入新的用户ID</label>
-                <input type="text" id="newUserIdInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入用户ID" value="${currentUserId}">
+                ${Input.renderInput({
+                    type: 'text',
+                    id: 'newUserIdInput',
+                    placeholder: '请输入用户ID',
+                    value: currentUserId,
+                    className: 'px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                })}
                 <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     当前用户ID: ${currentUserId || '未设置'}
                 </div>
@@ -504,7 +512,13 @@ export default class Settings {
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                         <div class="flex gap-2">
-                            <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入6位验证码" maxlength="6">
+                            ${Input.renderInput({
+                                type: 'text',
+                                id: 'verificationCodeInput',
+                                placeholder: '请输入6位验证码',
+                                maxlength: '6',
+                                className: 'flex-1 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                            })}
                             <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
                         </div>
                         <div class="mt-1 text-xs text-gray-500 dark:text-gray-400" id="codeHint">验证码将发送到您的QQ</div>
@@ -512,7 +526,13 @@ export default class Settings {
                 ` : ''}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${isModifying ? '新' : ''}秘钥</label>
-                    <input type="password" id="secretKeyInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入秘钥" value="${currentKey}">
+                    ${Input.renderInput({
+                        type: 'password',
+                        id: 'secretKeyInput',
+                        placeholder: '请输入秘钥',
+                        value: currentKey,
+                        className: 'px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    })}
                     <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         秘钥用于验证您的身份，请妥善保管
                     </div>
@@ -667,7 +687,13 @@ export default class Settings {
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                     <div class="flex gap-2">
-                        <input type="text" id="verificationCodeInput" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入6位验证码" maxlength="6">
+                        ${Input.renderInput({
+                            type: 'text',
+                            id: 'verificationCodeInput',
+                            placeholder: '请输入6位验证码',
+                            maxlength: '6',
+                            className: 'flex-1 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        })}
                         <button id="sendCodeBtn" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium whitespace-nowrap">发送验证码</button>
                     </div>
                     <div class="mt-1 text-xs text-gray-500 dark:text-gray-400" id="codeHint">验证码将发送到您的QQ</div>

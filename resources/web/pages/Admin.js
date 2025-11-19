@@ -6,6 +6,7 @@ import { AdminGroups } from './admin/AdminGroups.js';
 import { AdminUsers } from './admin/AdminUsers.js';
 import { AdminStatistics } from './admin/AdminStatistics.js';
 import { AdminAchievements } from './admin/AdminAchievements.js';
+import { ChartCard, Button, Input, Select, SearchInput, Badge, Tabs } from '/assets/js/components/index.js';
 
 export default class Admin {
     constructor(app) {
@@ -52,73 +53,43 @@ export default class Admin {
                     <div class="px-2 sm:px-4 lg:px-8">
                         <div class="flex items-center justify-between h-14 sm:h-16">
                             <!-- 左侧导航标签 -->
-                            <nav class="flex items-end -mb-px space-x-0.5 sm:space-x-1 overflow-x-auto scrollbar-hide" role="tablist" style="scrollbar-width: none; -ms-overflow-style: none;">
-                                <button 
-                                    id="tabOverview" 
-                                    class="admin-tab-btn active relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 bg-white dark:bg-gray-800 text-primary border-b-2 border-primary whitespace-nowrap flex-shrink-0"
-                                    role="tab"
-                                    aria-selected="true"
-                                >
-                                    <span class="flex items-center space-x-1 sm:space-x-2">
-                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                        </svg>
-                                        <span>概览</span>
-                                    </span>
-                                </button>
-                                <button 
-                                    id="tabGroups" 
-                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
-                                    role="tab"
-                                    aria-selected="false"
-                                >
-                                    <span class="flex items-center space-x-1 sm:space-x-2">
-                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                        </svg>
-                                        <span>群管理</span>
-                                    </span>
-                                </button>
-                                <button 
-                                    id="tabUsers" 
-                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
-                                    role="tab"
-                                    aria-selected="false"
-                                >
-                                    <span class="flex items-center space-x-1 sm:space-x-2">
-                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                                        </svg>
-                                        <span>用户管理</span>
-                                    </span>
-                                </button>
-                                <button 
-                                    id="tabStatistics" 
-                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
-                                    role="tab"
-                                    aria-selected="false"
-                                >
-                                    <span class="flex items-center space-x-1 sm:space-x-2">
-                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                        </svg>
-                                        <span>数据统计</span>
-                                    </span>
-                                </button>
-                                <button 
-                                    id="tabAchievements" 
-                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
-                                    role="tab"
-                                    aria-selected="false"
-                                >
-                                    <span class="flex items-center space-x-1 sm:space-x-2">
-                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
-                                        </svg>
-                                        <span>成就管理</span>
-                                    </span>
-                                </button>
-                            </nav>
+                            ${Tabs.render({
+                                tabs: [
+                                    {
+                                        id: 'tabOverview',
+                                        label: '概览',
+                                        icon: '<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>',
+                                        active: true
+                                    },
+                                    {
+                                        id: 'tabGroups',
+                                        label: '群管理',
+                                        icon: '<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>',
+                                        active: false
+                                    },
+                                    {
+                                        id: 'tabUsers',
+                                        label: '用户管理',
+                                        icon: '<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>',
+                                        active: false
+                                    },
+                                    {
+                                        id: 'tabStatistics',
+                                        label: '数据统计',
+                                        icon: '<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>',
+                                        active: false
+                                    },
+                                    {
+                                        id: 'tabAchievements',
+                                        label: '成就管理',
+                                        icon: '<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>',
+                                        active: false
+                                    }
+                                ],
+                                activeId: 'tabOverview',
+                                variant: 'underline',
+                                className: ''
+                            })}
                             <!-- 右侧操作按钮 -->
                             <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
                                 <button 
@@ -262,64 +233,40 @@ export default class Admin {
                                 <!-- 图表网格 - 响应式布局，优化排列 -->
                                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
                                     <!-- 消息趋势图 - 左上 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 order-1">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                                            <div class="flex items-center gap-2">
-                                                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">消息趋势</h3>
-                                                <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">近7天</span>
-                                                            </div>
-                                            <div class="flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                                                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-                                                <span>消息数</span>
-                                                            </div>
-                                                            </div>
-                                        <div id="messageTrendChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                                        </div>
+                                    ${ChartCard.render({
+                                        title: `<div class="flex items-center gap-2"><span>消息趋势</span>${Badge.render({ text: "近7天", variant: "info", size: "sm" })}</div>`,
+                                        content: '<div id="messageTrendChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        footer: '<div class="flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400"><div class="w-3 h-3 rounded-full bg-blue-500"></div><span>消息数</span></div>',
+                                        className: 'hover:shadow-lg transition-all duration-300 order-1',
+                                        height: 320
+                                    })}
                                     
                                     <!-- 群组活跃度分布 - 右上 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 order-2">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                                            <div class="flex items-center gap-2">
-                                                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">群组活跃度分布</h3>
-                                                <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">Top 10</span>
-                                            </div>
-                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-                                                <span>消息数</span>
-                                            </div>
-                                        </div>
-                                        <div id="groupActivityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                                    </div>
+                                    ${ChartCard.render({
+                                        title: `<div class="flex items-center gap-2"><span>群组活跃度分布</span>${Badge.render({ text: "Top 10", variant: "info", size: "sm" })}</div>`,
+                                        content: '<div id="groupActivityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        footer: '<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><div class="w-2 h-2 rounded-full bg-blue-500"></div><span>消息数</span></div>',
+                                        className: 'hover:shadow-lg transition-all duration-300 order-2',
+                                        height: 320
+                                    })}
                                                     
                                     <!-- 新增用户趋势 - 左下 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 order-3">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                                            <div class="flex items-center gap-2">
-                                                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">新增用户</h3>
-                                                <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">近7天</span>
-                                            </div>
-                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <div class="w-2 h-2 rounded-full bg-purple-500"></div>
-                                                <span>新增用户</span>
-                                            </div>
-                                        </div>
-                                        <div id="groupGrowthChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                    </div>
+                                    ${ChartCard.render({
+                                        title: `<div class="flex items-center gap-2"><span>新增用户</span>${Badge.render({ text: "近7天", variant: "primary", size: "sm" })}</div>`,
+                                        content: '<div id="groupGrowthChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        footer: '<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><div class="w-2 h-2 rounded-full bg-purple-500"></div><span>新增用户</span></div>',
+                                        className: 'hover:shadow-lg transition-all duration-300 order-3',
+                                        height: 320
+                                    })}
                                     
                                     <!-- 消息密度散点图 - 右下 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 order-4">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                                            <div class="flex items-center gap-2">
-                                                <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">消息密度分布</h3>
-                                                <span class="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">所有群组</span>
-                                            </div>
-                                            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <div class="w-2 h-2 rounded-full bg-purple-500"></div>
-                                                <span>群组</span>
-                                            </div>
-                                        </div>
-                                        <div id="messageDensityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                    </div>
+                                    ${ChartCard.render({
+                                        title: `<div class="flex items-center gap-2"><span>消息密度分布</span>${Badge.render({ text: "所有群组", variant: "primary", size: "sm" })}</div>`,
+                                        content: '<div id="messageDensityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        footer: '<div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><div class="w-2 h-2 rounded-full bg-purple-500"></div><span>群组</span></div>',
+                                        className: 'hover:shadow-lg transition-all duration-300 order-4',
+                                        height: 320
+                                    })}
                                 </div>
                             </div>
                                                         </div>
@@ -332,30 +279,18 @@ export default class Admin {
                             <div class="flex-shrink-0 lg:w-80 xl:w-96 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-full lg:h-auto">
                                 <!-- 搜索栏 -->
                                 <div class="flex-shrink-0 p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 mt-14 sm:mt-16 lg:mt-0">
-                                    <div class="relative">
-                                        <input 
-                                            type="text" 
-                                            id="groupSearchInput" 
-                                            placeholder="搜索群聊名称或ID..." 
-                                            class="w-full px-3 sm:px-4 py-2.5 sm:py-3 pl-10 sm:pl-11 pr-10 sm:pr-11 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm sm:text-base transition-all"
-                                                            >
-                                        <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                                                </svg>
-                                        <button 
-                                            id="groupSearchClearBtn" 
-                                            class="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hidden"
-                                            style="display: none;"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
-                                        </button>
-                                        </div>
+                                    ${SearchInput.render({
+                                        id: 'groupSearchInput',
+                                        name: 'groupSearch',
+                                        placeholder: '搜索群聊名称或ID...',
+                                        className: 'px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-50 dark:bg-gray-700',
+                                        showClearButton: true,
+                                        clearButtonId: 'groupSearchClearBtn'
+                                    })}
                                     <div class="flex items-center justify-between mt-2">
                                         <span id="groupListCount" class="text-xs text-gray-500 dark:text-gray-400 font-medium">共 <span class="text-primary dark:text-primary">-</span> 个群聊</span>
-                                            </div>
-                                        </div>
+                                    </div>
+                                </div>
                                 <!-- 群列表 -->
                                 <div class="flex-1 overflow-y-scroll p-3 sm:p-4 min-h-0">
                                     <div id="groupsList" class="space-y-2">
@@ -468,26 +403,14 @@ export default class Admin {
                             <div class="flex-shrink-0 lg:w-80 xl:w-96 flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-full lg:h-auto">
                                 <!-- 搜索栏 -->
                                 <div class="flex-shrink-0 p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 mt-14 sm:mt-16 lg:mt-0">
-                                    <div class="relative">
-                                        <input 
-                                            type="text" 
-                                            id="userSearchInput" 
-                                            placeholder="搜索用户名称或ID..." 
-                                            class="w-full px-3 sm:px-4 py-2.5 sm:py-3 pl-10 sm:pl-11 pr-10 sm:pr-11 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm sm:text-base transition-all"
-                                        >
-                                        <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                        </svg>
-                                        <button 
-                                            id="userSearchClearBtn" 
-                                            class="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hidden"
-                                            style="display: none;"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
-                                        </button>
-                                        </div>
+                                    ${SearchInput.render({
+                                        id: 'userSearchInput',
+                                        name: 'userSearch',
+                                        placeholder: '搜索用户名称或ID...',
+                                        className: 'px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-50 dark:bg-gray-700',
+                                        showClearButton: true,
+                                        clearButtonId: 'userSearchClearBtn'
+                                    })}
                                     <div class="flex items-center justify-between mt-2">
                                         <span id="userListCount" class="text-xs text-gray-500 dark:text-gray-400 font-medium">共 <span class="text-primary dark:text-primary">-</span> 个用户</span>
                                     </div>
@@ -626,29 +549,43 @@ export default class Admin {
                                     <div class="flex items-center gap-3">
                                         <div class="flex items-center gap-2">
                                             <label class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">时间范围：</label>
-                                            <select id="statisticsTimeRange" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                <option value="day">今天</option>
-                                                <option value="week" selected>最近7天</option>
-                                                <option value="month">最近30天</option>
-                                                <option value="year">最近一年</option>
-                                                <option value="custom">自定义</option>
-                                            </select>
+                                            ${Select.render({
+                                                id: 'statisticsTimeRange',
+                                                name: 'timeRange',
+                                                options: [
+                                                    { value: 'day', label: '今天', selected: false },
+                                                    { value: 'week', label: '最近7天', selected: true },
+                                                    { value: 'month', label: '最近30天', selected: false },
+                                                    { value: 'year', label: '最近一年', selected: false },
+                                                    { value: 'custom', label: '自定义', selected: false }
+                                                ],
+                                                className: 'px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                            })}
                                         </div>
                                         
                                         <!-- 自定义日期范围（默认隐藏） -->
                                         <div id="customDateRange" class="hidden flex items-center gap-2">
-                                            <input type="date" id="statisticsStartDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                            ${Input.renderInput({
+                                                type: 'date',
+                                                id: 'statisticsStartDate',
+                                                className: 'px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                            })}
                                             <span class="text-sm text-gray-500 dark:text-gray-400">至</span>
-                                            <input type="date" id="statisticsEndDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                            ${Input.renderInput({
+                                                type: 'date',
+                                                id: 'statisticsEndDate',
+                                                className: 'px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                            })}
                                         </div>
                                         
                                         <!-- 导出按钮 -->
-                                        <button id="exportStatisticsBtn" class="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-sm hover:shadow-md">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                            </svg>
-                                            <span class="hidden sm:inline">导出数据</span>
-                                        </button>
+                                        ${Button.render({
+                                            id: 'exportStatisticsBtn',
+                                            text: '导出数据',
+                                            variant: 'primary',
+                                            icon: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
+                                            className: 'px-3 py-1.5 text-sm shadow-sm hover:shadow-md'
+                                        })}
                                     </div>
                                 </div>
                             </div>
@@ -725,22 +662,20 @@ export default class Admin {
                                 <!-- 图表区域 -->
                                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                                     <!-- 消息趋势图 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-                                        <div class="flex items-center justify-between mb-4">
-                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">消息趋势</h3>
-                                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">折线图</span>
-                                        </div>
-                                        <div id="statisticsTrendChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                    </div>
+                                    ${ChartCard.render({
+                                        title: `<div class="flex items-center justify-between"><h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">消息趋势</h3>${Badge.render({ text: "折线图", variant: "info", size: "sm" })}</div>`,
+                                        content: '<div id="statisticsTrendChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        className: 'shadow-sm hover:shadow-md transition-shadow',
+                                        height: 320
+                                    })}
                                     
                                     <!-- 用户活跃度图 -->
-                                    <div class="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-                                        <div class="flex items-center justify-between mb-4">
-                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">用户活跃度</h3>
-                                            <span class="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">柱状图</span>
-                                        </div>
-                                        <div id="statisticsUserActivityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
-                                    </div>
+                                    ${ChartCard.render({
+                                        title: '<div class="flex items-center justify-between"><h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">用户活跃度</h3><span class="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">柱状图</span></div>',
+                                        content: '<div id="statisticsUserActivityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>',
+                                        className: 'shadow-sm hover:shadow-md transition-shadow',
+                                        height: 320
+                                    })}
                                 </div>
                                 
                                 <!-- 详细数据表格 -->
@@ -784,9 +719,14 @@ export default class Admin {
                                         <!-- 群组选择 -->
                                         <div class="flex items-center gap-2">
                                             <label class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">群组：</label>
-                                            <select id="achievementGroupSelect" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                                                <option value="">请选择群组</option>
-                                            </select>
+                                            ${Select.render({
+                                                id: 'achievementGroupSelect',
+                                                name: 'achievementGroup',
+                                                options: [
+                                                    { value: '', label: '请选择群组', selected: true }
+                                                ],
+                                                className: 'px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                                            })}
                                         </div>
                                         
                                         <!-- 刷新按钮 -->
@@ -810,15 +750,13 @@ export default class Admin {
                                 <!-- 搜索框 -->
                                 <div class="mb-4">
                                     <div class="relative max-w-md">
-                                        <input 
-                                            type="text" 
-                                            id="achievementSearch" 
-                                            placeholder="搜索成就名称、描述或分类..." 
-                                            class="w-full px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                        >
-                                        <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                        </svg>
+                                        ${SearchInput.render({
+                                            id: 'achievementSearch',
+                                            name: 'achievementSearch',
+                                            placeholder: '搜索成就名称、描述或分类...',
+                                            className: 'w-full px-4 py-2 text-sm',
+                                            showClearButton: false
+                                        })}
                                     </div>
                                 </div>
                                 
@@ -955,7 +893,12 @@ export default class Admin {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">管理员秘钥</label>
-                        <input type="password" id="adminSecretKeyInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" placeholder="请输入管理员秘钥">
+                        ${Input.renderInput({
+                            type: 'password',
+                            id: 'adminSecretKeyInput',
+                            placeholder: '请输入管理员秘钥',
+                            className: 'px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                        })}
                     </div>
                 </div>
             `, `
@@ -1062,19 +1005,20 @@ export default class Admin {
     }
     
     async switchTab(tabName) {
-        // 更新按钮状态（标签页样式）
-        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-            btn.classList.remove('active', 'bg-white', 'dark:bg-gray-800', 'text-primary', 'border-primary');
-            btn.classList.add('text-gray-600', 'dark:text-gray-400', 'border-transparent');
-            btn.setAttribute('aria-selected', 'false');
+        // 更新按钮状态（标签页样式）- 兼容 Tabs 组件
+        const tabId = `tab${tabName}`;
+        document.querySelectorAll('[role="tab"]').forEach(btn => {
+            const isActive = btn.id === tabId;
+            if (isActive) {
+                btn.classList.add('bg-white', 'dark:bg-gray-800', 'text-primary', 'border-primary');
+                btn.classList.remove('text-gray-600', 'dark:text-gray-400', 'border-transparent');
+                btn.setAttribute('aria-selected', 'true');
+            } else {
+                btn.classList.remove('bg-white', 'dark:bg-gray-800', 'text-primary', 'border-primary');
+                btn.classList.add('text-gray-600', 'dark:text-gray-400', 'border-transparent');
+                btn.setAttribute('aria-selected', 'false');
+            }
         });
-        
-        const activeBtn = document.getElementById(`tab${tabName}`);
-        if (activeBtn) {
-            activeBtn.classList.add('active', 'bg-white', 'dark:bg-gray-800', 'text-primary', 'border-primary');
-            activeBtn.classList.remove('text-gray-600', 'dark:text-gray-400', 'border-transparent');
-            activeBtn.setAttribute('aria-selected', 'true');
-        }
 
         // 更新内容显示
         document.querySelectorAll('.tab-content').forEach(content => {

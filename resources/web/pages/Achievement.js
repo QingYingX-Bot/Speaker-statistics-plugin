@@ -1,6 +1,8 @@
 /**
  * 成就页面 - 现代简约风格
  */
+import { Input } from '/assets/js/components/index.js';
+
 export default class Achievement {
     constructor(app) {
         this.app = app;
@@ -121,7 +123,12 @@ export default class Achievement {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">秘钥</label>
-                        <input type="password" id="achievementSecretKeyInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入秘钥">
+                        ${Input.renderInput({
+                            type: 'password',
+                            id: 'achievementSecretKeyInput',
+                            placeholder: '请输入秘钥',
+                            className: 'px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        })}
                     </div>
                 </div>
             `, `

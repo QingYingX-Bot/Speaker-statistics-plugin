@@ -47,7 +47,7 @@ export class AdminAchievements {
         const refreshBtn = document.getElementById('refreshAchievementsBtn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                this.loadAchievements();
+                    this.loadAchievements();
             });
         }
         
@@ -191,7 +191,7 @@ export class AdminAchievements {
         
         // 默认按人数降序排序
         filtered.sort((a, b) => {
-            return (b.userCount || 0) - (a.userCount || 0);
+                    return (b.userCount || 0) - (a.userCount || 0);
         });
         
         this.filteredAchievements = filtered;
@@ -237,7 +237,7 @@ export class AdminAchievements {
                 ${this.filteredAchievements.map(achievement => {
                     const rarity = this.normalizeRarity(achievement.rarity);
                     const rarityText = this.getRarityText(achievement.rarity);
-                    const rarityColors = {
+            const rarityColors = {
                         common: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
                         uncommon: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
                         rare: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
@@ -248,8 +248,8 @@ export class AdminAchievements {
                         special: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
                     };
                     const rarityColor = rarityColors[rarity] || rarityColors.common;
-                    
-                    return `
+            
+            return `
                         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                             <!-- 标题和稀有度 -->
                             <div class="flex items-start justify-between mb-2">
@@ -278,8 +278,8 @@ export class AdminAchievements {
                         </div>
                     `;
                 }).join('')}
-            </div>
-        `;
+                </div>
+            `;
     }
     
     /**
@@ -368,7 +368,7 @@ export class AdminAchievements {
             
             // 延迟清理，确保下载已开始
             setTimeout(() => {
-                document.body.removeChild(link);
+            document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             }, 100);
             

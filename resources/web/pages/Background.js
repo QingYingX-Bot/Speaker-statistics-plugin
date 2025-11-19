@@ -1,6 +1,8 @@
 /**
  * 背景设置页面 - 使用 Cropper.js
  */
+import { Input } from '/assets/js/components/index.js';
+
 export default class Background {
     constructor(app) {
         this.app = app;
@@ -61,7 +63,12 @@ export default class Background {
                             <!-- 上传图片 -->
                             <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">上传图片</label>
-                                <input type="file" id="imageInput" accept="image/*" class="hidden">
+                                ${Input.renderInput({
+                                    type: 'file',
+                                    id: 'imageInput',
+                                    accept: 'image/*',
+                                    className: 'hidden'
+                                })}
                                 <button id="uploadBtn" class="w-full px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm font-medium flex items-center justify-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -645,7 +652,12 @@ export default class Background {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">秘钥</label>
-                        <input type="password" id="backgroundSecretKeyInput" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-gray-900 dark:text-gray-100" placeholder="请输入秘钥">
+                        ${Input.renderInput({
+                            type: 'password',
+                            id: 'backgroundSecretKeyInput',
+                            placeholder: '请输入秘钥',
+                            className: 'px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        })}
                     </div>
                 </div>
             `, `

@@ -1,6 +1,8 @@
 /**
  * 排行榜页面 - 现代简约风格
  */
+import { RankCard, Select } from '/assets/js/components/index.js';
+
 export default class Ranking {
     constructor(app) {
         this.app = app;
@@ -28,34 +30,30 @@ export default class Ranking {
                             <!-- 筛选器 -->
                             <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
                                 <div id="typeSelectContainer" class="w-full sm:w-auto sm:min-w-[140px]">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">排行榜类型</label>
-                                    <div class="relative">
-                                        <select id="typeSelect" class="select-custom w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm appearance-none cursor-pointer hover:border-gray-300 dark:hover:border-gray-600">
-                                            <option value="total">总榜</option>
-                                            <option value="daily">日榜</option>
-                                            <option value="weekly">周榜</option>
-                                            <option value="monthly">月榜</option>
-                                            <option value="yearly">年榜</option>
-                                        </select>
-                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    ${Select.render({
+                                        id: 'typeSelect',
+                                        name: 'type',
+                                        label: '排行榜类型',
+                                        options: [
+                                            { value: 'total', label: '总榜', selected: false },
+                                            { value: 'daily', label: '日榜', selected: false },
+                                            { value: 'weekly', label: '周榜', selected: false },
+                                            { value: 'monthly', label: '月榜', selected: false },
+                                            { value: 'yearly', label: '年榜', selected: false }
+                                        ],
+                                        className: 'select-custom'
+                                    })}
                                 </div>
                                 <div class="w-full sm:w-auto sm:min-w-[220px]">
-                                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">选择群聊</label>
-                                    <div class="relative">
-                                        <select id="groupSelect" class="select-custom w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm appearance-none cursor-pointer hover:border-gray-300 dark:hover:border-gray-600">
-                                            <option value="all">全部群聊</option>
-                                        </select>
-                                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    ${Select.render({
+                                        id: 'groupSelect',
+                                        name: 'group',
+                                        label: '选择群聊',
+                                        options: [
+                                            { value: 'all', label: '全部群聊', selected: true }
+                                        ],
+                                        className: 'select-custom'
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -274,50 +272,16 @@ export default class Ranking {
             const avatarUrl = getAvatarUrl(item.user_id);
             const displayName = item.nickname || `用户${item.user_id}`;
             
-            // 前三名特殊样式
-            let rankClass = 'text-gray-700 dark:text-gray-300';
-            let rankBadgeClass = 'inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-semibold';
-            let cardClass = 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700';
-            let avatarBorderClass = 'border-gray-200 dark:border-gray-700';
-            
-            if (rank === 1) {
-                rankClass = 'text-yellow-600 dark:text-yellow-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-6 h-6 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold';
-                cardClass = 'bg-yellow-50/30 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700';
-                avatarBorderClass = 'border-yellow-300 dark:border-yellow-700';
-            } else if (rank === 2) {
-                rankClass = 'text-gray-600 dark:text-gray-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold';
-                cardClass = 'bg-gray-50/30 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600';
-                avatarBorderClass = 'border-gray-300 dark:border-gray-600';
-            } else if (rank === 3) {
-                rankClass = 'text-orange-600 dark:text-orange-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-6 h-6 rounded-md bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-semibold';
-                cardClass = 'bg-orange-50/30 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700';
-                avatarBorderClass = 'border-orange-300 dark:border-orange-700';
-            }
-            
-            html += `
-                <div class="bg-white dark:bg-gray-800 rounded-lg border ${cardClass} p-3" data-user-id="${item.user_id}">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                            <span class="${rankBadgeClass} flex-shrink-0">${rank}</span>
-                            <img src="${avatarUrl}" alt="${displayName}" class="w-8 h-8 rounded-full border-2 ${avatarBorderClass} object-cover flex-shrink-0" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\'%3E%3Ccircle cx=\\'12\\' cy=\\'12\\' r=\\'10\\' fill=\\'%23f3f4f6\\'/%3E%3C/svg%3E';">
-                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate ${rank <= 3 ? 'font-semibold' : ''}">${displayName}</span>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div class="flex justify-between">
-                            <span class="text-gray-500 dark:text-gray-400">发言数</span>
-                            <span class="font-medium ${rankClass}">${formatNumber(item.count || 0)}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-500 dark:text-gray-400">字数</span>
-                            <span class="font-medium ${rankClass}">${formatNumber(item.period_words || 0)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+            // 使用 RankCard 组件渲染移动端卡片
+            html += RankCard.render({
+                rank: rank,
+                userId: item.user_id,
+                userName: displayName,
+                avatarUrl: avatarUrl,
+                count: item.count || 0,
+                words: item.period_words || 0,
+                dataUserId: item.user_id
+            });
         });
         
         html += `
@@ -348,56 +312,22 @@ export default class Ranking {
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
         `;
         
+        // 桌面端表格行也使用 RankCard 组件
         this.rankings.forEach((item, index) => {
             const rank = index + 1;
             const avatarUrl = getAvatarUrl(item.user_id);
             const displayName = item.nickname || `用户${item.user_id}`;
             
-            // 前三名特殊样式（简约版）
-            let rankClass = 'text-gray-700 dark:text-gray-300';
-            let rankBadgeClass = 'inline-flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-semibold';
-            let rowClass = 'hover:bg-gray-50 dark:hover:bg-gray-700/50';
-            let avatarBorderClass = 'border-gray-200 dark:border-gray-700';
-            
-            if (rank === 1) {
-                rankClass = 'text-yellow-600 dark:text-yellow-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-8 h-8 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold';
-                rowClass = 'hover:bg-yellow-50/30 dark:hover:bg-yellow-900/20';
-                avatarBorderClass = 'border-yellow-300 dark:border-yellow-700';
-            } else if (rank === 2) {
-                rankClass = 'text-gray-600 dark:text-gray-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold';
-                rowClass = 'hover:bg-gray-50/50 dark:hover:bg-gray-700/50';
-                avatarBorderClass = 'border-gray-300 dark:border-gray-600';
-            } else if (rank === 3) {
-                rankClass = 'text-orange-600 dark:text-orange-400';
-                rankBadgeClass = 'inline-flex items-center justify-center w-8 h-8 rounded-md bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-semibold';
-                rowClass = 'hover:bg-orange-50/30 dark:hover:bg-orange-900/20';
-                avatarBorderClass = 'border-orange-300 dark:border-orange-700';
-            }
-            
-            html += `
-                <tr class="${rowClass} transition-colors" data-user-id="${item.user_id}">
-                    <td class="px-4 py-2.5">
-                        <span class="${rankBadgeClass}">${rank}</span>
-                    </td>
-                    <td class="px-4 py-2.5">
-                        <div class="flex items-center gap-2.5">
-                            <img 
-                                src="${avatarUrl}" 
-                                alt="${displayName}"
-                                class="w-8 h-8 rounded-full border-2 ${avatarBorderClass} object-cover flex-shrink-0"
-                                onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23f3f4f6%22/%3E%3C/svg%3E'"
-                            >
-                            <span class="text-sm text-gray-900 dark:text-gray-100 font-medium truncate ${rank <= 3 ? 'font-semibold' : ''}">${displayName}</span>
-                        </div>
-                    </td>
-                    <td class="px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 text-right font-medium">${formatNumber(item.count || 0)}</td>
-                    <td class="px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 text-right font-medium">${formatNumber(item.period_words || 0)}</td>
-                    <td class="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 text-right">${formatNumber(item.active_days || 0)}</td>
-                    <td class="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 text-right">${formatNumber(item.continuous_days || 0)}</td>
-                </tr>
-            `;
+            html += RankCard.renderTableRow({
+                rank: rank,
+                userId: item.user_id,
+                userName: displayName,
+                avatarUrl: avatarUrl,
+                count: item.count || 0,
+                words: item.period_words || 0,
+                activeDays: item.active_days || 0,
+                continuousDays: item.continuous_days || 0
+            });
         });
         
         html += `
