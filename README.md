@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.41-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.42-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -115,6 +115,8 @@
 | 切换通知 | `#水群设置开启/关闭通知` | 切换成就解锁通知 |
 | 刷新成就 | `#刷新水群成就` | 刷新当前群组的所有显示成就，先卸下所有自动佩戴的成就，然后重新检查并自动佩戴符合条件的成就（史诗及以上，使用解锁时间+24小时） |
 | 刷新全群成就 | `#刷新全群水群成就` | 刷新所有群组的所有显示成就，先卸下所有自动佩戴的成就，然后重新检查并自动佩戴符合条件的成就（史诗及以上，使用解锁时间+24小时） |
+| 清理僵尸群 | `#水群清理僵尸群` | 列出所有僵尸群（数据库中存在但机器人已不在群中），等待确认清理 |
+| 确认清理 | `#水群确认清理` | 确认清理列出的僵尸群，删除所有统计数据（需先使用 `#水群清理僵尸群` 查看列表，5分钟内有效） |
 
 ---
 

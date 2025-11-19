@@ -190,6 +190,14 @@ class Plugin extends plugin {
         return await this.adminCommands.refreshAchievements(e);
     }
 
+    async cleanZombieGroups(e) {
+        return await this.adminCommands.cleanZombieGroups(e);
+    }
+
+    async confirmCleanZombieGroups(e) {
+        return await this.adminCommands.confirmCleanZombieGroups(e);
+    }
+
     // 成就相关
     async showUserAchievements(e) {
         return await this.achievementCommands.showUserAchievements(e);

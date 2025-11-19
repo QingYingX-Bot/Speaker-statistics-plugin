@@ -1,9 +1,22 @@
 {
   "name": "speaker-statistics-plugin",
-  "version": "3.1.41",
+  "version": "3.1.42",
   "description": "群聊水群统计插件 for Yunzai-Bot",
   "type": "module",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git"
+  },
+  "gitee": {
+    "type": "git",
+    "url": "https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/QingYingX-Bot/Speaker-statistics-plugin/issues",
+    "gitee": "https://gitee.com/qingyingxbot/Speaker-statistics-plugin/issues"
+  },
+  "homepage": "https://gitee.com/qingyingxbot/Speaker-statistics-plugin#readme",
   "dependencies": {
     "better-sqlite3": "^12.4.1",
     "express": "^5.1.0",
@@ -19,6 +32,9 @@
     "yunzai-bot",
     "plugin",
     "statistics",
-    "postgresql"
+    "postgresql",
+    "sqlite",
+    "achievement",
+    "ranking"
   ]
 }

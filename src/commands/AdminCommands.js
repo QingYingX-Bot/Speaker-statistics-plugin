@@ -6,6 +6,7 @@ import { PathResolver } from '../core/utils/PathResolver.js';
 import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
 import { AchievementUtils } from '../core/utils/AchievementUtils.js';
+import common from '../../../../lib/common/common.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -13,6 +14,9 @@ import path from 'path';
  * 管理员命令处理类
  */
 class AdminCommands {
+    // 存储待清理的僵尸群列表，key: userId, value: { groups: [], timestamp: number }
+    static pendingCleanGroups = new Map();
+
     constructor(dataService = null) {
         this.dataService = dataService || new DataService();
         this.achievementService = new AchievementService(this.dataService);
@@ -42,6 +46,14 @@ class AdminCommands {
             {
                 reg: '^#刷新(全群)?水群成就$',
                 fnc: 'refreshAchievements'
+            },
+            {
+                reg: '^#水群清理僵尸群$',
+                fnc: 'cleanZombieGroups'
+            },
+            {
+                reg: '^#水群确认清理$',
+                fnc: 'confirmCleanZombieGroups'
             }
         ];
     }
@@ -296,10 +308,10 @@ class AdminCommands {
         const result = await this.processGroupAchievements(groupId, allDisplayAchievements);
         
         // 构建合并转发消息
-        const forwardMsg = [
-            {
-                message: `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
-            }
+        const msg = [
+            [
+                `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
+            ]
         ];
         
         // 如果有错误，添加到转发消息中
@@ -311,17 +323,11 @@ class AdminCommands {
                 errorMsg += result.errors.slice(0, 10).map(err => `  - ${err}`).join('\n');
                 errorMsg += `\n  ... 还有 ${result.errors.length - 10} 个错误`;
             }
-            forwardMsg.push({ message: errorMsg });
+            msg.push([errorMsg]);
         }
         
         // 发送合并转发消息
-        if (e.group && e.group.makeForwardMsg) {
-            return e.reply(await e.group.makeForwardMsg(forwardMsg));
-        } else {
-            // 如果不是群聊，直接发送文本消息
-            const textMsg = forwardMsg.map(msg => msg.message).join('');
-            return e.reply(textMsg);
-        }
+        return e.reply(common.makeForwardMsg(e, msg, `群组 ${maskedGroupId} 成就刷新完成`));
     }
 
     /**
@@ -384,10 +390,10 @@ class AdminCommands {
         }
         
         // 构建合并转发消息
-        const forwardMsg = [
-            {
-                message: `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
-            }
+        const msg = [
+            [
+                `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
+            ]
         ];
         
         // 显示各群组统计（拆分成多条消息，每条最多10个群组）
@@ -407,7 +413,7 @@ class AdminCommands {
                 if (i + chunkSize < groupResults.length) {
                     groupDetailMsg += `  ... 还有 ${groupResults.length - i - chunkSize} 个群组\n`;
                 }
-                forwardMsg.push({ message: groupDetailMsg });
+                msg.push([groupDetailMsg]);
             }
         }
         
@@ -421,18 +427,12 @@ class AdminCommands {
                 if (i + errorChunkSize < allErrors.length) {
                     errorMsg += `\n  ... 还有 ${allErrors.length - i - errorChunkSize} 个错误`;
                 }
-                forwardMsg.push({ message: errorMsg });
+                msg.push([errorMsg]);
             }
         }
         
         // 发送合并转发消息
-        if (e.group && e.group.makeForwardMsg) {
-            return e.reply(await e.group.makeForwardMsg(forwardMsg));
-        } else {
-            // 如果不是群聊，直接发送文本消息
-            const textMsg = forwardMsg.map(msg => msg.message).join('');
-            return e.reply(textMsg);
-        }
+        return e.reply(common.makeForwardMsg(e, msg, '所有群组成就刷新完成'));
     }
 
     /**
@@ -692,6 +692,200 @@ class AdminCommands {
             autoWornCount,
             errors
         };
+    }
+
+    /**
+     * 清理僵尸群（列出待清理的群组，等待确认）
+     */
+    async cleanZombieGroups(e) {
+        // 验证管理员权限
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const userId = String(e.user_id);
+                
+                // 获取机器人当前所在的所有群组（Bot.gl）
+                const currentGroups = new Set();
+                if (global.Bot && global.Bot.gl) {
+                    for (const [groupId] of global.Bot.gl) {
+                        // 排除标准输入
+                        if (groupId !== 'stdin') {
+                            currentGroups.add(String(groupId));
+                        }
+                    }
+                }
+                
+                // 查询数据库中的所有群组信息
+                const allGroups = await this.dataService.dbService.all(
+                    'SELECT group_id, group_name, updated_at FROM group_info ORDER BY updated_at ASC'
+                );
+                
+                if (!allGroups || allGroups.length === 0) {
+                    return e.reply('✅ 没有找到任何群组数据');
+                }
+                
+                // 筛选僵尸群：数据库中存在，但不在 Bot.gl 中
+                const zombieGroups = [];
+                const now = TimeUtils.getUTC8Date();
+                
+                for (const group of allGroups) {
+                    const groupId = String(group.group_id);
+                    
+                    // 如果不在当前群列表中，就是僵尸群
+                    if (!currentGroups.has(groupId)) {
+                        let updatedAt;
+                        if (group.updated_at instanceof Date) {
+                            updatedAt = group.updated_at;
+                        } else if (typeof group.updated_at === 'string') {
+                            updatedAt = new Date(group.updated_at);
+                        } else {
+                            updatedAt = new Date();
+                        }
+                        
+                        const daysAgo = Math.floor((now.getTime() - updatedAt.getTime()) / (24 * 60 * 60 * 1000));
+                        
+                        zombieGroups.push({
+                            groupId: group.group_id,
+                            groupName: group.group_name || group.group_id,
+                            updatedAt: TimeUtils.formatDateTime(updatedAt),
+                            daysAgo
+                        });
+                    }
+                }
+                
+                if (zombieGroups.length === 0) {
+                    return e.reply('✅ 没有找到僵尸群（所有数据库中的群组都在当前群列表中）');
+                }
+                
+                // 保存待清理的群组列表（5分钟内有效）
+                AdminCommands.pendingCleanGroups.set(userId, {
+                    groups: zombieGroups,
+                    timestamp: Date.now()
+                });
+                
+                // 构建合并转发消息
+                const msg = [
+                    [
+                        `🔍 找到 ${zombieGroups.length} 个僵尸群（数据库中存在但机器人已不在群中）\n\n⚠️ 警告：清理操作将删除这些群组的所有统计数据（用户统计、日统计、周统计、月统计、年统计、成就数据等）\n\n💡 如需清理，请发送：\n#水群确认清理\n\n⏰ 确认有效期为5分钟`
+                    ]
+                ];
+                
+                // 分批显示群组信息，每批15个
+                const batchSize = 15;
+                for (let i = 0; i < zombieGroups.length; i += batchSize) {
+                    const batch = zombieGroups.slice(i, i + batchSize);
+                    let batchText = `📋 群组列表 ${Math.floor(i / batchSize) + 1}：\n\n`;
+                    
+                    batch.forEach((group, index) => {
+                        const groupIndex = i + index + 1;
+                        const maskedGroupId = CommonUtils.maskGroupId(group.groupId);
+                        batchText += `${groupIndex}. ${group.groupName} (${maskedGroupId})\n`;
+                        batchText += `   最后更新: ${group.updatedAt} (${group.daysAgo}天前)\n\n`;
+                    });
+                    
+                    if (i + batchSize < zombieGroups.length) {
+                        batchText += `... 还有 ${zombieGroups.length - i - batchSize} 个群组\n`;
+                    }
+                    
+                    msg.push([batchText]);
+                }
+                
+                // 发送合并转发消息
+                return e.reply(common.makeForwardMsg(e, msg, '僵尸群列表'));
+            },
+            '清理僵尸群失败',
+            () => e.reply('查询失败，请稍后重试')
+        );
+    }
+
+    /**
+     * 确认清理僵尸群
+     */
+    async confirmCleanZombieGroups(e) {
+        // 验证管理员权限
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const userId = String(e.user_id);
+                
+                // 检查是否有待清理的群组列表
+                const pendingData = AdminCommands.pendingCleanGroups.get(userId);
+                if (!pendingData) {
+                    return e.reply('❌ 没有待清理的群组列表，请先使用 #水群清理僵尸群 查看');
+                }
+                
+                // 检查是否过期（5分钟）
+                const now = Date.now();
+                if (now - pendingData.timestamp > 5 * 60 * 1000) {
+                    AdminCommands.pendingCleanGroups.delete(userId);
+                    return e.reply('❌ 确认已过期，请重新使用 #水群清理僵尸群 查看');
+                }
+                
+                const zombieGroups = pendingData.groups;
+                if (!zombieGroups || zombieGroups.length === 0) {
+                    AdminCommands.pendingCleanGroups.delete(userId);
+                    return e.reply('❌ 待清理的群组列表为空');
+                }
+                
+                await e.reply(`🔄 开始清理 ${zombieGroups.length} 个僵尸群...`);
+                
+                let successCount = 0;
+                let failCount = 0;
+                const errors = [];
+                
+                // 逐个清理群组
+                for (const group of zombieGroups) {
+                    try {
+                        const success = await this.dataService.clearGroupStats(group.groupId);
+                        if (success) {
+                            successCount++;
+                            if (globalConfig.getConfig('global.debugLog')) {
+                                globalConfig.debug(`成功清理僵尸群: ${group.groupId}`);
+                            }
+                        } else {
+                            failCount++;
+                            errors.push(`${group.groupName} (${CommonUtils.maskGroupId(group.groupId)}): 清理失败`);
+                        }
+                    } catch (error) {
+                        failCount++;
+                        const maskedGroupId = CommonUtils.maskGroupId(group.groupId);
+                        errors.push(`${group.groupName} (${maskedGroupId}): ${error.message || '未知错误'}`);
+                        globalConfig.error(`清理僵尸群失败: ${group.groupId}`, error);
+                    }
+                }
+                
+                // 清除待清理列表
+                AdminCommands.pendingCleanGroups.delete(userId);
+                
+                // 构建合并转发消息
+                const msg = [
+                    [
+                        `✅ 僵尸群清理完成\n\n📊 统计信息：\n- 成功清理: ${successCount} 个\n- 清理失败: ${failCount} 个`
+                    ]
+                ];
+                
+                // 如果有错误，添加到转发消息中
+                if (errors.length > 0) {
+                    const errorChunkSize = 10; // 每条消息最多显示10个错误
+                    for (let i = 0; i < errors.length; i += errorChunkSize) {
+                        const chunk = errors.slice(i, i + errorChunkSize);
+                        let errorMsg = `⚠️ 错误信息 ${Math.floor(i / errorChunkSize) + 1} (共 ${errors.length} 个)：\n`;
+                        errorMsg += chunk.map(err => `- ${err}`).join('\n');
+                        if (i + errorChunkSize < errors.length) {
+                            errorMsg += `\n... 还有 ${errors.length - i - errorChunkSize} 个错误`;
+                        }
+                        msg.push([errorMsg]);
+                    }
+                }
+                
+                // 发送合并转发消息
+                return e.reply(common.makeForwardMsg(e, msg, '僵尸群清理完成'));
+            },
+            '确认清理失败',
+            () => e.reply('清理失败，请稍后重试')
+        );
     }
 
 }

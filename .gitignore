@@ -25,7 +25,6 @@ data/achievements/group/**/*.json
 *.db-wal
 *.db-shm
 *.log
-.DS_Store
 *.tmp
 *.swp
 *.swo
