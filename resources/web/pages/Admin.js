@@ -4,6 +4,8 @@
 import { AdminOverview } from './admin/AdminOverview.js';
 import { AdminGroups } from './admin/AdminGroups.js';
 import { AdminUsers } from './admin/AdminUsers.js';
+import { AdminStatistics } from './admin/AdminStatistics.js';
+import { AdminAchievements } from './admin/AdminAchievements.js';
 
 export default class Admin {
     constructor(app) {
@@ -26,7 +28,9 @@ export default class Admin {
         this.loading = {
             overview: false,
             groups: false,
-            users: false
+            users: false,
+            statistics: false,
+            achievements: false
         };
         // 配置数据
         this.globalConfig = null;
@@ -36,6 +40,8 @@ export default class Admin {
         this.overviewModule = new AdminOverview(this);
         this.groupsModule = new AdminGroups(this);
         this.usersModule = new AdminUsers(this);
+        this.statisticsModule = new AdminStatistics(this);
+        this.achievementsModule = new AdminAchievements(this);
     }
     
     async render() {
@@ -86,6 +92,32 @@ export default class Admin {
                                         <span>用户管理</span>
                                     </span>
                                 </button>
+                                <button 
+                                    id="tabStatistics" 
+                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
+                                    role="tab"
+                                    aria-selected="false"
+                                >
+                                    <span class="flex items-center space-x-1 sm:space-x-2">
+                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                        </svg>
+                                        <span>数据统计</span>
+                                    </span>
+                                </button>
+                                <button 
+                                    id="tabAchievements" 
+                                    class="admin-tab-btn relative px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 border-b-2 border-transparent whitespace-nowrap flex-shrink-0"
+                                    role="tab"
+                                    aria-selected="false"
+                                >
+                                    <span class="flex items-center space-x-1 sm:space-x-2">
+                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                                        </svg>
+                                        <span>成就管理</span>
+                                    </span>
+                                </button>
                             </nav>
                             <!-- 右侧操作按钮 -->
                             <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
@@ -107,7 +139,7 @@ export default class Admin {
                 <!-- 标签页内容区域 -->
                 <div class="flex-1 overflow-hidden flex flex-col bg-white dark:bg-gray-800">
                     <!-- 概览标签页 -->
-                    <div id="contentOverview" class="tab-content h-full overflow-y-auto">
+                    <div id="contentOverview" class="tab-content h-full overflow-y-scroll">
                         <div class="px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
                             <!-- 统计卡片 -->
                             <div class="mb-6 sm:mb-8">
@@ -325,7 +357,7 @@ export default class Admin {
                                             </div>
                                         </div>
                                 <!-- 群列表 -->
-                                <div class="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">
+                                <div class="flex-1 overflow-y-scroll p-3 sm:p-4 min-h-0">
                                     <div id="groupsList" class="space-y-2">
                                         ${Loading.render({ text: '加载中...', size: 'medium', className: 'py-8' })}
                                     </div>
@@ -334,7 +366,7 @@ export default class Admin {
                                                     
                             <!-- 右侧：群详情和管理 -->
                             <div class="flex-1 overflow-hidden flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 h-full lg:h-auto">
-                                <div id="groupDetailPanel" class="flex-1 overflow-y-auto min-h-0">
+                                <div id="groupDetailPanel" class="flex-1 overflow-y-scroll min-h-0">
                                     <!-- 空状态 -->
                                     <div class="empty-state flex flex-col items-center justify-center h-full min-h-[400px] px-4">
                                         <div class="w-24 h-24 mb-6 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-2xl flex items-center justify-center shadow-inner">
@@ -401,7 +433,7 @@ export default class Admin {
                                                     </div>
                                         
                                         <!-- 内容区域 -->
-                                        <div class="flex-1 overflow-y-auto">
+                                        <div class="flex-1 overflow-y-scroll">
                                             <div class="p-3 sm:p-4 space-y-4">
                                                 <!-- 统计概览 -->
                                                 <section id="groupStatsSection">
@@ -461,7 +493,7 @@ export default class Admin {
                                     </div>
                                 </div>
                                 <!-- 用户列表 -->
-                                <div class="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">
+                                <div class="flex-1 overflow-y-scroll p-3 sm:p-4 min-h-0">
                                     <div id="usersList" class="space-y-2">
                                         ${Loading.render({ text: '加载中...', size: 'medium', className: 'py-8' })}
                                                 </div>
@@ -470,7 +502,7 @@ export default class Admin {
                                         
                                         <!-- 右侧：用户详情 -->
                             <div class="flex-1 overflow-hidden flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 h-full lg:h-auto">
-                                <div id="userDetailPanel" class="flex-1 overflow-y-auto min-h-0 lg:!block hidden">
+                                <div id="userDetailPanel" class="flex-1 overflow-y-scroll min-h-0 lg:!block hidden">
                                     <!-- 空状态 -->
                                     <div class="empty-state flex flex-col items-center justify-center h-full min-h-[400px] px-4">
                                         <div class="w-20 h-20 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
@@ -498,12 +530,12 @@ export default class Admin {
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                                                         </svg>
                                                     </button>
-                                                    <div class="flex-1 min-w-0">
+                                                <div class="flex-1 min-w-0">
                                                         <h3 id="userDetailTitle" class="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 truncate"></h3>
-                                                        <p id="userDetailId" class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1"></p>
-                                                    </div>
-                                                    <span id="userDetailRoleBadge" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold rounded-full flex-shrink-0"></span>
+                                                    <p id="userDetailId" class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1"></p>
                                                 </div>
+                                                    <span id="userDetailRoleBadge" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold rounded-full flex-shrink-0"></span>
+                                            </div>
                                                 <div class="flex items-center gap-2 flex-wrap">
                                                     <div class="relative flex-1 sm:flex-none">
                                                     <select 
@@ -528,10 +560,11 @@ export default class Admin {
                                                 >
                                                     清除
                                                 </button>
+                                                </div>
                                             </div>
                                                         </div>
                                                         
-                                        <div class="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
+                                        <div class="flex-1 overflow-y-scroll p-3 sm:p-4 lg:p-6">
                                             <!-- 统计卡片 -->
                                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                                                 <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 sm:p-4 border border-gray-200 dark:border-gray-700">
@@ -570,7 +603,7 @@ export default class Admin {
                                                     <h4 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">所在群聊</h4>
                                                     <span id="userGroupsCount" class="text-xs text-gray-500 dark:text-gray-400"></span>
                                                         </div>
-                                                <div id="userGroupsList" class="space-y-2 overflow-y-auto custom-scrollbar">
+                                                <div id="userGroupsList" class="space-y-2 overflow-y-scroll custom-scrollbar">
                                                     ${Loading.render({ text: '加载中...', size: 'small', className: 'py-8' })}
                                                 </div>
                                             </div>
@@ -581,6 +614,234 @@ export default class Admin {
                                                         </div>
                                                     </div>
                                                     
+                    <!-- 数据统计标签页 -->
+                    <div id="contentStatistics" class="tab-content hidden h-full overflow-y-scroll">
+                        <div class="px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+                            <!-- 页面标题和筛选器 -->
+                            <div class="mb-6 sm:mb-8">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                    <h2 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">数据统计</h2>
+                                    
+                                    <!-- 时间范围选择器 -->
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">时间范围：</label>
+                                            <select id="statisticsTimeRange" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <option value="day">今天</option>
+                                                <option value="week" selected>最近7天</option>
+                                                <option value="month">最近30天</option>
+                                                <option value="year">最近一年</option>
+                                                <option value="custom">自定义</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- 自定义日期范围（默认隐藏） -->
+                                        <div id="customDateRange" class="hidden flex items-center gap-2">
+                                            <input type="date" id="statisticsStartDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">至</span>
+                                            <input type="date" id="statisticsEndDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        </div>
+                                        
+                                        <!-- 导出按钮 -->
+                                        <button id="exportStatisticsBtn" class="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-sm hover:shadow-md">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <span class="hidden sm:inline">导出数据</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 加载状态 -->
+                            <div id="statisticsLoading" class="hidden flex items-center justify-center py-12">
+                                <div class="text-center">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 统计内容 -->
+                            <div id="statisticsContent" class="space-y-6">
+                                <!-- 统计卡片 -->
+                                <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                                    <!-- 总消息数 -->
+                                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg sm:rounded-xl p-4 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-xs font-medium text-blue-600 dark:text-blue-400">总消息数</p>
+                                            <div class="w-8 h-8 bg-blue-500/20 dark:bg-blue-500/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <p id="statTotalMessages" class="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100 mb-1">-</p>
+                                        <p class="text-xs text-blue-600 dark:text-blue-400">较上期 <span id="statMessagesChange" class="font-medium">-</span></p>
+                                    </div>
+                                    
+                                    <!-- 总字数 -->
+                                    <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-lg sm:rounded-xl p-4 border border-green-200 dark:border-green-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-xs font-medium text-green-600 dark:text-green-400">总字数</p>
+                                            <div class="w-8 h-8 bg-green-500/20 dark:bg-green-500/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <p id="statTotalWords" class="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100 mb-1">-</p>
+                                        <p class="text-xs text-green-600 dark:text-green-400">较上期 <span id="statWordsChange" class="font-medium">-</span></p>
+                                    </div>
+                                    
+                                    <!-- 活跃用户数 -->
+                                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-lg sm:rounded-xl p-4 border border-purple-200 dark:border-purple-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-xs font-medium text-purple-600 dark:text-purple-400">活跃用户</p>
+                                            <div class="w-8 h-8 bg-purple-500/20 dark:bg-purple-500/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <p id="statActiveUsers" class="text-xl sm:text-2xl font-bold text-purple-900 dark:text-purple-100 mb-1">-</p>
+                                        <p class="text-xs text-purple-600 dark:text-purple-400">较上期 <span id="statUsersChange" class="font-medium">-</span></p>
+                                    </div>
+                                    
+                                    <!-- 活跃群数 -->
+                                    <div class="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-lg sm:rounded-xl p-4 border border-orange-200 dark:border-orange-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-xs font-medium text-orange-600 dark:text-orange-400">活跃群数</p>
+                                            <div class="w-8 h-8 bg-orange-500/20 dark:bg-orange-500/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <p id="statActiveGroups" class="text-xl sm:text-2xl font-bold text-orange-900 dark:text-orange-100 mb-1">-</p>
+                                        <p class="text-xs text-orange-600 dark:text-orange-400">较上期 <span id="statGroupsChange" class="font-medium">-</span></p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 图表区域 -->
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                                    <!-- 消息趋势图 -->
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">消息趋势</h3>
+                                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">折线图</span>
+                                        </div>
+                                        <div id="statisticsTrendChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
+                                    </div>
+                                    
+                                    <!-- 用户活跃度图 -->
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">用户活跃度</h3>
+                                            <span class="px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full">柱状图</span>
+                                        </div>
+                                        <div id="statisticsUserActivityChart" class="w-full" style="height: 320px; min-height: 320px;"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 详细数据表格 -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                                    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">详细数据</h3>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead class="bg-gray-50 dark:bg-gray-900">
+                                                <tr>
+                                                    <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">日期</th>
+                                                    <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">消息数</th>
+                                                    <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">字数</th>
+                                                    <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">活跃用户</th>
+                                                    <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">活跃群数</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="statisticsTableBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                <tr>
+                                                    <td colspan="5" class="px-4 sm:px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">暂无数据</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 成就管理标签页 -->
+                    <div id="contentAchievements" class="tab-content hidden h-full overflow-y-scroll">
+                        <div class="px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+                            <!-- 页面标题和筛选器 -->
+                            <div class="mb-6 sm:mb-8">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                    <h2 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">成就管理</h2>
+                                    
+                                    <!-- 筛选和操作按钮 -->
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <!-- 群组选择 -->
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">群组：</label>
+                                            <select id="achievementGroupSelect" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                                                <option value="">请选择群组</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- 刷新按钮 -->
+                                        <button id="refreshAchievementsBtn" class="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors flex items-center gap-2 shadow-sm hover:shadow-md">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            <span class="hidden sm:inline">刷新</span>
+                                        </button>
+                                        
+                                        <!-- 导出按钮 -->
+                                        <button id="exportAchievementsBtn" class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2 shadow-sm hover:shadow-md">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <span class="hidden sm:inline">导出</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- 搜索框 -->
+                                <div class="mb-4">
+                                    <div class="relative max-w-md">
+                                        <input 
+                                            type="text" 
+                                            id="achievementSearch" 
+                                            placeholder="搜索成就名称、描述或分类..." 
+                                            class="w-full px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        >
+                                        <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                
+                                <!-- 统计信息 -->
+                                <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <span id="achievementListCount">共 <span>0</span> 个成就</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 加载状态 -->
+                            <div id="achievementsLoading" class="hidden flex items-center justify-center py-12">
+                                <div class="text-center">
+                                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 成就列表 -->
+                            <div id="achievementsList" class="space-y-4">
+                                <!-- 成就列表将在这里动态生成 -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -762,7 +1023,7 @@ export default class Admin {
         }
         
         // 标签页切换
-        const tabs = ['Overview', 'Groups', 'Users'];
+        const tabs = ['Overview', 'Groups', 'Users', 'Statistics', 'Achievements'];
         tabs.forEach(tab => {
             const tabBtn = document.getElementById(`tab${tab}`);
             const content = document.getElementById(`content${tab}`);
@@ -862,7 +1123,7 @@ export default class Admin {
             }
         } else if (tabName === 'Users') {
             if (this.users.length === 0) {
-                await this.usersModule.loadUsers();
+            await this.usersModule.loadUsers();
             }
             // 确保移动端详情面板初始状态正确
             if (window.innerWidth < 1024) {
@@ -872,10 +1133,74 @@ export default class Admin {
                 }
                 this.usersModule.initMobileLayout();
             }
+        } else if (tabName === 'Statistics') {
+            // 初始化数据统计页面
+            if (!this.statisticsModule.initialized) {
+                this.statisticsModule.initialized = true;
+                this.statisticsModule.initEventListeners();
+            }
+            // 初始化图表（每次切换都尝试初始化，确保图表容器可见）
+            setTimeout(() => {
+                this.statisticsModule.initCharts();
+                // 如果图表已存在，调整大小
+                if (this.statisticsModule.trendChart) {
+                    setTimeout(() => this.statisticsModule.trendChart.resize(), 100);
+                }
+                if (this.statisticsModule.userActivityChart) {
+                    setTimeout(() => this.statisticsModule.userActivityChart.resize(), 100);
+                }
+            }, 100);
+            // 加载统计数据
+            await this.statisticsModule.loadStatistics();
+        } else if (tabName === 'Achievements') {
+            // 初始化成就管理页面
+            if (!this.achievementsModule.initialized) {
+                this.achievementsModule.initialized = true;
+                this.achievementsModule.initEventListeners();
+                
+                // 加载群组列表到下拉框
+                if (this.groups.length === 0) {
+                    await this.groupsModule.loadGroups();
+                }
+                this.updateAchievementGroupSelect();
+                
+                // 如果有群组，默认加载第一个群组的成就数据
+                if (this.groups.length > 0) {
+                    await this.achievementsModule.loadAchievements();
+                }
+            }
         }
         
         // 初始化当前标签页的下拉框
-        this.initCustomSelectsForActiveTab();
+            this.initCustomSelectsForActiveTab();
+    }
+    
+    /**
+     * 更新成就管理页面的群组选择下拉框
+     */
+    updateAchievementGroupSelect() {
+        const groupSelect = document.getElementById('achievementGroupSelect');
+        if (!groupSelect) return;
+        
+        // 清空现有选项
+        groupSelect.innerHTML = '<option value="">请选择群组</option>';
+        
+        // 添加群组选项
+        this.groups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.group_id;
+            option.textContent = group.group_name || `群${group.group_id}`;
+            groupSelect.appendChild(option);
+        });
+        
+        // 设置默认值为第一个群组
+        if (this.groups.length > 0) {
+            groupSelect.value = this.groups[0].group_id;
+            // 触发成就模块更新选中的群组ID
+            if (this.achievementsModule) {
+                this.achievementsModule.selectedGroupId = this.groups[0].group_id;
+            }
+        }
     }
     
     async loadData() {

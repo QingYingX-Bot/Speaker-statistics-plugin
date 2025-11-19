@@ -973,7 +973,7 @@ class DataService {
                 this.getGroupIds(),
                 this.dbService.getAllGroupsInfoBatch()
             ]);
-
+            
             let totalGroups = 0;
             let totalUsersSet = new Set(); // 使用 Set 来避免重复计算用户
             let totalMessages = 0;

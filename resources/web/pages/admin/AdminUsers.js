@@ -53,10 +53,10 @@ export class AdminUsers {
         
         // 默认按名称排序
         filtered.sort((a, b) => {
-            const nameA = (a.username || a.userId || '').toLowerCase();
-            const nameB = (b.username || b.userId || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-        });
+                const nameA = (a.username || a.userId || '').toLowerCase();
+                const nameB = (b.username || b.userId || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
         
         this.filteredUsers = filtered;
         this.updateUsersList();
@@ -102,47 +102,47 @@ export class AdminUsers {
             const roleText = user.role === 'admin' ? '管理员' : '普通用户';
             const roleClass = user.role === 'admin' ? 'user-role-admin' : 'user-role-user';
             
-            return `
-                <div 
+                    return `
+                        <div 
                     class="user-list-item ${isSelected ? 'user-list-item-selected' : ''}"
-                    data-user-id="${user.userId}"
-                >
+                            data-user-id="${user.userId}"
+                        >
                     <div class="user-list-item-content">
                         <div class="user-list-item-icon ${roleClass}">
                             <span class="user-list-item-icon-text">${user.role === 'admin' ? 'A' : 'U'}</span>
-                        </div>
+                                </div>
                         <div class="user-list-item-info">
                             <div class="user-list-item-name">${this.escapeHtml(userName)}</div>
                             <div class="user-list-item-meta">
                                 <span class="user-list-item-role ${roleClass}">${roleText}</span>
                                 ${user.createdAt ? `<span class="user-list-item-date">${user.createdAt.split(' ')[0]}</span>` : ''}
+                                </div>
                             </div>
-                        </div>
-                        ${isSelected ? `
+                            ${isSelected ? `
                             <div class="user-list-item-check">
                                 <svg fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                                 </svg>
                             </div>
-                        ` : `
+                            ` : `
                             <div class="user-list-item-arrow">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                 </svg>
                             </div>
-                        `}
+                            `}
                     </div>
-                </div>
-            `;
-        }).join('');
-        
+                        </div>
+                    `;
+                }).join('');
+                
         // 绑定点击事件
         usersListEl.querySelectorAll('.user-list-item').forEach(item => {
             item.addEventListener('click', () => {
                 const userId = item.dataset.userId;
-                this.selectUser(userId);
-            });
-        });
+                        this.selectUser(userId);
+                    });
+                });
     }
     
     /**
@@ -162,9 +162,9 @@ export class AdminUsers {
             await this.loadUserDetail(userId);
         } else {
             // PC端更新列表显示选中状态
-            this.updateUsersList();
-            await this.loadUserDetail(userId);
-        }
+        this.updateUsersList();
+        await this.loadUserDetail(userId);
+    }
     }
     
     /**
@@ -369,11 +369,11 @@ export class AdminUsers {
         if (!roleBadgeEl) return;
         
         const user = this.admin.selectedUserData.user;
-        const isAdmin = user?.role === 'admin';
-        roleBadgeEl.textContent = isAdmin ? '管理员' : '普通用户';
+            const isAdmin = user?.role === 'admin';
+            roleBadgeEl.textContent = isAdmin ? '管理员' : '普通用户';
         roleBadgeEl.className = `user-role-badge ${isAdmin ? 'user-role-badge-admin' : 'user-role-badge-user'}`;
-    }
-    
+        }
+        
     /**
      * 更新时间信息
      */
@@ -435,9 +435,9 @@ export class AdminUsers {
         if (roleSelectEl._customSelectInstance) {
             roleSelectEl._customSelectInstance.updateButtonText();
             roleSelectEl._customSelectInstance.highlightSelected();
+            }
         }
-    }
-    
+        
     /**
      * 更新群列表
      */
@@ -447,17 +447,17 @@ export class AdminUsers {
         
         if (!groupsListEl) return;
         
-        if (this.admin.selectedUserData.groups && this.admin.selectedUserData.groups.length > 0) {
-            if (groupsCountEl) {
-                groupsCountEl.textContent = `共 ${this.admin.selectedUserData.groups.length} 个群`;
-            }
-            
-            groupsListEl.innerHTML = this.admin.selectedUserData.groups.map((group, index) => {
-                const stats = group.stats || {};
-                const messageCount = parseInt(stats.total_count || 0, 10);
-                const wordCount = parseInt(stats.total_words || 0, 10);
-                const rank = stats.rank || null;
-                const hasData = messageCount > 0 || wordCount > 0;
+            if (this.admin.selectedUserData.groups && this.admin.selectedUserData.groups.length > 0) {
+                if (groupsCountEl) {
+                    groupsCountEl.textContent = `共 ${this.admin.selectedUserData.groups.length} 个群`;
+                }
+                
+                groupsListEl.innerHTML = this.admin.selectedUserData.groups.map((group, index) => {
+                    const stats = group.stats || {};
+                    const messageCount = parseInt(stats.total_count || 0, 10);
+                    const wordCount = parseInt(stats.total_words || 0, 10);
+                    const rank = stats.rank || null;
+                    const hasData = messageCount > 0 || wordCount > 0;
                 const groupName = group.group_name || `群${group.group_id}`;
                 
                 // 排名样式
@@ -477,8 +477,8 @@ export class AdminUsers {
                     rankBadgeClass = 'user-group-rank-badge user-group-rank-badge-default';
                     rankBadgeContent = rank.toString();
                 }
-                
-                return `
+                    
+                    return `
                     <div class="user-group-item">
                         <div class="user-group-item-header">
                             <div class="user-group-item-info">
@@ -502,16 +502,16 @@ export class AdminUsers {
                             <div class="user-group-item-stat">
                                 <span class="user-group-item-stat-label">字数:</span>
                                 <span class="user-group-item-stat-value ${hasData ? '' : 'user-group-item-stat-value-empty'}">${formatNumber(wordCount)}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            if (groupsCountEl) {
-                groupsCountEl.textContent = '';
-            }
-            groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-12">该用户不在任何群中</p>';
+                    `;
+                }).join('');
+            } else {
+                if (groupsCountEl) {
+                    groupsCountEl.textContent = '';
+                }
+                groupsListEl.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-12">该用户不在任何群中</p>';
         }
     }
     

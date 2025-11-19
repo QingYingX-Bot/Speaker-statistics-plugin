@@ -1,5 +1,126 @@
 /* ==================== 工具类和滚动条样式 ==================== */
 
+/* 全局滚动条样式 - 美化且始终显示 */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(74, 144, 226, 0.6) rgba(248, 249, 250, 0.3);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    display: block !important;
+}
+
+*::-webkit-scrollbar-track {
+    background: rgba(248, 249, 250, 0.6);
+    border-radius: 10px;
+    margin: 2px;
+    border: 1px solid rgba(222, 226, 230, 0.3);
+}
+
+.dark *::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.6);
+    border-color: rgba(55, 65, 81, 0.3);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.7) 0%, rgba(53, 122, 189, 0.8) 50%, rgba(46, 109, 164, 0.9) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 0 3px rgba(74, 144, 226, 0.2);
+    transition: all 0.2s ease;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(91, 163, 245, 0.7) 0%, rgba(74, 144, 226, 0.8) 50%, rgba(53, 122, 189, 0.9) 100%);
+    box-shadow: 0 0 3px rgba(91, 163, 245, 0.3);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 0.9) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.4);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.9) 0%, rgba(53, 122, 189, 1) 50%, rgba(46, 109, 164, 1) 100%);
+    box-shadow: 0 0 5px rgba(91, 163, 245, 0.5);
+}
+
+*::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(46, 109, 164, 1) 0%, rgba(30, 77, 122, 1) 50%, rgba(13, 45, 74, 1) 100%);
+    box-shadow: 0 0 7px rgba(74, 144, 226, 0.6);
+}
+
+.dark *::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 1) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 7px rgba(91, 163, 245, 0.7);
+}
+
+/* 确保特定元素始终显示滚动条 */
+.tab-content::-webkit-scrollbar,
+#achievementsList::-webkit-scrollbar,
+#groupRankingList::-webkit-scrollbar,
+#userRankingList::-webkit-scrollbar,
+#groupDetailPanel::-webkit-scrollbar,
+#userDetailPanel::-webkit-scrollbar,
+#userGroupsList::-webkit-scrollbar {
+    display: block !important;
+}
+
+/* tab-content 滚动条样式 */
+.tab-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(74, 144, 226, 0.7) rgba(248, 249, 250, 0.8);
+}
+
+.dark .tab-content {
+    scrollbar-color: rgba(91, 163, 245, 0.7) rgba(31, 41, 55, 0.8);
+}
+
+.tab-content::-webkit-scrollbar {
+    width: 10px;
+    display: block !important;
+}
+
+.tab-content::-webkit-scrollbar-track {
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 10px;
+    margin: 2px;
+    border: 1px solid rgba(222, 226, 230, 0.5);
+}
+
+.dark .tab-content::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(55, 65, 81, 0.5);
+}
+
+.tab-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.7) 0%, rgba(53, 122, 189, 0.8) 50%, rgba(46, 109, 164, 0.9) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 0 4px rgba(74, 144, 226, 0.2);
+    transition: all 0.2s ease;
+    min-height: 20px;
+}
+
+.dark .tab-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(91, 163, 245, 0.7) 0%, rgba(74, 144, 226, 0.8) 50%, rgba(53, 122, 189, 0.9) 100%);
+    box-shadow: 0 0 4px rgba(91, 163, 245, 0.3);
+}
+
+.tab-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 0.9) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 6px rgba(74, 144, 226, 0.4);
+}
+
+.dark .tab-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.9) 0%, rgba(53, 122, 189, 1) 50%, rgba(46, 109, 164, 1) 100%);
+    box-shadow: 0 0 6px rgba(91, 163, 245, 0.5);
+}
+
 /* 自定义滚动条样式 - 用于群聊列表等 */
 .custom-scrollbar::-webkit-scrollbar {
     width: 10px;
@@ -60,95 +181,165 @@
     scrollbar-color: #5BA3F5 #1f2937;
 }
 
-/* 页面内容滚动条样式 */
+/* 页面内容滚动条样式 - 美化且始终显示 */
 .page-content::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
+    display: block !important;
 }
 
 .page-content::-webkit-scrollbar-track {
-    background: #f8f8f8;
-    border-radius: 4px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 10px;
+    margin: 2px;
+    border: 1px solid rgba(222, 226, 230, 0.5);
 }
 
 .dark .page-content::-webkit-scrollbar-track {
-    background: #1f2937;
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(55, 65, 81, 0.5);
 }
 
 .page-content::-webkit-scrollbar-thumb {
-    background: #c0c0c0;
-    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.7) 0%, rgba(53, 122, 189, 0.8) 50%, rgba(46, 109, 164, 0.9) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 0 4px rgba(74, 144, 226, 0.2);
+    transition: all 0.2s ease;
+    min-height: 20px;
 }
 
 .dark .page-content::-webkit-scrollbar-thumb {
-    background: #4b5563;
+    background: linear-gradient(180deg, rgba(91, 163, 245, 0.7) 0%, rgba(74, 144, 226, 0.8) 50%, rgba(53, 122, 189, 0.9) 100%);
+    box-shadow: 0 0 4px rgba(91, 163, 245, 0.3);
 }
 
 .page-content::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    background: linear-gradient(180deg, rgba(53, 122, 189, 0.9) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 6px rgba(74, 144, 226, 0.4);
+    transform: scaleX(1.05);
 }
 
 .dark .page-content::-webkit-scrollbar-thumb:hover {
-    background: #6b7280;
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.9) 0%, rgba(53, 122, 189, 1) 50%, rgba(46, 109, 164, 1) 100%);
+    box-shadow: 0 0 6px rgba(91, 163, 245, 0.5);
+}
+
+.page-content::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(46, 109, 164, 1) 0%, rgba(30, 77, 122, 1) 50%, rgba(13, 45, 74, 1) 100%);
+    box-shadow: 0 0 8px rgba(74, 144, 226, 0.6);
+}
+
+.dark .page-content::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 1) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 8px rgba(91, 163, 245, 0.7);
 }
 
 .page-content {
     scrollbar-width: thin;
-    scrollbar-color: #c0c0c0 #f8f8f8;
+    scrollbar-color: rgba(74, 144, 226, 0.7) rgba(248, 249, 250, 0.8);
 }
 
 .dark .page-content {
-    scrollbar-color: #4b5563 #1f2937;
+    scrollbar-color: rgba(91, 163, 245, 0.7) rgba(31, 41, 55, 0.8);
 }
 
-/* 全局 overflow 滚动条样式 */
+/* 全局 overflow 滚动条样式 - 美化且始终显示（覆盖全局样式） */
 .overflow-x-auto::-webkit-scrollbar,
-.overflow-y-auto::-webkit-scrollbar {
-    height: 8px;
-    width: 8px;
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-scroll::-webkit-scrollbar,
+.overflow-y-scroll::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+    display: block !important;
 }
 
 .overflow-x-auto::-webkit-scrollbar-track,
-.overflow-y-auto::-webkit-scrollbar-track {
-    background: #f5f5f5;
-    border-radius: 4px;
+.overflow-y-auto::-webkit-scrollbar-track,
+.overflow-x-scroll::-webkit-scrollbar-track,
+.overflow-y-scroll::-webkit-scrollbar-track {
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 10px;
+    margin: 2px;
+    border: 1px solid rgba(222, 226, 230, 0.5);
 }
 
 .dark .overflow-x-auto::-webkit-scrollbar-track,
-.dark .overflow-y-auto::-webkit-scrollbar-track {
-    background: #1f2937;
+.dark .overflow-y-auto::-webkit-scrollbar-track,
+.dark .overflow-x-scroll::-webkit-scrollbar-track,
+.dark .overflow-y-scroll::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.8);
+    border-color: rgba(55, 65, 81, 0.5);
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb,
-.overflow-y-auto::-webkit-scrollbar-thumb {
-    background: #c0c0c0;
-    border-radius: 4px;
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-x-scroll::-webkit-scrollbar-thumb,
+.overflow-y-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.7) 0%, rgba(53, 122, 189, 0.8) 50%, rgba(46, 109, 164, 0.9) 100%);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 0 4px rgba(74, 144, 226, 0.2);
+    transition: all 0.2s ease;
+    min-height: 20px;
 }
 
 .dark .overflow-x-auto::-webkit-scrollbar-thumb,
-.dark .overflow-y-auto::-webkit-scrollbar-thumb {
-    background: #4b5563;
+.dark .overflow-y-auto::-webkit-scrollbar-thumb,
+.dark .overflow-x-scroll::-webkit-scrollbar-thumb,
+.dark .overflow-y-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(91, 163, 245, 0.7) 0%, rgba(74, 144, 226, 0.8) 50%, rgba(53, 122, 189, 0.9) 100%);
+    box-shadow: 0 0 4px rgba(91, 163, 245, 0.3);
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb:hover,
-.overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+.overflow-y-auto::-webkit-scrollbar-thumb:hover,
+.overflow-x-scroll::-webkit-scrollbar-thumb:hover,
+.overflow-y-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 0.9) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 6px rgba(74, 144, 226, 0.4);
+    transform: scaleX(1.05);
 }
 
 .dark .overflow-x-auto::-webkit-scrollbar-thumb:hover,
-.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    background: #6b7280;
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+.dark .overflow-x-scroll::-webkit-scrollbar-thumb:hover,
+.dark .overflow-y-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(74, 144, 226, 0.9) 0%, rgba(53, 122, 189, 1) 50%, rgba(46, 109, 164, 1) 100%);
+    box-shadow: 0 0 6px rgba(91, 163, 245, 0.5);
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:active,
+.overflow-y-auto::-webkit-scrollbar-thumb:active,
+.overflow-x-scroll::-webkit-scrollbar-thumb:active,
+.overflow-y-scroll::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(46, 109, 164, 1) 0%, rgba(30, 77, 122, 1) 50%, rgba(13, 45, 74, 1) 100%);
+    box-shadow: 0 0 8px rgba(74, 144, 226, 0.6);
+}
+
+.dark .overflow-x-auto::-webkit-scrollbar-thumb:active,
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:active,
+.dark .overflow-x-scroll::-webkit-scrollbar-thumb:active,
+.dark .overflow-y-scroll::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, rgba(53, 122, 189, 1) 0%, rgba(46, 109, 164, 1) 50%, rgba(30, 77, 122, 1) 100%);
+    box-shadow: 0 0 8px rgba(91, 163, 245, 0.7);
 }
 
 /* Firefox 滚动条 */
 .overflow-x-auto,
-.overflow-y-auto {
+.overflow-y-auto,
+.overflow-x-scroll,
+.overflow-y-scroll {
     scrollbar-width: thin;
-    scrollbar-color: #c0c0c0 #f5f5f5;
+    scrollbar-color: rgba(74, 144, 226, 0.7) rgba(248, 249, 250, 0.8);
 }
 
 .dark .overflow-x-auto,
-.dark .overflow-y-auto {
-    scrollbar-color: #4b5563 #1f2937;
+.dark .overflow-y-auto,
+.dark .overflow-x-scroll,
+.dark .overflow-y-scroll {
+    scrollbar-color: rgba(91, 163, 245, 0.7) rgba(31, 41, 55, 0.8);
 }
 
 /* 隐藏滚动条但保持滚动功能 */
@@ -173,42 +364,74 @@
 
 /* 移动端滚动条优化 */
 @media (max-width: 640px) {
+    *::-webkit-scrollbar,
     .overflow-x-auto::-webkit-scrollbar,
-    .overflow-y-auto::-webkit-scrollbar {
-        height: 6px;
-        width: 6px;
+    .overflow-y-auto::-webkit-scrollbar,
+    .overflow-x-scroll::-webkit-scrollbar,
+    .overflow-y-scroll::-webkit-scrollbar,
+    .tab-content::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+        display: block !important;
     }
     
+    *::-webkit-scrollbar-track,
     .overflow-x-auto::-webkit-scrollbar-track,
-    .overflow-y-auto::-webkit-scrollbar-track {
-        background: #f5f5f5;
-        border-radius: 3px;
+    .overflow-y-auto::-webkit-scrollbar-track,
+    .overflow-x-scroll::-webkit-scrollbar-track,
+    .overflow-y-scroll::-webkit-scrollbar-track,
+    .tab-content::-webkit-scrollbar-track {
+        background: rgba(248, 249, 250, 0.6);
+        border-radius: 8px;
+        margin: 1px;
     }
     
+    .dark *::-webkit-scrollbar-track,
     .dark .overflow-x-auto::-webkit-scrollbar-track,
-    .dark .overflow-y-auto::-webkit-scrollbar-track {
-        background: #1f2937;
+    .dark .overflow-y-auto::-webkit-scrollbar-track,
+    .dark .overflow-x-scroll::-webkit-scrollbar-track,
+    .dark .overflow-y-scroll::-webkit-scrollbar-track,
+    .dark .tab-content::-webkit-scrollbar-track {
+        background: rgba(31, 41, 55, 0.6);
     }
     
+    *::-webkit-scrollbar-thumb,
     .overflow-x-auto::-webkit-scrollbar-thumb,
-    .overflow-y-auto::-webkit-scrollbar-thumb {
-        background: #c0c0c0;
-        border-radius: 3px;
+    .overflow-y-auto::-webkit-scrollbar-thumb,
+    .overflow-x-scroll::-webkit-scrollbar-thumb,
+    .overflow-y-scroll::-webkit-scrollbar-thumb,
+    .tab-content::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(74, 144, 226, 0.7) 0%, rgba(53, 122, 189, 0.8) 100%);
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background-clip: padding-box;
     }
     
+    .dark *::-webkit-scrollbar-thumb,
     .dark .overflow-x-auto::-webkit-scrollbar-thumb,
-    .dark .overflow-y-auto::-webkit-scrollbar-thumb {
-        background: #4b5563;
+    .dark .overflow-y-auto::-webkit-scrollbar-thumb,
+    .dark .overflow-x-scroll::-webkit-scrollbar-thumb,
+    .dark .overflow-y-scroll::-webkit-scrollbar-thumb,
+    .dark .tab-content::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(91, 163, 245, 0.7) 0%, rgba(74, 144, 226, 0.8) 100%);
     }
     
+    *::-webkit-scrollbar-thumb:hover,
     .overflow-x-auto::-webkit-scrollbar-thumb:hover,
-    .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+    .overflow-x-scroll::-webkit-scrollbar-thumb:hover,
+    .overflow-y-scroll::-webkit-scrollbar-thumb:hover,
+    .tab-content::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(53, 122, 189, 0.9) 0%, rgba(46, 109, 164, 1) 100%);
     }
     
+    .dark *::-webkit-scrollbar-thumb:hover,
     .dark .overflow-x-auto::-webkit-scrollbar-thumb:hover,
-    .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-        background: #6b7280;
+    .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+    .dark .overflow-x-scroll::-webkit-scrollbar-thumb:hover,
+    .dark .overflow-y-scroll::-webkit-scrollbar-thumb:hover,
+    .dark .tab-content::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(74, 144, 226, 0.9) 0%, rgba(53, 122, 189, 1) 100%);
     }
 }
 

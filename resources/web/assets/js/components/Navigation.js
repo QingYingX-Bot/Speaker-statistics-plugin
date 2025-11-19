@@ -235,10 +235,7 @@ export class Navigation {
                         ${this.renderIcon(this.icons.user, 'w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0')}
                         <span class="text-xs text-gray-600 dark:text-gray-400 truncate flex-1" id="leftNavUserId">${displayName}</span>
                     </div>
-                    <div class="grid grid-cols-4 gap-2">
-                        <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary flex items-center justify-center" id="userInfoBtn" title="用户信息">
-                            ${this.renderIcon(this.icons.user, 'w-5 h-5')}
-                        </button>
+                    <div class="grid grid-cols-3 gap-2">
                         <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300 hover:text-primary flex items-center justify-center" id="navPositionToggleBtn" title="切换到顶部导航栏">
                             ${this.renderIcon(this.icons.layout, 'w-5 h-5')}
                         </button>
@@ -613,22 +610,12 @@ export class Navigation {
 
     /**
      * 初始化用户信息按钮（跳转到个人中心）
-     * 注意：顶部导航栏的用户信息已改为 div 显示，不再需要点击事件
-     * 左侧导航栏仍保留 userInfoBtn 按钮用于跳转
+     * 注意：此方法已废弃，左侧导航栏的个人页面按钮已移除
+     * 用户可以通过导航栏中的"个人"按钮访问个人中心页面
      */
     initUserInfoButton() {
-        const userInfoBtns = document.querySelectorAll('#userInfoBtn');
-        userInfoBtns.forEach(btn => {
-            if (!btn.dataset.listenerBound) {
-                btn.dataset.listenerBound = 'true';
-                btn.addEventListener('click', () => {
-                    // 跳转到个人中心页面
-                    if (window.router) {
-                        window.router.navigate('/profile');
-                    }
-                });
-            }
-        });
+        // 左侧导航栏的个人页面按钮已移除，不再需要初始化
+        // 用户可以通过导航栏中的"个人"按钮访问个人中心页面
     }
 }
 

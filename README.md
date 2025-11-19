@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.4-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.41-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -88,8 +88,10 @@
     - 群组活跃度分布（Top 10）
     - 消息密度散点图（所有群组，X轴=用户数，Y轴=消息数）
     - 群组增长趋势图（近7天新增群组数）
+  - **数据统计**：日期范围筛选、消息趋势图、用户活跃度图、详细数据表格、数据导出
   - **群管理**：群详情、群内用户排名、刷新/清除统计数据
   - **用户管理**：用户详情、所在群聊列表、修改用户权限、清除用户数据
+  - **成就管理**：成就列表展示、群组筛选、搜索功能、默认按人数排序、稀有度显示、数据导出
 
 > 💡 **访问方式**：通过 `#水群网页` 命令获取个人链接，或直接访问管理页面（需管理员权限）
 

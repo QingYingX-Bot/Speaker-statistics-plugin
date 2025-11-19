@@ -974,23 +974,23 @@ class App {
         const favicon = document.querySelector('link[rel="icon"]');
         
         // 直接切换主题，依靠CSS过渡效果实现平滑切换
-        if (isDark) {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-            if (favicon) favicon.href = '/assets/favicon-light.ico';
-        } else {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-            if (favicon) favicon.href = '/assets/favicon-dark.ico';
-        }
-        
-        // 更新导航栏激活状态
-        if (this.navigation) {
-            const currentRoute = router?.getCurrentRoute() || '/';
-            requestAnimationFrame(() => {
-                this.navigation.updateActive(currentRoute);
-            });
-        }
+            if (isDark) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                if (favicon) favicon.href = '/assets/favicon-light.ico';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                if (favicon) favicon.href = '/assets/favicon-dark.ico';
+            }
+            
+            // 更新导航栏激活状态
+            if (this.navigation) {
+                const currentRoute = router?.getCurrentRoute() || '/';
+                requestAnimationFrame(() => {
+                    this.navigation.updateActive(currentRoute);
+                });
+            }
         
         // 更新图表（主题切换后重新生成图表以更新颜色）
         // 使用双重 requestAnimationFrame 确保 DOM 和样式完全更新后再更新图表

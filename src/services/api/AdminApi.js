@@ -1,5 +1,6 @@
 import { getDataService } from '../../core/DataService.js';
 import { getMessageRecorder } from '../../core/MessageRecorder.js';
+import { AchievementService } from '../../core/AchievementService.js';
 import { AuthService } from '../auth/AuthService.js';
 import { AuthMiddleware } from './middleware/AuthMiddleware.js';
 import { ApiResponse } from './utils/ApiResponse.js';
@@ -14,6 +15,7 @@ export class AdminApi {
         this.app = app;
         this.authService = authService;
         this.dataService = getDataService();
+        this.achievementService = new AchievementService(this.dataService);
         this.authMiddleware = new AuthMiddleware(authService);
     }
 
@@ -427,6 +429,175 @@ export class AdminApi {
             }, '获取统计概览失败')
         );
 
+        // 获取统计数据（管理员）- 支持日期范围查询
+        this.app.get('/api/admin/statistics',
+            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
+            ApiResponse.asyncHandler(async (req, res) => {
+                const { startDate, endDate } = req.query;
+                
+                if (!startDate || !endDate) {
+                    return ApiResponse.error(res, '缺少日期参数', 400);
+                }
+                
+                // 验证日期格式
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                    return ApiResponse.error(res, '日期格式错误', 400);
+                }
+                
+                if (start > end) {
+                    return ApiResponse.error(res, '开始日期不能大于结束日期', 400);
+                }
+                
+                // 计算日期范围（UTC+8）
+                const startUTC8 = new Date(start);
+                startUTC8.setHours(0, 0, 0, 0);
+                const endUTC8 = new Date(end);
+                endUTC8.setHours(23, 59, 59, 999);
+                
+                const startDateKey = TimeUtils.formatDate(startUTC8);
+                const endDateKey = TimeUtils.formatDate(endUTC8);
+                
+                // 获取日期范围内的统计数据
+                const dailyStats = await this.dataService.dbService.all(
+                    `SELECT 
+                        date_key as date,
+                        SUM(message_count) as message_count,
+                        SUM(word_count) as word_count,
+                        COUNT(DISTINCT user_id) as active_users,
+                        COUNT(DISTINCT group_id) as active_groups
+                    FROM daily_stats 
+                    WHERE date_key >= $1 AND date_key <= $2 
+                    GROUP BY date_key 
+                    ORDER BY date_key ASC`,
+                    startDateKey,
+                    endDateKey
+                ).catch(() => []);
+                
+                // 计算总统计
+                const totalStats = await this.dataService.dbService.get(
+                    `SELECT 
+                        SUM(message_count) as total_messages,
+                        SUM(word_count) as total_words,
+                        COUNT(DISTINCT user_id) as total_active_users,
+                        COUNT(DISTINCT group_id) as total_active_groups
+                    FROM daily_stats 
+                    WHERE date_key >= $1 AND date_key <= $2`,
+                    startDateKey,
+                    endDateKey
+                ).catch(() => ({
+                    total_messages: 0,
+                    total_words: 0,
+                    total_active_users: 0,
+                    total_active_groups: 0
+                }));
+                
+                // 获取上一期的统计数据（用于对比）
+                const daysDiff = Math.ceil((endUTC8 - startUTC8) / (1000 * 60 * 60 * 24)) + 1;
+                const prevStartUTC8 = new Date(startUTC8);
+                prevStartUTC8.setDate(prevStartUTC8.getDate() - daysDiff);
+                const prevEndUTC8 = new Date(startUTC8);
+                prevEndUTC8.setDate(prevEndUTC8.getDate() - 1);
+                prevEndUTC8.setHours(23, 59, 59, 999);
+                
+                const prevStartDateKey = TimeUtils.formatDate(prevStartUTC8);
+                const prevEndDateKey = TimeUtils.formatDate(prevEndUTC8);
+                
+                const prevStats = await this.dataService.dbService.get(
+                    `SELECT 
+                        SUM(message_count) as total_messages,
+                        SUM(word_count) as total_words,
+                        COUNT(DISTINCT user_id) as total_active_users,
+                        COUNT(DISTINCT group_id) as total_active_groups
+                    FROM daily_stats 
+                    WHERE date_key >= $1 AND date_key <= $2`,
+                    prevStartDateKey,
+                    prevEndDateKey
+                ).catch(() => ({
+                    total_messages: 0,
+                    total_words: 0,
+                    total_active_users: 0,
+                    total_active_groups: 0
+                }));
+                
+                // 计算变化百分比
+                const calculateChange = (current, previous) => {
+                    if (!previous || previous === 0) return current > 0 ? 100 : 0;
+                    return Math.round(((current - previous) / previous) * 100);
+                };
+                
+                // 格式化每日数据
+                const formattedDailyStats = dailyStats.map(item => ({
+                    date: item.date,
+                    message_count: parseInt(item.message_count || 0, 10),
+                    word_count: parseInt(item.word_count || 0, 10),
+                    active_users: parseInt(item.active_users || 0, 10),
+                    active_groups: parseInt(item.active_groups || 0, 10)
+                }));
+                
+                // 生成日期范围内的所有日期（补全缺失日期）
+                const allDates = [];
+                const dailyStatsMap = new Map(formattedDailyStats.map(item => [item.date, item]));
+                const currentDate = new Date(startUTC8);
+                while (currentDate <= endUTC8) {
+                    const dateKey = TimeUtils.formatDate(currentDate);
+                    const stats = dailyStatsMap.get(dateKey) || {
+                        date: dateKey,
+                        message_count: 0,
+                        word_count: 0,
+                        active_users: 0,
+                        active_groups: 0
+                    };
+                    allDates.push({
+                        ...stats,
+                        date_label: currentDate.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+                    });
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                // 获取每日消息趋势数据（用于图表）
+                const trendData = allDates.map(item => ({
+                    date: item.date_label,
+                    messages: item.message_count
+                }));
+                
+                // 获取每日活跃用户数据（用于图表）
+                const userActivityData = allDates.map(item => ({
+                    date: item.date_label,
+                    users: item.active_users
+                }));
+                
+                ApiResponse.success(res, {
+                    total_messages: parseInt(totalStats?.total_messages || 0, 10),
+                    total_words: parseInt(totalStats?.total_words || 0, 10),
+                    total_active_users: parseInt(totalStats?.total_active_users || 0, 10),
+                    total_active_groups: parseInt(totalStats?.total_active_groups || 0, 10),
+                    changes: {
+                        messages: calculateChange(
+                            parseInt(totalStats?.total_messages || 0, 10),
+                            parseInt(prevStats?.total_messages || 0, 10)
+                        ),
+                        words: calculateChange(
+                            parseInt(totalStats?.total_words || 0, 10),
+                            parseInt(prevStats?.total_words || 0, 10)
+                        ),
+                        users: calculateChange(
+                            parseInt(totalStats?.total_active_users || 0, 10),
+                            parseInt(prevStats?.total_active_users || 0, 10)
+                        ),
+                        groups: calculateChange(
+                            parseInt(totalStats?.total_active_groups || 0, 10),
+                            parseInt(prevStats?.total_active_groups || 0, 10)
+                        )
+                    },
+                    daily_data: formattedDailyStats,
+                    trend_data: trendData,
+                    user_activity_data: userActivityData
+                });
+            }, '获取统计数据失败')
+        );
+
         // 获取词云数据（管理员）
         this.app.get('/api/admin/wordcloud',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),
@@ -518,6 +689,9 @@ export class AdminApi {
                 }
             }, '更新配置失败')
         );
+        
+        // 注册成就管理相关路由
+        this._registerAchievementRoutes();
     }
     
     /**
@@ -649,5 +823,109 @@ export class AdminApi {
             });
         
         return wordFreqArray;
+    }
+    
+    /**
+     * 获取成就列表（管理员）
+     */
+    _registerAchievementRoutes() {
+        // 获取成就列表（管理员）
+        this.app.get('/api/admin/achievements/list/:groupId',
+            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
+            ApiResponse.asyncHandler(async (req, res) => {
+                const { groupId } = req.params;
+                
+                const definitions = this.achievementService.getAchievementDefinitions();
+                const achievements = [];
+                
+                for (const [id, def] of Object.entries(definitions)) {
+                    achievements.push({
+                        id,
+                        name: def.name || id,
+                        description: def.description || '',
+                        category: def.category || '未分类',
+                        rarity: def.rarity || 'Common',
+                        ...def
+                    });
+                }
+                
+                ApiResponse.success(res, { achievements });
+            }, '获取成就列表失败')
+        );
+        
+        // 获取成就统计（管理员）
+        this.app.get('/api/admin/achievements/stats/:groupId',
+            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
+            ApiResponse.asyncHandler(async (req, res) => {
+                const { groupId } = req.params;
+                const definitions = this.achievementService.getAchievementDefinitions();
+                const stats = [];
+                
+                // 获取群组总用户数（用于计算百分比）
+                const totalUsersResult = await this.dataService.dbService.get(
+                    'SELECT COUNT(DISTINCT user_id) as total FROM user_stats WHERE group_id = $1',
+                    groupId
+                ).catch(() => ({ total: 0 }));
+                const totalUsers = parseInt(totalUsersResult?.total || 0, 10);
+                
+                for (const [id, def] of Object.entries(definitions)) {
+                    const isGlobal = def.rarity === 'Special' || def.rarity === 'Festival';
+                    const unlockCount = await this.dataService.dbService.getAchievementUnlockCount(
+                        id,
+                        isGlobal ? null : groupId,
+                        isGlobal
+                    ).catch(() => 0);
+                    
+                    const percentage = totalUsers > 0 
+                        ? ((unlockCount / totalUsers) * 100).toFixed(2)
+                        : 0;
+                    
+                    stats.push({
+                        achievement_id: id,
+                        user_count: unlockCount,
+                        percentage: parseFloat(percentage)
+                    });
+                }
+                
+                ApiResponse.success(res, stats);
+            }, '获取成就统计失败')
+        );
+        
+        // 获取全部成就统计（所有群组汇总）
+        this.app.get('/api/admin/achievements/stats/all',
+            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
+            ApiResponse.asyncHandler(async (req, res) => {
+                const definitions = this.achievementService.getAchievementDefinitions();
+                const stats = [];
+                
+                // 获取所有群组的总用户数（去重）
+                const totalUsersResult = await this.dataService.dbService.get(
+                    'SELECT COUNT(DISTINCT user_id) as total FROM user_stats'
+                ).catch(() => ({ total: 0 }));
+                const totalUsers = parseInt(totalUsersResult?.total || 0, 10);
+                
+                for (const [id, def] of Object.entries(definitions)) {
+                    // 对于全部统计，需要统计所有群组的数据
+                    // 使用全局统计，不限制群组
+                    const unlockCount = await this.dataService.dbService.get(
+                        'SELECT COUNT(DISTINCT user_id) as count FROM user_achievements WHERE achievement_id = $1',
+                        id
+                    ).catch(() => ({ count: 0 }));
+                    
+                    const count = parseInt(unlockCount?.count || 0, 10);
+                    const percentage = totalUsers > 0 
+                        ? ((count / totalUsers) * 100).toFixed(2)
+                        : 0;
+                    
+                    stats.push({
+                        achievement_id: id,
+                        user_count: count,
+                        percentage: parseFloat(percentage)
+                    });
+                }
+                
+                ApiResponse.success(res, stats);
+            }, '获取全部成就统计失败')
+        );
     }
 }

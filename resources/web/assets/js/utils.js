@@ -969,8 +969,129 @@ function updateCustomSelect(selectElement) {
     }
 }
 
+/**
+ * 图表主题工具类
+ * 统一管理图表的主题颜色和主题变化监听
+ */
+class ChartThemeUtils {
+    /**
+     * 获取当前主题颜色配置
+     * @returns {Object} 主题颜色配置对象
+     */
+    static getThemeColors() {
+        // 强制重新读取主题状态
+        const htmlElement = document.documentElement;
+        const isDark = htmlElement.classList.contains('dark');
+        
+        // 深色模式使用纯白色，浅色模式使用纯黑色
+        return {
+            isDark,
+            textColor: isDark ? '#FFFFFF' : '#000000',
+            gridColor: isDark ? '#4B5563' : '#E5E7EB',
+            tooltipBg: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            borderColor: isDark ? '#4B5563' : '#D1D5DB',
+            axisLineColor: isDark ? '#4B5563' : '#9CA3AF'
+        };
+    }
+    
+    /**
+     * 创建主题变化监听器
+     * @param {Function} callback 主题变化时的回调函数
+     * @param {Object} options 配置选项
+     * @param {number} options.debounceDelay 防抖延迟时间（毫秒），默认150
+     * @returns {MutationObserver|null} MutationObserver实例，用于后续清理
+     */
+    static createThemeObserver(callback, options = {}) {
+        if (typeof MutationObserver === 'undefined' || typeof callback !== 'function') {
+            return null;
+        }
+        
+        const { debounceDelay = 150 } = options;
+        let themeChangeTimer = null;
+        
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    // 防抖处理，避免频繁触发
+                    if (themeChangeTimer) {
+                        clearTimeout(themeChangeTimer);
+                    }
+                    
+                    themeChangeTimer = setTimeout(() => {
+                        callback();
+                    }, debounceDelay);
+                }
+            });
+        });
+        
+        // 开始监听 document.documentElement 的 class 属性变化
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+        
+        return observer;
+    }
+    
+    /**
+     * 获取ECharts主题配置
+     * 返回适用于ECharts的完整主题配置对象
+     * @returns {Object} ECharts主题配置
+     */
+    static getEChartsTheme() {
+        const colors = this.getThemeColors();
+        return {
+            backgroundColor: 'transparent',
+            textStyle: {
+                color: colors.textColor
+            },
+            tooltip: {
+                backgroundColor: colors.tooltipBg,
+                borderColor: colors.borderColor,
+                borderWidth: 1,
+                textStyle: {
+                    color: colors.textColor,
+                    fontSize: 12
+                }
+            },
+            grid: {
+                borderColor: colors.gridColor
+            },
+            xAxis: {
+                axisLine: {
+                    lineStyle: {
+                        color: colors.axisLineColor
+                    }
+                },
+                axisLabel: {
+                    color: colors.textColor,
+                    fontSize: 11
+                }
+            },
+            yAxis: {
+                axisLine: {
+                    lineStyle: {
+                        color: colors.axisLineColor
+                    }
+                },
+                axisLabel: {
+                    color: colors.textColor,
+                    fontSize: 11
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: colors.gridColor,
+                        type: 'dashed'
+                    }
+                }
+            }
+        };
+    }
+}
+
 // 导出到全局
 window.SecretKeyManager = SecretKeyManager;
 window.CustomSelect = CustomSelect;
 window.initCustomSelects = initCustomSelects;
 window.updateCustomSelect = updateCustomSelect;
+window.ChartThemeUtils = ChartThemeUtils;

@@ -17,63 +17,45 @@ export class AdminOverview {
      * 初始化主题变化监听器
      */
     initThemeObserver() {
-        // 使用 MutationObserver 监听 document.documentElement 的 classList 变化
-        if (typeof MutationObserver !== 'undefined') {
-            let themeChangeTimer = null;
-            this.themeObserver = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                        // 防抖处理，避免频繁触发
-                        if (themeChangeTimer) {
-                            clearTimeout(themeChangeTimer);
-                        }
-                        
-                        themeChangeTimer = setTimeout(() => {
-                            // 只有在图表已初始化且数据已加载时才重新生成图表
-                            if (this.admin.overview && 
-                                this.messageTrendChart && 
-                                this.groupActivityChart && 
-                                this.messageDensityChart && 
-                                this.groupGrowthChart) {
-                                
-                                // 销毁所有图表实例
-                                if (this.groupActivityChart) {
-                                    try {
-                                        this.groupActivityChart.dispose();
-                                    } catch (e) {}
-                                    this.groupActivityChart = null;
-                                }
-                                if (this.messageTrendChart) {
-                                    try {
-                                        this.messageTrendChart.dispose();
-                                    } catch (e) {}
-                                    this.messageTrendChart = null;
-                                }
-                                if (this.messageDensityChart) {
-                                    try {
-                                        this.messageDensityChart.dispose();
-                                    } catch (e) {}
-                                    this.messageDensityChart = null;
-                                }
-                                if (this.groupGrowthChart) {
-                                    try {
-                                        this.groupGrowthChart.dispose();
-                                    } catch (e) {}
-                                    this.groupGrowthChart = null;
-                                }
-                                
-                                // 重新初始化并更新图表
-                                this.updateCharts();
-                            }
-                        }, 150);
+        // 使用公共工具类创建主题监听器
+        if (window.ChartThemeUtils) {
+            this.themeObserver = window.ChartThemeUtils.createThemeObserver(() => {
+                // 只有在图表已初始化且数据已加载时才重新生成图表
+                if (this.admin.overview && 
+                    this.messageTrendChart && 
+                    this.groupActivityChart && 
+                    this.messageDensityChart && 
+                    this.groupGrowthChart) {
+                    
+                    // 销毁所有图表实例
+                    if (this.groupActivityChart) {
+                        try {
+                            this.groupActivityChart.dispose();
+                        } catch (e) {}
+                        this.groupActivityChart = null;
                     }
-                });
-            });
-            
-            // 开始观察
-            this.themeObserver.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['class']
+                    if (this.messageTrendChart) {
+                        try {
+                            this.messageTrendChart.dispose();
+                        } catch (e) {}
+                        this.messageTrendChart = null;
+                    }
+                    if (this.messageDensityChart) {
+                        try {
+                            this.messageDensityChart.dispose();
+                        } catch (e) {}
+                        this.messageDensityChart = null;
+                    }
+                    if (this.groupGrowthChart) {
+                        try {
+                            this.groupGrowthChart.dispose();
+                        } catch (e) {}
+                        this.groupGrowthChart = null;
+                    }
+                    
+                    // 重新初始化并更新图表
+                    this.updateCharts();
+                }
             });
         }
     }
@@ -243,13 +225,17 @@ export class AdminOverview {
     
     /**
      * 获取当前主题颜色配置
+     * @deprecated 使用 ChartThemeUtils.getThemeColors() 替代
      */
     getThemeColors() {
-        // 强制重新读取主题状态
+        // 使用公共工具类获取主题颜色
+        if (window.ChartThemeUtils) {
+            return window.ChartThemeUtils.getThemeColors();
+        }
+        
+        // 降级方案：如果工具类未加载，使用本地实现
         const htmlElement = document.documentElement;
         const isDark = htmlElement.classList.contains('dark');
-        
-        // 深色模式使用纯白色，浅色模式使用纯黑色
         return {
             isDark,
             textColor: isDark ? '#FFFFFF' : '#000000',

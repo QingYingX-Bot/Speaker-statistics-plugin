@@ -132,6 +132,17 @@ class API {
     }
     
     /**
+     * 获取成就列表（管理员）
+     * @param {string} userId 管理员用户ID
+     * @param {string} secretKey 管理员秘钥
+     * @param {string} groupId 群组ID
+     * @returns {Promise} 成就列表
+     */
+    async getAdminAchievementList(userId, secretKey, groupId) {
+        return this.request(`/api/admin/achievements/list/${groupId}?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
+    }
+    
+    /**
      * 获取用户成就
      * @param {string} userId 用户ID
      * @param {string} groupId 群组ID
@@ -148,6 +159,27 @@ class API {
      */
     async getAchievementStats(groupId) {
         return this.request(`/api/achievements/stats/${groupId}`);
+    }
+    
+    /**
+     * 获取成就统计（管理员）
+     * @param {string} userId 管理员用户ID
+     * @param {string} secretKey 管理员秘钥
+     * @param {string} groupId 群组ID
+     * @returns {Promise} 成就统计数据
+     */
+    async getAdminAchievementStats(userId, secretKey, groupId) {
+        return this.request(`/api/admin/achievements/stats/${groupId}?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
+    }
+    
+    /**
+     * 获取全部成就统计（所有群组汇总）
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @returns {Promise} 成就统计
+     */
+    async getAdminAchievementStatsAll(userId, secretKey) {
+        return this.request(`/api/admin/achievements/stats/all?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
     }
     
     /**
@@ -388,6 +420,18 @@ class API {
      */
     async getAdminOverview(userId, secretKey) {
         return this.request(`/api/admin/overview?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
+    }
+    
+    /**
+     * 获取统计数据（管理员）- 支持日期范围查询
+     * @param {string} userId 用户ID
+     * @param {string} secretKey 秘钥
+     * @param {string} startDate 开始日期 (YYYY-MM-DD)
+     * @param {string} endDate 结束日期 (YYYY-MM-DD)
+     * @returns {Promise} 统计数据
+     */
+    async getAdminStatistics(userId, secretKey, startDate, endDate) {
+        return this.request(`/api/admin/statistics?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}&startDate=${startDate}&endDate=${endDate}`);
     }
     
     /**
