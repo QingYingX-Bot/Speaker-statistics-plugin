@@ -154,7 +154,7 @@ export class Navigation {
         const navLinks = this.renderNavLinks(navItems, currentRoute, 'top');
 
         return `
-            <nav class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50" id="navbar">
+            <nav class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-50" id="navbar" style="z-index: 1000;">
                 <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
                     <div class="flex items-center justify-between h-14 sm:h-16">
                         <div class="flex items-center gap-2 sm:gap-3">
@@ -253,8 +253,6 @@ export class Navigation {
                     </div>
                 </div>
             </aside>
-            
-            ${this.renderMobileMenu(navItems, currentRoute, userId)}
         `;
     }
 
@@ -411,6 +409,13 @@ export class Navigation {
             e.preventDefault();
             e.stopPropagation();
             
+            // 如果是移动端菜单中的链接，关闭菜单
+            const mobileMenu = document.getElementById('mobileMenu');
+            if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+                this.isMobileMenuOpen = false;
+                mobileMenu.classList.add('hidden');
+            }
+            
             // 使用router.navigate进行路由切换（保持当前URL中的token）
             if (window.router && typeof window.router.navigate === 'function') {
                 try {
@@ -533,10 +538,18 @@ export class Navigation {
         const mobileMenu = document.getElementById('mobileMenu');
         
         if (mobileMenuBtn && mobileMenu) {
-            mobileMenuBtn.addEventListener('click', () => {
+            // 移除旧的事件监听器（如果存在）
+            if (this._mobileMenuBtnHandler) {
+                mobileMenuBtn.removeEventListener('click', this._mobileMenuBtnHandler);
+            }
+            
+            // 创建新的事件处理器
+            this._mobileMenuBtnHandler = () => {
                 this.isMobileMenuOpen = !this.isMobileMenuOpen;
                 mobileMenu.classList.toggle('hidden', !this.isMobileMenuOpen);
-            });
+            };
+            
+            mobileMenuBtn.addEventListener('click', this._mobileMenuBtnHandler);
         }
     }
 

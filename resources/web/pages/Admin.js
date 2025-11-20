@@ -47,9 +47,9 @@ export default class Admin {
     
     async render() {
         return `
-            <div class="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            <div class="admin-page-container h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
                 <!-- 顶部导航栏（标签页样式） -->
-                <div class="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-14 sm:top-16 lg:static lg:top-0 z-30">
+                <div class="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-30">
                     <div class="px-2 sm:px-4 lg:px-8">
                         <div class="flex items-center justify-between h-14 sm:h-16">
                             <!-- 左侧导航标签 -->
@@ -90,19 +90,6 @@ export default class Admin {
                                 variant: 'underline',
                                 className: ''
                             })}
-                            <!-- 右侧操作按钮 -->
-                            <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-                                <button 
-                                    id="refreshAllBtn" 
-                                    class="px-2 sm:px-4 py-1.5 sm:py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-xs sm:text-sm font-medium flex items-center space-x-1 sm:space-x-2 shadow-sm hover:shadow-md"
-                                >
-                                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                    </svg>
-                                    <span class="hidden sm:inline">刷新全部</span>
-                                    <span class="sm:hidden">刷新</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
                     </div>
@@ -116,7 +103,17 @@ export default class Admin {
                             <div class="mb-6 sm:mb-8">
                                 <div class="flex items-center justify-between mb-4 sm:mb-6">
                                     <h2 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">数据概览</h2>
-                                    </div>
+                                    <button 
+                                        id="refreshDataBtn" 
+                                        class="px-3 sm:px-4 py-1.5 sm:py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-xs sm:text-sm font-medium flex items-center space-x-1 sm:space-x-2 shadow-sm hover:shadow-md"
+                                        title="刷新图表数据"
+                                    >
+                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        <span>刷新数据</span>
+                                    </button>
+                                </div>
                                 <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
                                     <!-- 总群数 -->
                                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-blue-200 dark:border-blue-800 shadow-sm hover:shadow-md transition-shadow">
@@ -267,7 +264,7 @@ export default class Admin {
                                         className: 'hover:shadow-lg transition-all duration-300 order-4',
                                         height: 320
                                     })}
-                                </div>
+                                            </div>
                             </div>
                                                         </div>
                                                     </div>
@@ -289,8 +286,8 @@ export default class Admin {
                                     })}
                                     <div class="flex items-center justify-between mt-2">
                                         <span id="groupListCount" class="text-xs text-gray-500 dark:text-gray-400 font-medium">共 <span class="text-primary dark:text-primary">-</span> 个群聊</span>
-                                    </div>
-                                </div>
+                                            </div>
+                                        </div>
                                 <!-- 群列表 -->
                                 <div class="flex-1 overflow-y-scroll p-3 sm:p-4 min-h-0">
                                     <div id="groupsList" class="space-y-2">
@@ -959,10 +956,13 @@ export default class Admin {
     }
     
     setupEventListeners() {
-        // 刷新全部按钮
-        const refreshAllBtn = document.getElementById('refreshAllBtn');
-        if (refreshAllBtn) {
-            refreshAllBtn.addEventListener('click', () => this.loadData());
+        // 刷新数据按钮（概览页面）
+        const refreshDataBtn = document.getElementById('refreshDataBtn');
+        if (refreshDataBtn) {
+            refreshDataBtn.addEventListener('click', () => {
+                // 刷新概览数据
+                this.loadData();
+            });
         }
         
         // 标签页切换
@@ -1015,8 +1015,8 @@ export default class Admin {
                 btn.setAttribute('aria-selected', 'true');
             } else {
                 btn.classList.remove('bg-white', 'dark:bg-gray-800', 'text-primary', 'border-primary');
-                btn.classList.add('text-gray-600', 'dark:text-gray-400', 'border-transparent');
-                btn.setAttribute('aria-selected', 'false');
+            btn.classList.add('text-gray-600', 'dark:text-gray-400', 'border-transparent');
+            btn.setAttribute('aria-selected', 'false');
             }
         });
 
@@ -1148,24 +1148,30 @@ export default class Admin {
     }
     
     async loadData() {
-        const refreshBtn = document.getElementById('refreshAllBtn');
+        const refreshBtn = document.getElementById('refreshDataBtn');
         if (refreshBtn) {
             refreshBtn.disabled = true;
+            const originalHTML = refreshBtn.innerHTML;
             refreshBtn.innerHTML = Loading.renderInline({ text: '刷新中...' });
-        }
-        
-        try {
-        await Promise.all([
-            this.overviewModule.loadOverview(),
-            this.groupsModule.loadGroups(),
-            this.usersModule.loadUsers()
-        ]);
-        } finally {
-            if (refreshBtn) {
+            
+            try {
+                await Promise.all([
+                    this.overviewModule.loadOverview(),
+                    this.groupsModule.loadGroups(),
+                    this.usersModule.loadUsers()
+                ]);
+            } finally {
                 refreshBtn.disabled = false;
-                refreshBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg><span>刷新全部</span>';
+                refreshBtn.innerHTML = originalHTML;
             }
+        } else {
+            // 如果没有按钮，直接加载数据
+            await Promise.all([
+                this.overviewModule.loadOverview(),
+                this.groupsModule.loadGroups(),
+                this.usersModule.loadUsers()
+            ]);
         }
-        }
+    }
     
 }
