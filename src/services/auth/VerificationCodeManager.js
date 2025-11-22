@@ -32,9 +32,10 @@ class VerificationCodeManager {
      * 验证验证码
      * @param {string} userId 用户ID
      * @param {string} code 验证码
+     * @param {boolean} consume 是否消费验证码（删除），默认true
      * @returns {{valid: boolean, message?: string}}
      */
-    verifyCode(userId, code) {
+    verifyCode(userId, code, consume = true) {
         const stored = this.codes.get(userId);
         
         if (!stored) {
@@ -53,8 +54,15 @@ class VerificationCodeManager {
             return { valid: false, message: '验证码错误' };
         }
         
-        // 验证成功，删除验证码（一次性使用）
-        this.codes.delete(userId);
+        // 验证成功
+        if (consume) {
+            // 消费验证码（删除，一次性使用）
+            this.codes.delete(userId);
+        } else {
+            // 标记为已验证但未使用（用于后续操作）
+            stored.verified = true;
+            this.codes.set(userId, stored);
+        }
         return { valid: true, message: '验证码验证成功' };
     }
 

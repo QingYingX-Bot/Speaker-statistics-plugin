@@ -193,8 +193,11 @@ export default class Settings {
     }
     
     maskSecretKey(key) {
-        if (!key || key.length <= 8) return '****';
-        return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+        // 确保 key 是字符串类型
+        if (!key) return '****';
+        const keyStr = String(key);
+        if (keyStr.length <= 8) return '****';
+        return keyStr.substring(0, 4) + '****' + keyStr.substring(keyStr.length - 4);
     }
     
     async loadSystemVersion() {
@@ -597,31 +600,22 @@ export default class Settings {
             
             if (confirmBtn && input) {
                 const handleSave = async () => {
+                    const key = input.value.trim();
+                    if (!key) {
+                        Toast.show('请输入秘钥', 'error');
+                        return;
+                    }
+                    
                     // 如果是修改秘钥，需要验证码
                     if (isModifying) {
                         if (!codeInput || !codeInput.value.trim()) {
                             Toast.show('请输入验证码', 'error');
                             return;
                         }
-                        
-                        try {
-                            const verifyResult = await api.verifyCode(this.app.userId, codeInput.value.trim());
-                            if (!verifyResult.valid) {
-                                Toast.show(verifyResult.message || '验证码错误', 'error');
-                                return;
-                            }
-                            verificationCode = codeInput.value.trim();
-                        } catch (error) {
-                            console.error('验证码验证失败:', error);
-                            Toast.show('验证码验证失败: ' + (error.message || '未知错误'), 'error');
-                            return;
-                        }
-                    }
-                    
-                    const key = input.value.trim();
-                    if (!key) {
-                        Toast.show('请输入秘钥', 'error');
-                        return;
+                        // 保存验证码值，稍后传递给后端验证
+                        // 注意：不在前端验证验证码，因为验证码是一次性的
+                        // 验证会在保存秘钥时由后端进行
+                        verificationCode = codeInput.value.trim();
                     }
                     
                     // 禁用按钮，显示加载状态
@@ -629,8 +623,18 @@ export default class Settings {
                     confirmBtn.textContent = '保存中...';
                     
                     try {
-                        // 使用统一的秘钥保存方法
-                        await SecretKeyManager.save(this.app.userId, key);
+                        // 调用 API 保存秘钥
+                        // 如果是修改秘钥，传递验证码给后端，后端会验证验证码并跳过旧秘钥验证
+                        // 如果是首次设置，不传递验证码和旧秘钥
+                        const response = await api.saveSecretKey(this.app.userId, key, null, verificationCode);
+                        
+                        // 检查响应是否成功
+                        if (response && response.success === false) {
+                            throw new Error(response.message || '保存秘钥失败');
+                        }
+                        
+                        // 保存到本地存储
+                        Storage.set('secretKey', key);
                         
                         Modal.hide();
                         Toast.show('秘钥已保存', 'success');
@@ -644,7 +648,16 @@ export default class Settings {
                         await this.updateSecretKeyDisplay();
                     } catch (error) {
                         console.error('保存秘钥失败:', error);
-                        Toast.show('保存失败: ' + (error.message || '未知错误'), 'error');
+                        // 提取更详细的错误信息
+                        let errorMessage = '未知错误';
+                        if (error.message) {
+                            errorMessage = error.message;
+                        } else if (error.error) {
+                            errorMessage = error.error;
+                        } else if (typeof error === 'string') {
+                            errorMessage = error;
+                        }
+                        Toast.show('保存失败: ' + errorMessage, 'error');
                         confirmBtn.disabled = false;
                         confirmBtn.textContent = '确认';
                     }

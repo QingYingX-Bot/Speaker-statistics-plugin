@@ -474,6 +474,13 @@ export default class Admin {
                                                     更新
                                                 </button>
                                                 <button 
+                                                    id="resetUserPasswordBtn" 
+                                                        class="px-3 py-2 text-xs sm:text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium flex-1 sm:flex-none"
+                                                    title="重置密码"
+                                                >
+                                                    重置密码
+                                                </button>
+                                                <button 
                                                     id="clearUserDataBtn" 
                                                         class="px-3 py-2 text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium flex-1 sm:flex-none"
                                                     title="清除数据"

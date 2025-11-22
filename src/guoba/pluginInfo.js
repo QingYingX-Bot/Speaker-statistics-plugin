@@ -23,7 +23,7 @@ export function getPluginInfo() {
     // 作者主页地址
     authorLink: 'https://gitee.com/QingYingX',
     // 仓库地址
-    link: '',
+    link: 'https://gitee.com/qingyingxbot/Speaker-statistics-plugin',
     isV3: true,
     isV2: false,
     // 是否显示在左侧菜单，可选值：auto、true、false

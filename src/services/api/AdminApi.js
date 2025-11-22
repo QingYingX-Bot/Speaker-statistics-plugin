@@ -95,6 +95,24 @@ export class AdminApi {
             }, '更新用户角色失败')
         );
 
+        // 重置用户密码（管理员）
+        this.app.put('/api/admin/users/:userId/password',
+            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
+            ApiResponse.asyncHandler(async (req, res) => {
+                const { userId } = req.params;
+                const defaultPassword = '123456';
+
+                // 使用 AuthService 的 saveSecretKey 方法重置密码
+                const result = await this.authService.saveSecretKey(userId, defaultPassword);
+
+                if (!result.success) {
+                    return ApiResponse.error(res, result.message || '重置密码失败', 400);
+                }
+
+                ApiResponse.success(res, { password: defaultPassword }, result.message || '密码已重置为 123456');
+            }, '重置用户密码失败')
+        );
+
         // 获取统计概览（管理员）
         this.app.get('/api/admin/overview',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),

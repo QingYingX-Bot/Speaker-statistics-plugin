@@ -283,15 +283,24 @@ class API {
      * 保存秘钥
      * @param {string} userId 用户ID
      * @param {string} secretKey 秘钥
+     * @param {string} oldSecretKey 旧秘钥（可选，用于修改秘钥时验证）
+     * @param {string} verificationCode 验证码（可选，如果提供且验证成功，将跳过旧秘钥验证）
      * @returns {Promise} 保存结果
      */
-    async saveSecretKey(userId, secretKey) {
+    async saveSecretKey(userId, secretKey, oldSecretKey = null, verificationCode = null) {
+        const body = {
+            userId,
+            secretKey
+        };
+        if (oldSecretKey) {
+            body.oldSecretKey = oldSecretKey;
+        }
+        if (verificationCode) {
+            body.verificationCode = verificationCode;
+        }
         const result = await this.request('/api/save-secret-key', {
             method: 'POST',
-            body: {
-                userId,
-                secretKey
-            },
+            body: body,
         });
         return result;
     }
@@ -409,6 +418,19 @@ class API {
         return this.request(`/api/admin/users/${targetUserId}/role?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`, {
             method: 'PUT',
             body: { role },
+        });
+    }
+    
+    /**
+     * 重置用户密码（管理员）
+     * @param {string} targetUserId 目标用户ID
+     * @param {string} userId 当前用户ID
+     * @param {string} secretKey 秘钥
+     * @returns {Promise} 重置结果
+     */
+    async resetUserPassword(targetUserId, userId, secretKey) {
+        return this.request(`/api/admin/users/${targetUserId}/password?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`, {
+            method: 'PUT',
         });
     }
     

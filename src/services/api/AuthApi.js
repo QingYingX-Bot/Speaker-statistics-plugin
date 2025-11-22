@@ -126,8 +126,25 @@ export class AuthApi {
         this.app.post('/api/save-secret-key',
             this.authMiddleware.requireParams(['userId', 'secretKey']),
             ApiResponse.asyncHandler(async (req, res) => {
-                const { userId, oldSecretKey, secretKey } = req.body;
-                const result = await this.authService.saveSecretKey(userId, secretKey, oldSecretKey);
+                const { userId, oldSecretKey, secretKey, verificationCode } = req.body;
+                
+                // 如果提供了验证码，先验证验证码
+                // 验证码验证成功后，跳过旧秘钥验证
+                // consume=true 表示验证后删除验证码（一次性使用）
+                let skipOldKeyVerification = false;
+                if (verificationCode) {
+                    const verifyResult = this.verificationCodeManager.verifyCode(userId, verificationCode, true);
+                    if (!verifyResult.valid) {
+                        return ApiResponse.error(res, verifyResult.message || '验证码验证失败', 400);
+                    }
+                    // 验证码验证成功，跳过旧秘钥验证
+                    skipOldKeyVerification = true;
+                }
+                
+                // 如果验证码验证成功，不传递旧秘钥（跳过验证）
+                // 否则传递旧秘钥进行验证
+                const finalOldSecretKey = skipOldKeyVerification ? null : oldSecretKey;
+                const result = await this.authService.saveSecretKey(userId, secretKey, finalOldSecretKey);
                 
                 if (!result.success) {
                     return ApiResponse.error(res, result.message || '保存秘钥失败', 400);

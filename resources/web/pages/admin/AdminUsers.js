@@ -591,6 +591,64 @@ export class AdminUsers {
     }
     
     /**
+     * 重置用户密码
+     */
+    async resetUserPassword() {
+        if (!this.admin.selectedUserId) {
+            Toast.show('请先选择一个用户', 'error');
+            return;
+        }
+        
+        if (!this.admin.secretKey) {
+            Toast.show('请先验证权限', 'error');
+            return;
+        }
+        
+        const userName = this.admin.selectedUserData?.user?.username || this.admin.selectedUserId;
+        
+        const confirmed = await new Promise((resolve) => {
+            window.Modal.show('确认重置密码', `
+                <div class="space-y-3">
+                    <p class="text-gray-700 dark:text-gray-300">确定要将用户 <strong class="text-primary">${this.escapeHtml(userName)}</strong> 的密码重置为 <strong class="text-orange-600 dark:text-orange-400">123456</strong> 吗？</p>
+                    <p class="text-sm text-orange-600 dark:text-orange-400 font-medium">⚠️ 重置后用户需要使用新密码登录</p>
+                </div>
+            `, `
+                <button class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium" id="confirmResetPasswordBtn">确认重置</button>
+                <button class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium" onclick="Modal.hide()">取消</button>
+            `);
+            
+            setTimeout(() => {
+                const confirmBtn = document.getElementById('confirmResetPasswordBtn');
+                if (confirmBtn) {
+                    confirmBtn.addEventListener('click', () => {
+                        window.Modal.hide();
+                        resolve(true);
+                    });
+                }
+            }, 100);
+        });
+        
+        if (!confirmed) return;
+        
+        try {
+            const response = await api.resetUserPassword(
+                this.admin.selectedUserId,
+                this.admin.app.userId,
+                this.admin.secretKey
+            );
+            
+            if (response.success) {
+                Toast.show('密码已重置为 123456', 'success');
+            } else {
+                Toast.show(response.message || '重置密码失败', 'error');
+            }
+        } catch (error) {
+            console.error('重置密码失败:', error);
+            Toast.show('重置失败: ' + (error.message || '未知错误'), 'error');
+        }
+    }
+    
+    /**
      * 清除用户数据
      */
     async clearUserData() {
@@ -693,6 +751,14 @@ export class AdminUsers {
         if (updateRoleBtn) {
             updateRoleBtn.addEventListener('click', () => {
                 this.updateUserRole();
+            });
+        }
+        
+        // 重置用户密码按钮
+        const resetPasswordBtn = document.getElementById('resetUserPasswordBtn');
+        if (resetPasswordBtn) {
+            resetPasswordBtn.addEventListener('click', () => {
+                this.resetUserPassword();
             });
         }
         
