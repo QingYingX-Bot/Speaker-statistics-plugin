@@ -1,6 +1,6 @@
 {
   "name": "speaker-statistics-plugin",
-  "version": "3.1.44",
+  "version": "3.1.45",
   "description": "群聊水群统计插件 for Yunzai-Bot",
   "type": "module",
   "main": "index.js",
@@ -23,8 +23,7 @@
     "handlebars": "^4.7.8",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
-    "pg": "^8.11.3",
-    "sharp": "^0.32.6"
+    "pg": "^8.11.3"
   },
   "author": "QingYingX",
   "license": "MIT",

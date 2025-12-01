@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.44-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.45-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -437,7 +437,6 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 | better-sqlite3 | ^12.4.1 | SQLite 数据库驱动（可选） |
 | express | ^5.1.0 | Web服务器 |
 | handlebars | ^4.7.8 | 模板引擎 |
-| sharp | ^0.32.6 | 图片处理 |
 | multer | ^2.0.2 | 文件上传 |
 
 > 💡 **可选依赖**：`better-sqlite3` 为可选依赖，仅在使用 SQLite 时需要安装。如果只使用 PostgreSQL，则无需安装。

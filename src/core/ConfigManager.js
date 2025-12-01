@@ -376,6 +376,15 @@ class ConfigManager {
     }
 
     /**
+     * 记录警告日志（总是记录，不受debugLog控制）
+     * @param {string} message 日志消息
+     * @param {any[]} args 额外参数
+     */
+    warn(message, ...args) {
+        global.logger.warn(`[发言统计] ${message}`, ...args);
+    }
+
+    /**
      * 记录错误日志（总是记录，不受debugLog控制）
      * @param {string} message 日志消息
      * @param {any[]} args 额外参数

@@ -593,54 +593,36 @@ export class SQLiteAdapter extends BaseAdapter {
         `);
 
         // 检查并添加新字段（数据库迁移）
+        // 使用 PRAGMA table_info 检查列是否存在，避免重复添加
         try {
-            // SQLite 不支持直接检查列是否存在，需要捕获错误
-            // SQLite 错误格式: "SqliteError: duplicate column name: is_manual"
-            try {
-                await this.run(`ALTER TABLE user_display_achievements ADD COLUMN is_manual INTEGER DEFAULT 0`);
-            } catch (error) {
-                // 列已存在，忽略错误（检查错误消息和错误代码）
-                // better-sqlite3 错误格式: "SqliteError: duplicate column name: is_manual" (code: 'SQLITE_ERROR')
-                // sqlite3 错误格式: "Error: SQLITE_ERROR: duplicate column name: is_manual"
-                const errorMsg = (error.message || String(error) || '').toLowerCase();
-                const errorCode = (error.code || '').toString();
-                const isDuplicateColumn = errorMsg.includes('duplicate column') || 
-                                         errorMsg.includes('duplicate column name') ||
-                                         (errorCode === 'SQLITE_ERROR' && errorMsg.includes('duplicate'));
-                
-                if (isDuplicateColumn) {
-                    // 列已存在，静默忽略（这是正常的，因为新表已经包含这些列）
-                } else {
-                    // 其他错误，重新抛出
-                    throw error;
+            const tableInfo = await this.all(`PRAGMA table_info(user_display_achievements)`);
+            const columnNames = tableInfo.map(col => col.name.toLowerCase());
+            
+            // 检查并添加 is_manual 列（如果不存在）
+            if (!columnNames.includes('is_manual')) {
+                try {
+                    await this.run(`ALTER TABLE user_display_achievements ADD COLUMN is_manual INTEGER DEFAULT 0`);
+                    globalConfig.debug('[SQLite适配器] 已添加列: is_manual');
+                } catch (error) {
+                    // 如果添加失败，记录错误（但不抛出，因为可能是其他问题）
+                    globalConfig.warn('[SQLite适配器] 添加列 is_manual 失败:', error.message);
                 }
             }
             
-            try {
-                await this.run(`ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TEXT`);
-            } catch (error) {
-                // 列已存在，忽略错误（检查错误消息和错误代码）
-                // better-sqlite3 错误格式: "SqliteError: duplicate column name: auto_display_at" (code: 'SQLITE_ERROR')
-                // sqlite3 错误格式: "Error: SQLITE_ERROR: duplicate column name: auto_display_at"
-                const errorMsg = (error.message || String(error) || '').toLowerCase();
-                const errorCode = (error.code || '').toString();
-                const isDuplicateColumn = errorMsg.includes('duplicate column') || 
-                                         errorMsg.includes('duplicate column name') ||
-                                         (errorCode === 'SQLITE_ERROR' && errorMsg.includes('duplicate'));
-                
-                if (isDuplicateColumn) {
-                    // 列已存在，静默忽略（这是正常的，因为新表已经包含这些列）
-                } else {
-                    // 其他错误，重新抛出
-                    throw error;
+            // 检查并添加 auto_display_at 列（如果不存在）
+            if (!columnNames.includes('auto_display_at')) {
+                try {
+                    await this.run(`ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TEXT`);
+                    globalConfig.debug('[SQLite适配器] 已添加列: auto_display_at');
+                } catch (error) {
+                    // 如果添加失败，记录错误（但不抛出，因为可能是其他问题）
+                    globalConfig.warn('[SQLite适配器] 添加列 auto_display_at 失败:', error.message);
                 }
             }
         } catch (error) {
-            // 只有非重复列错误才记录
-            const errorMsg = error.message || '';
-            if (!errorMsg.includes('duplicate column') && !errorMsg.includes('duplicate column name')) {
-                globalConfig.error('[SQLite适配器] 数据库迁移失败:', error.message);
-            }
+            // 如果 PRAGMA 查询失败，可能是表不存在或其他问题
+            // 记录错误但不抛出，因为表创建可能已经成功
+            globalConfig.warn('[SQLite适配器] 检查表结构失败:', error.message);
         }
 
         // 群组信息表

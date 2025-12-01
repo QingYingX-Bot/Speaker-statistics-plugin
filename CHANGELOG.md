@@ -4,6 +4,40 @@
 
 ---
 
+## [3.1.45] - 2025-12-01
+
+### 🐛 问题修复
+
+#### SQLite 数据库建表优化
+- ✅ **修复重复列错误**：修复 SQLite 建表时出现的 "duplicate column name" 错误
+  - 使用 `PRAGMA table_info()` 检查列是否存在，避免重复添加列
+  - 修复 `is_manual` 和 `auto_display_at` 字段的重复定义问题
+  - 优化数据库迁移逻辑，兼容新表和旧表结构
+  - 添加详细的错误处理和日志记录
+
+### 🔧 技术优化
+
+#### 依赖清理
+- ✅ **移除 sharp 依赖**：完全移除 sharp 图片处理库
+  - 从 `package.json` 中移除 `sharp` 依赖
+  - 更新 `README.md`，移除 sharp 相关说明
+  - `BackgroundApi.js` 已使用无 Sharp 版本实现
+  - `ImageGenerator.js` 使用 puppeteer 生成图片，无需 sharp
+
+#### 代码清理
+- ✅ **清理未使用的导入**：移除未使用的模块导入
+  - 移除 `BackgroundApi.js` 中未使用的 `AuthService` 导入
+  - 移除 `BackgroundApi.js` 中未使用的 `pipeline` 导入
+  - 优化代码结构，提高可维护性
+
+### 📝 文档更新
+
+- ✅ 更新 README.md，更新版本号为 3.1.45
+- ✅ 更新 CHANGELOG.md，记录 3.1.45 版本的所有更新
+- ✅ 更新 package.json 版本号为 3.1.45
+
+---
+
 ## [3.1.44] - 2025-11-22
 
 ### ✨ 新增功能
