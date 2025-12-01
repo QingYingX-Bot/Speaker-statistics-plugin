@@ -400,25 +400,92 @@ class MessageRecorder {
     calculateWordCount(text) {
         if (!text || typeof text !== 'string') return 0;
 
-        // 确保是字符串类型
         const textStr = String(text);
         
+        // 快速检测：空字符串或只包含空白字符
+        if (textStr.trim().length === 0) return 0;
+        
+        // 检测特殊消息类型（卡片消息、聊天记录等），这些消息只计算为1个字
+        if (this.isSpecialMessage(textStr)) {
+            return 1;
+        }
+        
+        // 优化：使用正则表达式一次性匹配所有非空白字符，提高性能
         // 中文字符按1个字计算，其他非空白字符按1个字计算
         // 空白字符（空格、制表符、换行等）不计算
-        let count = 0;
-        for (let i = 0; i < textStr.length; i++) {
-            const char = textStr.charAt(i);
-            // 判断是否为中文字符（包括中文标点等扩展字符）
-            if (/[\u4e00-\u9fa5\u3400-\u4dbf\uf900-\ufaff]/.test(char)) {
-                count += 1;
-            } else if (char.trim()) {
-                // 非空白字符按1计算（包括英文、数字、符号等）
-                count += 1;
-            }
-            // 空白字符（空格、制表符、换行等）不计算
-        }
+        const nonWhitespacePattern = /\S/g;
+        
+        // 统计所有非空白字符数量（包括中文、英文、数字、符号等）
+        const matches = textStr.match(nonWhitespacePattern);
+        return matches ? matches.length : 0;
+    }
 
-        return count;
+    /**
+     * 检测是否为特殊消息类型（卡片消息、聊天记录等）
+     * 这些消息包含大量JSON结构，应该只计算为1个字
+     * @param {string} text 消息文本
+     * @returns {boolean} 是否为特殊消息
+     */
+    isSpecialMessage(text) {
+        if (!text || typeof text !== 'string' || text.length === 0) return false;
+
+        const textStr = String(text);
+        const textLength = textStr.length;
+        
+        // 快速检测：如果文本很短，不可能是JSON消息
+        if (textLength < 50) return false;
+        
+        // 优化：优先检测最常见的特殊消息类型（提前返回，避免不必要的计算）
+        // 检测1: QQ小程序卡片消息（最常见）
+        if (textStr.includes('"app":"com.tencent.miniapp') || 
+            textStr.includes('"app":"com.tencent.miniapp_')) {
+            return true;
+        }
+        
+        // 检测2: 聊天记录转发消息
+        if (textStr.includes('"app":"com.tencent.multimsg"')) {
+            return true;
+        }
+        
+        // 检测3: 包含 "view":"view_" 和 "app":" 的消息（卡片消息特征）
+        if (textStr.includes('"view":"view_') && textStr.includes('"app":"')) {
+            return true;
+        }
+        
+        // 如果已经检测到明确的特殊消息类型，直接返回
+        // 否则继续检测JSON结构特征（需要统计大括号）
+        
+        // 统计 { 和 } 的数量（使用单次遍历）
+        let openBraces = 0;
+        let closeBraces = 0;
+        for (let i = 0; i < textLength; i++) {
+            const char = textStr[i];
+            if (char === '{') openBraces++;
+            else if (char === '}') closeBraces++;
+        }
+        
+        // 检测4: 包含大量 {} 结构的消息（JSON格式）
+        // 如果包含超过5个 { 或 }，且占文本长度的一定比例，可能是JSON消息
+        if (openBraces >= 5 || closeBraces >= 5) {
+            const braceRatio = (openBraces + closeBraces) / textLength;
+            // 如果大括号占比超过5%，可能是JSON消息
+            if (braceRatio > 0.05) {
+                return true;
+            }
+        }
+        
+        // 检测5: 包含 "meta": 和大量嵌套JSON的消息（卡片消息特征）
+        if (textStr.includes('"meta":') && (openBraces >= 3 || closeBraces >= 3)) {
+            return true;
+        }
+        
+        // 检测6: 包含 "config": 和 "prompt": 的消息（卡片消息特征）
+        if (textStr.includes('"config":') && textStr.includes('"prompt":') && 
+            (openBraces >= 3 || closeBraces >= 3)) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
