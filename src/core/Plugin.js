@@ -215,6 +215,14 @@ class Plugin extends plugin {
         return await this.achievementCommands.showAchievementStatistics(e);
     }
 
+    async grantUserAchievement(e) {
+        return await this.achievementCommands.grantUserAchievement(e);
+    }
+
+    async addUserAchievement(e) {
+        return await this.achievementCommands.addUserAchievement(e);
+    }
+
     // 帮助命令
     async showHelp(e) {
         return await this.helpCommands.showHelp(e);

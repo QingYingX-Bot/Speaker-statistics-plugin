@@ -438,6 +438,24 @@ export function getConfigSchemas() {
     },
     {
       component: 'Divider',
+      label: '用户成就',
+      componentProps: {
+        orientation: 'left',
+        plain: true
+      }
+    },
+    {
+      field: 'userAchievements',
+      label: '用户成就（手动授予）',
+      bottomHelpMessage: '添加用户成就，这些成就需要管理员手动授予，无法自动获取。稀有度固定为 mythic（神话等级）',
+      component: 'GSubForm',
+      componentProps: {
+        multiple: true,
+        schemas: getUserAchievementSchemas()
+      }
+    },
+    {
+      component: 'Divider',
       label: '用户自定义成就',
       componentProps: {
         orientation: 'left',
@@ -605,6 +623,63 @@ function getAchievementSchemas(disabled = false) {
         disabled: disabled
       },
       bottomHelpMessage: disabled ? undefined : '仅用于"时间窗口"类型，ISO格式日期'
+    }
+  ];
+}
+
+/**
+ * 获取用户成就 Schema（手动授予的成就，稀有度固定为 mythic）
+ * @returns {Array} Schema 数组
+ */
+function getUserAchievementSchemas() {
+  return [
+    {
+      field: 'id',
+      label: '成就ID',
+      component: 'Input',
+      required: true,
+      componentProps: {
+        placeholder: '例如：user_special_achievement_1'
+      }
+    },
+    {
+      field: 'name',
+      label: '成就名称',
+      component: 'Input',
+      required: true,
+      componentProps: {
+        placeholder: '例如：特殊贡献者'
+      }
+    },
+    {
+      field: 'description',
+      label: '成就描述',
+      component: 'InputTextArea',
+      required: true,
+      componentProps: {
+        rows: 2,
+        placeholder: '成就的详细描述',
+        showCount: true,
+        maxLength: 200
+      }
+    },
+    {
+      field: 'category',
+      label: '分类',
+      component: 'Select',
+      required: true,
+      componentProps: {
+        placeholder: '请选择分类',
+        options: [
+          { label: '基础', value: 'basic' },
+          { label: '发言数', value: 'count' },
+          { label: '字数', value: 'words' },
+          { label: '活跃', value: 'active' },
+          { label: '每日', value: 'daily' },
+          { label: '连续', value: 'streak' },
+          { label: '时段', value: 'time' }
+        ]
+      }
     }
   ];
 }

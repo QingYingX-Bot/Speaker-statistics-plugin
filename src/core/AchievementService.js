@@ -258,12 +258,46 @@ class AchievementService {
     }
 
     /**
-     * 获取所有成就定义（包括群专属）
+     * 获取用户成就定义（来自 users.json）
+     * @returns {Object} 用户成就定义对象
+     */
+    getUserAchievementDefinitions() {
+        const usersJsonPath = path.join(this.achievementsDir, 'users.json');
+        const userDefinitions = {};
+        
+        try {
+            if (fs.existsSync(usersJsonPath)) {
+                const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'));
+                Object.assign(userDefinitions, fileData);
+                globalConfig.debug(`已加载用户成就文件: users.json`);
+            }
+        } catch (error) {
+            globalConfig.error(`加载用户成就文件失败: users.json`, error);
+        }
+        
+        return userDefinitions;
+    }
+
+    /**
+     * 检查成就是否是用户成就（来自 users.json，需要手动授予）
+     * @param {string} achievementId 成就ID
+     * @returns {boolean} 是否是用户成就
+     */
+    isUserAchievement(achievementId) {
+        const userDefinitions = this.getUserAchievementDefinitions();
+        return achievementId in userDefinitions;
+    }
+
+    /**
+     * 获取所有成就定义（包括群专属和用户成就）
      * @param {string} groupId 群号
      * @returns {Object} 成就定义对象
      */
     getAllAchievementDefinitions(groupId) {
         const globalDefinitions = this.getAchievementDefinitions();
+        
+        // 加载用户成就（来自 users.json）
+        const userDefinitions = this.getUserAchievementDefinitions();
         
         // 加载群专属成就
         const groupAchievementsDir = path.join(this.achievementsDir, 'group', groupId);
@@ -286,9 +320,10 @@ class AchievementService {
             globalConfig.error(`加载群专属成就失败 (${groupId}):`, error);
         }
 
-        // 合并全局和群专属成就
+        // 合并全局、用户成就和群专属成就
         return {
             ...globalDefinitions,
+            ...userDefinitions,
             ...groupDefinitions
         };
     }
@@ -517,8 +552,13 @@ class AchievementService {
         const newAchievements = [];
         let progressChanged = false;
 
-        // 检查每个成就（包含群专属）
+        // 检查每个成就（包含群专属和用户成就）
         for (const [achievementId, definition] of Object.entries(allDefinitions)) {
+            // 用户成就（来自 users.json）需要手动授予，跳过自动检查
+            if (this.isUserAchievement(achievementId)) {
+                continue;
+            }
+
             // 判断是否为全局成就（特殊成就或节日成就）
             const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);
 
@@ -673,6 +713,10 @@ class AchievementService {
 
             case 'time_window':
                 return this.checkTimeWindow(condition);
+
+            case 'manual_grant':
+                // 手动授予的成就（用户成就），不在此处检查，通过 grantUserAchievement 方法授予
+                return { matched: false, progressed: false };
 
             default:
                 return { matched: false, progressed: false };
@@ -955,6 +999,101 @@ class AchievementService {
         } catch (error) {
             globalConfig.error('设置显示成就失败:', error);
             return false;
+        }
+    }
+
+    /**
+     * 手动授予用户成就（来自 users.json）
+     * @param {string} groupId 群号
+     * @param {string} userId 用户ID
+     * @param {string} achievementId 成就ID
+     * @returns {Promise<{success: boolean, message: string, achievement?: Object}>}
+     */
+    async grantUserAchievement(groupId, userId, achievementId) {
+        try {
+            // 验证 groupId 是否有效
+            if (!groupId || groupId === 'undefined' || groupId === 'null') {
+                return {
+                    success: false,
+                    message: '此命令仅支持在群聊中使用'
+                };
+            }
+
+            // 检查成就是否是用户成就
+            if (!this.isUserAchievement(achievementId)) {
+                return {
+                    success: false,
+                    message: `成就 ${achievementId} 不是用户成就，无法手动授予`
+                };
+            }
+
+            // 获取成就定义
+            const userDefinitions = this.getUserAchievementDefinitions();
+            const definition = userDefinitions[achievementId];
+            
+            if (!definition) {
+                return {
+                    success: false,
+                    message: `未找到成就定义: ${achievementId}`
+                };
+            }
+
+            // 检查用户是否已经解锁此成就
+            const userAchievements = await this.getUserAchievements(groupId, userId);
+            const isAlreadyUnlocked = userAchievements.achievements[achievementId]?.unlocked;
+
+            // 解锁成就（使用 UTC+8 时区）
+            const unlockedAt = TimeUtils.formatDateTimeForDB();
+            
+            const achievementDataToSave = {
+                unlocked: true,
+                unlocked_at: unlockedAt,
+                progress: 1
+            };
+
+            // 用户成就：同步到用户所在的所有群聊
+            // 获取用户所有群组
+            const userGroups = await this.dbService.getUserGroups(userId);
+            
+            // 同步成就到所有群
+            for (const gId of userGroups) {
+                await this.saveUserAchievement(gId, userId, achievementId, achievementDataToSave);
+            }
+            
+            // 在所有群中设置为显示成就（手动设置，永久显示）
+            for (const gId of userGroups) {
+                await this.setDisplayAchievement(
+                    gId,
+                    userId,
+                    achievementId,
+                    definition.name,
+                    definition.rarity || 'mythic',
+                    true  // 手动设置，永久显示
+                );
+            }
+
+            // 用户成就同步到所有群，类似于全局成就
+            const groupCount = userGroups.length;
+            const scopeText = groupCount > 1 ? `（已同步到 ${groupCount} 个群聊）` : '';
+
+            return {
+                success: true,
+                message: isAlreadyUnlocked 
+                    ? `成就 "${definition.name}" 已经解锁，已重新设置为显示成就${scopeText}` 
+                    : `成功授予成就 "${definition.name}" 并设置为显示成就${scopeText}`,
+                achievement: {
+                    id: achievementId,
+                    name: definition.name,
+                    rarity: definition.rarity || 'mythic',
+                    isGlobal: true  // 用户成就同步到所有群，视为全局
+                }
+            };
+        } catch (error) {
+            globalConfig.error('授予用户成就失败:', error);
+            return {
+                success: false,
+                message: `授予成就失败: ${error.message}`
+            };
         }
     }
 

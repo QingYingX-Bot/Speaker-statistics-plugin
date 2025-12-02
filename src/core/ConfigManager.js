@@ -499,7 +499,7 @@ class ConfigManager {
     }
 
     /**
-     * 获取用户自定义成就配置数据
+     * 获取用户自定义成就配置数据（不包括 users.json）
      * @returns {Object} 用户成就配置对象
      */
     getUserAchievementsConfig() {
@@ -510,7 +510,9 @@ class ConfigManager {
 
             // 检查是否存在用户自定义目录
             if (fs.existsSync(achievementsDir)) {
-                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'));
+                const files = fs.readdirSync(achievementsDir).filter(file => 
+                    file.endsWith('.json') && file !== 'users.json'  // 排除 users.json
+                );
                 for (const file of files) {
                     const filePath = path.join(achievementsDir, file);
                     try {
@@ -526,6 +528,59 @@ class ConfigManager {
         } catch (error) {
             this.error('读取用户成就配置失败:', error);
             return {};
+        }
+    }
+
+    /**
+     * 获取用户成就配置数据（来自 users.json）
+     * @returns {Object} 用户成就配置对象
+     */
+    getUsersAchievementsConfig() {
+        try {
+            const dataDir = PathResolver.getDataDir();
+            const usersJsonPath = path.join(dataDir, 'achievements', 'users.json');
+            const achievements = {};
+
+            if (fs.existsSync(usersJsonPath)) {
+                try {
+                    const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'));
+                    Object.assign(achievements, fileData);
+                } catch (fileError) {
+                    this.error('加载用户成就文件失败: users.json', fileError);
+                }
+            }
+
+            return achievements;
+        } catch (error) {
+            this.error('读取用户成就配置失败:', error);
+            return {};
+        }
+    }
+
+    /**
+     * 保存用户成就配置数据（保存到 users.json）
+     * @param {Object} achievements 成就对象
+     * @returns {boolean} 是否成功
+     */
+    setUsersAchievementsConfig(achievements) {
+        try {
+            const dataDir = PathResolver.getDataDir();
+            const achievementsDir = path.join(dataDir, 'achievements');
+            
+            // 确保目录存在
+            PathResolver.ensureDirectory(achievementsDir);
+            
+            const filePath = path.join(achievementsDir, 'users.json');
+            const configContent = JSON.stringify(achievements, null, 2);
+            fs.writeFileSync(filePath, configContent);
+            
+            if (this.config?.global?.debugLog) {
+                this.debug('用户成就配置保存成功 (users.json)');
+            }
+            return true;
+        } catch (error) {
+            this.error('保存用户成就配置文件失败:', error);
+            return false;
         }
     }
 

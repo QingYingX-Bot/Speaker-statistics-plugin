@@ -19,6 +19,39 @@ export async function setConfigData(data, { Result }) {
       // 忽略系统默认成就，因为它只读
       if (keyPath === 'defaultAchievements') {
         // 默认成就不处理，跳过
+      } else if (keyPath === 'userAchievements') {
+        // 处理用户成就（来自 users.json）
+        const userAchievementsData = {};
+        
+        if (Array.isArray(value) && value.length > 0) {
+          value.forEach(achievement => {
+            const id = achievement.id;
+            if (id) {
+              // 用户成就使用 mythic 稀有度，条件类型为 manual_grant
+              userAchievementsData[id] = {
+                id: id,
+                name: achievement.name || '',
+                description: achievement.description || '',
+                rarity: 'mythic',  // 用户成就使用神话等级
+                category: achievement.category || 'basic',
+                condition: {
+                  type: 'manual_grant'  // 手动授予类型
+                }
+              };
+            }
+          });
+        }
+        
+        // 保存用户成就
+        if (Object.keys(userAchievementsData).length > 0) {
+          const success = globalConfig.setUsersAchievementsConfig(userAchievementsData);
+          if (!success) {
+            return Result.fail('保存用户成就配置失败，请查看日志');
+          }
+        } else {
+          // 如果列表为空，清空用户成就文件
+          globalConfig.setUsersAchievementsConfig({});
+        }
       } else if (keyPath === 'customAchievements') {
         // 处理自定义成就
         if (Array.isArray(value) && value.length > 0) {

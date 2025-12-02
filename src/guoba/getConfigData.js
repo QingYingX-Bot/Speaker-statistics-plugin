@@ -27,6 +27,25 @@ export async function getConfigData() {
       };
     });
     
+    // 获取用户成就（来自 users.json）并转换为表单格式
+    const usersAchievements = globalConfig.getUsersAchievementsConfig();
+    const userAchievementsList = Object.entries(usersAchievements).map(([id, achievement]) => {
+      const condition = achievement.condition || {};
+      const conditionType = condition.type || '';
+      
+      const achievementData = {
+        id: achievement.id || id,
+        name: achievement.name || '',
+        description: achievement.description || '',
+        rarity: achievement.rarity || 'mythic',
+        category: achievement.category || 'basic',
+        conditionType: conditionType || 'manual_grant',
+        conditionValue: condition.value || ''
+      };
+      
+      return achievementData;
+    });
+    
     // 获取用户自定义成就并转换为表单格式
     const userAchievements = globalConfig.getUserAchievementsConfig();
     const customAchievements = Object.entries(userAchievements).map(([id, achievement]) => {
@@ -127,6 +146,7 @@ export async function getConfigData() {
       achievements,
       defaultAchievements: defaultAchievementsList,
       customAchievements,
+      userAchievements: userAchievementsList,
       groupAchievements: groupAchievementsList
     };
   } catch (error) {

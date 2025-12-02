@@ -4,6 +4,7 @@ import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
 import { AchievementUtils } from '../core/utils/AchievementUtils.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import { segment } from 'oicq';
 
 /**
@@ -32,6 +33,14 @@ class AchievementCommands {
             {
                 reg: '^#水群成就统计$',
                 fnc: 'showAchievementStatistics'
+            },
+            {
+                reg: '^#水群成就给予\\s+(\\d+)\\s+(.+)$',
+                fnc: 'grantUserAchievement'
+            },
+            {
+                reg: '^#水群配置成就\\s+.+',
+                fnc: 'addUserAchievement'
             }
         ];
     }
@@ -291,6 +300,143 @@ class AchievementCommands {
         } catch (error) {
             globalConfig.error('显示成就统计失败:', error);
             return e.reply('查询失败，请稍后重试');
+        }
+    }
+
+    /**
+     * 授予用户成就（管理员命令）
+     */
+    async grantUserAchievement(e) {
+        // 验证管理员权限
+        const adminValidation = await CommonUtils.validateAdminPermission(e);
+        if (!adminValidation.valid) {
+            return e.reply(adminValidation.message);
+        }
+        
+        // 验证群消息
+        const groupValidation = CommonUtils.validateGroupMessage(e);
+        if (!groupValidation.valid) {
+            return e.reply(groupValidation.message);
+        }
+
+        // 双重检查：确保在群聊中且 group_id 存在
+        if (!e.group_id) {
+            return e.reply('此命令仅支持在群聊中使用');
+        }
+
+        try {
+            const match = e.msg.match(/^#水群成就给予\s+(\d+)\s+(.+)$/);
+            if (!match) {
+                return e.reply('格式错误，正确格式：#水群成就给予 <用户ID> <成就ID>\n示例：#水群成就给予 123456789 achievement_id');
+            }
+
+            const targetUserId = match[1].trim();
+            const achievementId = match[2].trim();
+            const groupId = String(e.group_id);
+
+            // 验证用户ID是否为数字
+            if (!/^\d+$/.test(targetUserId)) {
+                return e.reply('用户ID必须是数字');
+            }
+
+            // 授予成就
+            const result = await this.achievementService.grantUserAchievement(
+                groupId,
+                targetUserId,
+                achievementId
+            );
+
+            if (result.success) {
+                // 服务已经返回包含同步信息的完整消息，直接使用
+                return e.reply(`✅ ${result.message}`);
+            } else {
+                // 如果成就不存在，提供添加建议
+                if (result.message && result.message.includes('未找到成就定义')) {
+                    return e.reply(`❌ 此成就不存在: ${achievementId}\n\n💡 可以使用以下命令添加成就：\n#水群配置成就 <成就ID> <成就名称> <成就描述>\n\n示例：\n#水群配置成就 ${achievementId} 特殊成就 这是一个特殊成就`);
+                }
+                return e.reply(`❌ ${result.message}`);
+            }
+        } catch (error) {
+            globalConfig.error('授予用户成就失败:', error);
+            return e.reply('授予失败，请稍后重试');
+        }
+    }
+
+    /**
+     * 添加用户成就（管理员命令）
+     */
+    async addUserAchievement(e) {
+        // 验证管理员权限
+        const adminValidation = await CommonUtils.validateAdminPermission(e);
+        if (!adminValidation.valid) {
+            return e.reply(adminValidation.message);
+        }
+        
+        // 验证群消息
+        const groupValidation = CommonUtils.validateGroupMessage(e);
+        if (!groupValidation.valid) {
+            return e.reply(groupValidation.message);
+        }
+
+        // 双重检查：确保在群聊中且 group_id 存在
+        if (!e.group_id) {
+            return e.reply('此命令仅支持在群聊中使用');
+        }
+
+        try {
+            // 解析命令：格式为 #水群配置成就 <成就ID> <成就名称> <成就描述>
+            // 成就ID不能包含空格，名称和描述可以包含空格
+            const parts = e.msg.replace(/^#水群配置成就\s+/, '').split(/\s+/);
+            
+            if (parts.length < 3) {
+                return e.reply('格式错误，正确格式：#水群配置成就 <成就ID> <成就名称> <成就描述>\n示例：#水群配置成就 special_1 特殊成就 这是一个特殊成就');
+            }
+
+            const achievementId = parts[0].trim();
+            const achievementName = parts[1].trim();
+            const achievementDescription = parts.slice(2).join(' ').trim();
+
+            // 验证成就ID格式（不能包含空格）
+            if (/\s/.test(achievementId)) {
+                return e.reply('成就ID不能包含空格');
+            }
+
+            // 获取现有的用户成就
+            const existingAchievements = globalConfig.getUsersAchievementsConfig();
+
+            // 检查成就ID是否已存在
+            if (existingAchievements[achievementId]) {
+                return e.reply(`❌ 成就ID "${achievementId}" 已存在，请使用其他ID`);
+            }
+
+            // 创建新成就（使用默认参数）
+            const newAchievement = {
+                id: achievementId,
+                name: achievementName,
+                description: achievementDescription,
+                rarity: 'mythic',  // 默认使用神话等级
+                category: 'basic',  // 默认使用基础分类
+                condition: {
+                    type: 'manual_grant'  // 手动授予类型
+                }
+            };
+
+            // 添加到现有成就中
+            existingAchievements[achievementId] = newAchievement;
+
+            // 保存到 users.json
+            const success = globalConfig.setUsersAchievementsConfig(existingAchievements);
+
+            if (success) {
+                // 重新加载成就定义（清除缓存）
+                this.achievementService.reloadAchievements();
+                return e.reply(`✅ 成功添加用户成就：${achievementName}\n成就ID: ${achievementId}\n稀有度: mythic（神话等级）\n\n现在可以使用 #水群成就给予 <用户ID> ${achievementId} 来授予此成就`);
+            } else {
+                return e.reply('❌ 保存成就失败，请查看日志');
+            }
+        } catch (error) {
+            globalConfig.error('添加用户成就失败:', error);
+            return e.reply('添加失败，请稍后重试');
         }
     }
 }
