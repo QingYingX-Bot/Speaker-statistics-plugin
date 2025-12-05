@@ -731,10 +731,12 @@ class MessageRecorder {
                                         });
                                     }
                                     
-                                    // 输出日志
-                                    global.logger.mark(
-                                        `${global.logger.cyan('[成就解锁]')} ${global.logger.green(userNickname)}(${userId}) 在群 ${groupId} 解锁成就: ${rarityColor(achievementName)}`
-                                    );
+                                    // 输出日志（检查配置开关）
+                                    if (globalConfig.getConfig('global.enableAchievementLog') !== false) {
+                                        global.logger.mark(
+                                            `${global.logger.cyan('[成就解锁]')} ${global.logger.green(userNickname)}(${userId}) 在群 ${groupId} 解锁成就: ${rarityColor(achievementName)}`
+                                        );
+                                    }
                                 }
                             });
                         }

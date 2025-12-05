@@ -17,7 +17,9 @@ const configTemplate = {
         // 是否启用数据备份功能
         enableBackup: true,
         // 是否启用完成标记（用于大文件）
-        useOkMarker: false
+        useOkMarker: false,
+        // 是否启用成就解锁日志
+        enableAchievementLog: true
     },
 
     // 显示配置

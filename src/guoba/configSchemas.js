@@ -46,6 +46,12 @@ export function getConfigSchemas() {
       component: 'Switch'
     },
     {
+      field: 'global.enableAchievementLog',
+      label: '启用成就解锁日志',
+      bottomHelpMessage: '是否启用成就解锁日志输出',
+      component: 'Switch'
+    },
+    {
       label: '显示配置',
       // 第二个分组标记开始
       component: 'SOFT_GROUP_BEGIN'
