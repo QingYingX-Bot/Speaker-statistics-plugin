@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.1.47-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.1.48-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -46,7 +46,8 @@
 |------|------|------|
 | 个人统计 | `#水群查询` | 查看个人发言统计和排名（支持 @ 查询他人） |
 | 查询他人 | `#水群查询 @用户` | 查看指定用户的发言统计和排名 |
-| 群列表 | `#水群查询群列表` | 查看用户所在的所有群聊 |
+| 群列表 | `#水群查询群列表` | 查看用户所在的所有群聊（支持 @ 查询他人） |
+| 查询他人群列表 | `#水群查询群列表 @用户` | 查看指定用户所在的所有群聊 |
 | 群统计 | `#水群统计` | 查看当前群聊的统计信息 |
 | 群信息 | `#水群信息` | 查看当前群聊的详细信息 |
 
@@ -452,74 +453,6 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 | multer | ^2.0.2 | 文件上传 |
 
 > 💡 **可选依赖**：`better-sqlite3` 为可选依赖，仅在使用 SQLite 时需要安装。如果只使用 PostgreSQL，则无需安装。
-
-### 项目架构
-
-```
-Speaker-statistics-plugin/
-├── src/
-│   ├── core/                          # 核心模块
-│   │   ├── database/
-│   │   │   ├── DatabaseService.js     # 数据库服务（适配器选择器）
-│   │   │   └── adapters/              # 数据库适配器
-│   │   │       ├── BaseAdapter.js     # 适配器基类
-│   │   │       ├── PostgreSQLAdapter.js # PostgreSQL 适配器
-│   │   │       └── SQLiteAdapter.js   # SQLite 适配器
-│   │   ├── utils/                     # 工具类
-│   │   │   ├── PathResolver.js        # 路径解析器
-│   │   │   ├── TimeUtils.js           # 时间工具（UTC+8）
-│   │   │   ├── CommonUtils.js         # 通用工具
-│   │   │   ├── AchievementUtils.js   # 成就工具（稀有度配置和排序）
-│   │   │   ├── CommandWrapper.js     # 命令包装器（统一验证和错误处理）
-│   │   │   ├── PermissionManager.js  # 权限管理器（统一权限检查）
-│   │   │   └── KeyFileOptimizer.js   # key.json 优化工具（清理明文秘钥）
-│   │   ├── ConfigManager.js           # 配置管理
-│   │   ├── DataService.js             # 数据服务（单例）
-│   │   ├── AchievementService.js      # 成就服务
-│   │   ├── MessageRecorder.js         # 消息记录器（单例）
-│   │   └── Plugin.js                  # 插件主入口
-│   ├── commands/                      # 命令处理
-│   │   ├── RankCommands.js            # 排行榜命令
-│   │   ├── UserCommands.js            # 用户查询命令
-│   │   ├── AchievementCommands.js     # 成就命令
-│   │   ├── AdminCommands.js           # 管理员命令
-│   │   └── HelpCommands.js            # 帮助命令
-│   ├── managers/
-│   │   └── BackgroundManager.js       # 背景管理器
-│   ├── render/                        # 渲染模块
-│   │   ├── ImageGenerator.js          # 图片生成
-│   │   └── TemplateManager.js         # 模板管理
-│   └── services/
-│       ├── WebServer.js                # Web服务器（主服务器）
-│       ├── auth/                       # 认证相关服务
-│       │   ├── TokenManager.js         # Token管理
-│       │   ├── VerificationCodeManager.js # 验证码管理
-│       │   └── AuthService.js          # 认证服务
-│       ├── api/                        # API路由
-│       │   ├── AuthApi.js              # 认证API
-│       │   ├── StatsApi.js              # 统计API
-│       │   ├── RankingApi.js           # 排行榜API
-│       │   ├── AchievementApi.js      # 成就API
-│       │   ├── BackgroundApi.js        # 背景API
-│       │   └── AdminApi.js             # 管理API
-│       └── routes/                     # 页面路由
-│           └── PageRoutes.js          # 页面路由处理
-├── config/
-│   ├── configTemplate.js              # 配置模板
-│   ├── achievements-config.json       # 成就分类和稀有度配置
-│   └── achievements/                  # 系统默认成就目录（按分类分文件）
-├── data/
-│   ├── global.json                    # 全局配置
-│   ├── achievements/                  # 用户自定义成就目录
-│   │   ├── README.md                  # 成就配置说明文档
-│   │   └── group/                     # 群专属成就目录
-│   └── backups/                       # 备份目录
-├── guoba.support.js                   # Guoba-Plugin 集成
-├── index.js                           # 插件入口
-├── package.json                       # 项目配置
-├── README.md                          # 说明文档
-└── CHANGELOG.md                       # 更新日志
-```
 
 ---
 

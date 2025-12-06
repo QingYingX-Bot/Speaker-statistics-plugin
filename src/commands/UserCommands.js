@@ -5,6 +5,7 @@ import { TimeUtils } from '../core/utils/TimeUtils.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
 import { TextFormatter } from '../render/TextFormatter.js';
 import { segment } from 'oicq';
+import common from '../../../../lib/common/common.js';
 
 /**
  * 用户查询命令处理类
@@ -26,7 +27,7 @@ class UserCommands {
                 fnc: 'queryUserStats'
             },
             {
-                reg: '^#水群查询群列表$',
+                reg: '^#水群查询群列表(\\s+@.*)?$',
                 fnc: 'listUserGroups'
             },
             {
@@ -243,7 +244,24 @@ class UserCommands {
         }
 
         try {
-            const userId = String(e.sender.user_id);
+            // 解析 @ 用户
+            let userId, nickname;
+            const mentionedUser = this.parseMentionedUser(e);
+            
+            if (mentionedUser) {
+                // 查询 @ 的用户
+                userId = mentionedUser.userId;
+                nickname = mentionedUser.nickname;
+            } else {
+                // 查询自己
+                userId = String(e.sender?.user_id || e.user_id || '');
+                nickname = e.sender?.card || e.sender?.nickname || '未知用户';
+            }
+            
+            if (!userId) {
+                return e.reply('无法获取用户信息');
+            }
+
             const dbService = this.dataService.dbService;
             
             // 直接从数据库查询该用户所在的所有群（性能优化）
@@ -253,7 +271,10 @@ class UserCommands {
             );
 
             if (!userStatsList || userStatsList.length === 0) {
-                return e.reply('你在任何群中都没有统计数据');
+                const message = mentionedUser 
+                    ? `${nickname} 在任何群中都没有统计数据`
+                    : '你在任何群中都没有统计数据';
+                return e.reply(message);
             }
 
             const userGroups = [];
@@ -266,17 +287,29 @@ class UserCommands {
                 
                 // 只要有任何一个统计数据（发言数、字数、活跃天数），就显示该群
                 if (totalCount > 0 || totalWords > 0 || activeDays > 0) {
-                    // 获取群名称
+                    // 获取群名称：优先从数据库获取，然后从 Bot.gl 获取，最后使用默认值
                     let groupName = `群${userStats.group_id}`;
                     try {
-                        if (typeof Bot !== 'undefined' && Bot.gl) {
-                            const groupInfo = Bot.gl.get(userStats.group_id);
-                            if (groupInfo) {
-                                groupName = groupInfo.group_name || groupName;
+                        // 优先从数据库获取
+                        const groupInfo = await dbService.getGroupInfo(userStats.group_id);
+                        if (groupInfo && groupInfo.group_name) {
+                            groupName = groupInfo.group_name;
+                        } else {
+                            // 如果数据库中没有，尝试从 Bot.gl 获取
+                            if (typeof Bot !== 'undefined' && Bot.gl) {
+                                const botGroupInfo = Bot.gl.get(userStats.group_id);
+                                if (botGroupInfo) {
+                                    groupName = botGroupInfo.group_name || botGroupInfo.name || groupName;
+                                    // 如果从 Bot.gl 获取到了，保存到数据库
+                                    if (groupName !== `群${userStats.group_id}`) {
+                                        dbService.saveGroupInfo(userStats.group_id, groupName).catch(() => {});
+                                    }
+                                }
                             }
                         }
                     } catch (err) {
-                        // 忽略错误
+                        // 忽略错误，使用默认值
+                        globalConfig.debug('获取群名称失败:', err);
                     }
 
                     userGroups.push({
@@ -291,24 +324,59 @@ class UserCommands {
             }
 
             if (userGroups.length === 0) {
-                return e.reply('你在任何群中都没有统计数据');
+                const message = mentionedUser 
+                    ? `${nickname} 在任何群中都没有统计数据`
+                    : '你在任何群中都没有统计数据';
+                return e.reply(message);
             }
 
-            let text = `📊 你在以下群聊的统计数据：\n\n`;
+            // 使用数据库中的昵称（如果有），否则使用解析的昵称
+            // 尝试从第一个群统计中获取用户昵称
+            try {
+                const firstStat = userStatsList[0];
+                if (firstStat && firstStat.nickname) {
+                    nickname = firstStat.nickname;
+                }
+            } catch (err) {
+                // 忽略错误，使用原有昵称
+            }
+
+            // 构建合并转发消息
+            const msg = [];
+            
+            // 添加标题
+            const titleText = mentionedUser 
+                ? `📊 ${nickname} 在以下群聊的统计数据：\n`
+                : `📊 你在以下群聊的统计数据：\n`;
+            msg.push([
+                titleText,
+                `共 ${userGroups.length} 个群聊\n`
+            ]);
+
+            // 为每个群添加一条消息
             userGroups.forEach((group, index) => {
-                text += `${index + 1}. ${group.groupName} (${group.groupId})\n`;
-                text += `   总发言: ${CommonUtils.formatNumber(group.totalCount)} 条\n`;
-                text += `   总字数: ${CommonUtils.formatNumber(group.totalWords)} 字\n`;
-                text += `   活跃天数: ${group.activeDays} 天\n`;
-                text += `   最后发言: ${group.lastSpeakingTime}\n\n`;
+                const maskedGroupId = CommonUtils.maskGroupId(group.groupId);
+                msg.push([
+                    `${index + 1}. ${group.groupName}\n`,
+                    `群号: ${maskedGroupId}\n`,
+                    `总发言: ${CommonUtils.formatNumber(group.totalCount)} 条\n`,
+                    `总字数: ${CommonUtils.formatNumber(group.totalWords)} 字\n`,
+                    `活跃天数: ${group.activeDays} 天\n`,
+                    `最后发言: ${group.lastSpeakingTime}`
+                ]);
             });
 
-            // 计算总统计
+            // 计算总统计并添加到最后
             const totalCount = userGroups.reduce((sum, g) => sum + g.totalCount, 0);
             const totalWords = userGroups.reduce((sum, g) => sum + g.totalWords, 0);
-            text += `总计: ${CommonUtils.formatNumber(totalCount)} 条 / ${CommonUtils.formatNumber(totalWords)} 字`;
+            msg.push([
+                `📊 总计统计\n`,
+                `总发言: ${CommonUtils.formatNumber(totalCount)} 条\n`,
+                `总字数: ${CommonUtils.formatNumber(totalWords)} 字`
+            ]);
 
-            return e.reply(text);
+            // 发送合并转发消息
+            return e.reply(common.makeForwardMsg(e, msg, '水群查询群列表'));
         } catch (error) {
             globalConfig.error('查询用户群列表失败:', error);
             return e.reply('查询失败，请稍后重试');
