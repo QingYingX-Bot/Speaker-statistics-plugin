@@ -494,8 +494,8 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 ## 🙏 致谢
 
 - QingYingX & AI
-- [Yunzai-Bot] 项目组
+- [Trss-Yunzai](https://gitee.com/TimeRainStarSky/Yunzai)
 - [Guoba-Plugin](https://gitee.com/guoba-yunzai/guoba-plugin) 作者
-- [group-insight](https://github.com/KBVsent/group-insight) 作者
+- [group-insight](https://github.com/KBVsent/group-insight) 作者 水群榜插件使用其词云部分的代码
 - 所有贡献者和测试用户
 
