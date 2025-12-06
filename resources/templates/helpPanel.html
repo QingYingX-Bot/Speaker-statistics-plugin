@@ -129,6 +129,19 @@
         ]}
       ]);
 
+      const wordcloud = section('词云功能', null, [
+        { title: '群聊词云', items:[
+          { cmd:'#水群词云', desc:'生成当天群聊词云图' },
+          { cmd:'#水群词云 三天', desc:'生成近三天群聊词云图' },
+          { cmd:'#水群词云 七天', desc:'生成近七天群聊词云图' }
+        ]},
+        { title: '个人词云', items:[
+          { cmd:'#我的水群词云', desc:'生成当天个人词云图' },
+          { cmd:'#我的水群词云 三天', desc:'生成近三天个人词云图' },
+          { cmd:'#我的水群词云 七天', desc:'生成近七天个人词云图' }
+        ]}
+      ]);
+
       const achieve = section('成就系统', null, [
         { items:[
           { cmd:'#水群成就列表', desc:'查看当前群聊所有可获取的成就' },
@@ -151,7 +164,7 @@
       ]);
 
       const root = document.getElementById('help-root');
-      [basic, achieve, background, web].forEach(n => root.appendChild(n));
+      [basic, wordcloud, achieve, background, web].forEach(n => root.appendChild(n));
 
       if (isMaster) {
         const adminWrap = el('div', { class: 'admin-section section' }, [ el('div', { class: 'section-title' }, [ '管理员命令（仅主人）' ]) ]);

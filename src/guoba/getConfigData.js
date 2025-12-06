@@ -133,7 +133,8 @@ export async function getConfigData() {
       backgroundServer,
       database,
       dataStorage,
-      achievements
+      achievements,
+      wordcloud
     } = config;
     
     return {
@@ -144,6 +145,7 @@ export async function getConfigData() {
       database,
       dataStorage,
       achievements,
+      wordcloud,
       defaultAchievements: defaultAchievementsList,
       customAchievements,
       userAchievements: userAchievementsList,

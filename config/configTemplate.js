@@ -133,6 +133,34 @@ const configTemplate = {
         checkInterval: 0,
         // 成就排行榜显示数量
         rankingDisplayCount: 10
+    },
+
+    // 词云功能配置
+    wordcloud: {
+        // 是否启用消息收集（保存消息到 Redis 用于词云生成）
+        enableMessageCollection: false,
+        // 消息保留天数（默认 7 天）
+        retentionDays: 7,
+        // 最大显示词汇数
+        maxWords: 100,
+        // 最小词长度
+        minLength: 2,
+        // 最小词频（出现次数）
+        minFrequency: 2,
+        // 关键词提取方式：'frequency'（词频）或 'tfidf'（TF-IDF）
+        extractMethod: 'frequency',
+        // 图片尺寸
+        width: 1200,
+        height: 800,
+        // 背景颜色
+        backgroundColor: '#ffffff',
+        // 渲染配置
+        render: {
+            // 图片类型：'png' 或 'jpeg'
+            imgType: 'png',
+            // 图片质量（1-100，仅对 jpeg 有效）
+            quality: 100
+        }
     }
 };
 

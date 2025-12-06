@@ -166,17 +166,27 @@ class MessageRecorder {
             // 提取消息文本
             const messageText = this.extractMessageText(e);
             
+            // 获取消息时间戳（用于日志去重和 Redis 存储）
+            const messageTime = e.time || Date.now();
+            
             // 保存最新消息文本（用于成就检查）
             this.saveRecentMessageText(groupId, userId, messageText);
+            
+            // 保存消息到 Redis（用于词云功能，如果 Redis 可用）
+            if (typeof redis !== 'undefined' && redis && globalConfig.getConfig('wordcloud.enableMessageCollection')) {
+                this.saveMessageToRedis(e, groupId, userId, nickname, messageText, messageTime).catch(err => {
+                    // 静默处理，不影响主流程
+                    if (globalConfig.getConfig('global.debugLog')) {
+                        globalConfig.debug(`保存消息到Redis失败: ${err.message}`);
+                    }
+                });
+            }
 
             // 计算消息字数
             let wordCount = 0;
             if (globalConfig.getConfig('global.enableWordCount')) {
                 wordCount = this.calculateWordCount(messageText);
             }
-
-            // 获取消息时间戳（用于日志去重）
-            const messageTime = e.time || Date.now();
             
             // 使用已计算的 messageId 作为日志去重的唯一标识
             const logMessageId = messageId;
@@ -751,6 +761,47 @@ class MessageRecorder {
         } finally {
             // 清除处理标志（必须在 finally 中执行，确保锁被释放）
             this.isProcessingAchievements = false;
+        }
+    }
+
+    /**
+     * 保存消息到 Redis（用于词云功能）
+     * @param {Object} e - 消息事件对象
+     * @param {string} groupId - 群号
+     * @param {string} userId - 用户ID
+     * @param {string} nickname - 用户昵称
+     * @param {string} messageText - 消息文本
+     * @param {number} messageTime - 消息时间戳（秒）
+     */
+    async saveMessageToRedis(e, groupId, userId, nickname, messageText, messageTime) {
+        try {
+            if (typeof redis === 'undefined' || !redis) {
+                return;
+            }
+
+            const moment = (await import('moment')).default;
+            const date = moment.unix(messageTime).format('YYYY-MM-DD');
+            const key = `Speaker-statistics:messages:${groupId}:${date}`;
+            
+            const messageData = {
+                user_id: parseInt(userId),
+                nickname: nickname,
+                message: messageText,
+                time: messageTime,
+                timestamp: Date.now()
+            };
+
+            const messageStr = JSON.stringify(messageData);
+            await redis.lPush(key, messageStr);
+            
+            // 设置过期时间（保留 7 天）
+            const retentionDays = globalConfig.getConfig('wordcloud.retentionDays') || 7;
+            await redis.expire(key, retentionDays * 24 * 60 * 60);
+        } catch (error) {
+            // 静默处理，不影响主流程
+            if (globalConfig.getConfig('global.debugLog')) {
+                globalConfig.debug(`保存消息到Redis失败: ${error.message}`);
+            }
         }
     }
 
