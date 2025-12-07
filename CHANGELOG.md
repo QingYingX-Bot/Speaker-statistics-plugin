@@ -4,6 +4,46 @@
 
 ---
 
+## [3.2.11] - 2025-12-07
+
+### 🐛 问题修复
+
+#### PostgreSQL 数据库编码错误修复
+- ✅ **修复 NULL 字节编码错误**：修复 PostgreSQL 数据库插入数据时出现的 `invalid byte sequence for encoding "UTF8": 0x00` 错误
+  - PostgreSQL 的 UTF-8 编码不允许字符串中包含 NULL 字节（0x00）
+  - 当用户昵称或其他字符串数据包含 NULL 字节时，会导致数据库插入失败
+  - **增强字符串清理方法**：优化 `DatabaseService.sanitizeString()` 方法
+    - 不仅移除 NULL 字节（0x00），还移除其他可能导致编码问题的控制字符
+    - 保留常用字符（换行符、制表符等）
+    - 确保所有字符串数据在存储前都被正确清理
+  - **PostgreSQL 适配器层面自动清理**：在 `PostgreSQLAdapter` 中添加参数自动清理机制
+    - 新增 `sanitizeParam()` 和 `sanitizeParams()` 方法
+    - 支持递归清理数组和对象中的字符串
+    - 在所有数据库操作方法（`run`、`get`、`all`）中自动清理参数
+    - 确保所有传入 PostgreSQL 的参数都被自动处理，无需修改每个调用方法
+  - **双重保护机制**：
+    - DatabaseService 层面的清理（`sanitizeString` 方法）
+    - PostgreSQLAdapter 层面的自动清理（`sanitizeParams` 方法）
+    - 确保即使数据在传入前包含 NULL 字节，也会被自动清理
+  - 修复后，即使数据中包含 NULL 字节，也会在传入数据库前被自动清理，不会再出现编码错误
+
+### 🔧 技术优化
+
+#### 数据库适配器优化
+- ✅ **参数清理机制**：在 PostgreSQLAdapter 中实现统一的参数清理机制
+  - 自动清理所有字符串参数中的 NULL 字节和控制字符
+  - 支持递归处理数组和对象类型参数
+  - 在数据库操作前统一清理，确保数据安全
+  - 不影响其他类型参数（数字、布尔值等）
+
+### 📝 文档更新
+
+- ✅ 更新 README.md，更新版本号为 3.2.11
+- ✅ 更新 CHANGELOG.md，记录 3.2.11 版本的所有更新
+- ✅ 更新 package.json 版本号为 3.2.11
+
+---
+
 ## [3.2.1] - 2025-12-07
 
 ### ✨ 新增功能

@@ -357,6 +357,25 @@ class DatabaseService {
         return TimeUtils.formatDateTimeForDB();
     }
 
+    /**
+     * 清理字符串中的 null 字节（0x00），PostgreSQL 不允许 UTF-8 字符串中包含 null 字节
+     * @param {string|null|undefined} str 要清理的字符串
+     * @returns {string|null} 清理后的字符串，如果输入为 null 或 undefined 则返回 null
+     */
+    sanitizeString(str) {
+        if (str === null || str === undefined) {
+            return null;
+        }
+        // 转换为字符串
+        let cleaned = String(str);
+        // 移除所有 null 字节（0x00）
+        cleaned = cleaned.replace(/\0/g, '');
+        // 移除其他可能导致问题的控制字符（保留换行符、制表符等常用字符）
+        // 只移除可能导致编码问题的字符
+        cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, '');
+        return cleaned;
+    }
+
     // ========== 用户统计相关方法 ==========
 
     /**
@@ -379,6 +398,11 @@ class DatabaseService {
     async saveUserStats(groupId, userId, stats) {
         const now = this.getCurrentTime();
         
+        // 清理所有字符串字段中的 null 字节（PostgreSQL 不允许 UTF-8 字符串中包含 null 字节）
+        const sanitizedGroupId = this.sanitizeString(groupId) || '';
+        const sanitizedUserId = this.sanitizeString(userId) || '';
+        const sanitizedNickname = this.sanitizeString(stats.nickname) || '';
+        
         // 确保 last_speaking_time 是字符串或 null
         let lastSpeakingTime = stats.last_speaking_time || null;
         if (lastSpeakingTime instanceof Date) {
@@ -386,6 +410,8 @@ class DatabaseService {
         } else if (lastSpeakingTime && typeof lastSpeakingTime !== 'string') {
             lastSpeakingTime = String(lastSpeakingTime);
         }
+        // 清理 last_speaking_time 中的 null 字节
+        lastSpeakingTime = this.sanitizeString(lastSpeakingTime);
         
         // 使用 PostgreSQL 的 INSERT ... ON CONFLICT ... DO UPDATE 语法（UPSERT）
         // 这样可以避免并发时的主键冲突问题
@@ -404,9 +430,9 @@ class DatabaseService {
                 last_speaking_time = EXCLUDED.last_speaking_time,
                 updated_at = EXCLUDED.updated_at
         `,
-            groupId,
-            userId,
-            stats.nickname || '',
+            sanitizedGroupId,
+            sanitizedUserId,
+            sanitizedNickname,
             stats.total_count || 0,
             stats.total_words || 0,
             stats.active_days || 0,

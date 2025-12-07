@@ -88,6 +88,51 @@ export class PostgreSQLAdapter extends BaseAdapter {
     }
 
     /**
+     * 清理字符串参数中的 null 字节（0x00），PostgreSQL 不允许 UTF-8 字符串中包含 null 字节
+     * @param {any} param 要清理的参数
+     * @returns {any} 清理后的参数
+     */
+    sanitizeParam(param) {
+        if (param === null || param === undefined) {
+            return param;
+        }
+        // 如果是字符串，清理 null 字节
+        if (typeof param === 'string') {
+            // 移除所有 null 字节（0x00）
+            let cleaned = param.replace(/\0/g, '');
+            // 移除其他可能导致问题的控制字符（保留换行符、制表符等常用字符）
+            cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, '');
+            return cleaned;
+        }
+        // 如果是数组，递归清理每个元素
+        if (Array.isArray(param)) {
+            return param.map(item => this.sanitizeParam(item));
+        }
+        // 如果是对象，递归清理每个属性值
+        if (typeof param === 'object') {
+            const cleaned = {};
+            for (const [key, value] of Object.entries(param)) {
+                cleaned[key] = this.sanitizeParam(value);
+            }
+            return cleaned;
+        }
+        // 其他类型直接返回
+        return param;
+    }
+
+    /**
+     * 清理参数数组中的所有字符串参数
+     * @param {Array} params 参数数组
+     * @returns {Array} 清理后的参数数组
+     */
+    sanitizeParams(params) {
+        if (!params || params.length === 0) {
+            return params;
+        }
+        return params.map(param => this.sanitizeParam(param));
+    }
+
+    /**
      * 执行 SQL 语句（无返回值）
      * @param {string} sql SQL 语句
      * @param {...any} params 参数
@@ -101,7 +146,9 @@ export class PostgreSQLAdapter extends BaseAdapter {
         try {
             // PostgreSQL 使用 $1, $2, $3... 作为占位符
             const convertedSql = this.convertPlaceholders(sql);
-            const result = await this.pool.query(convertedSql, params);
+            // 清理所有参数中的 null 字节
+            const sanitizedParams = this.sanitizeParams(params);
+            const result = await this.pool.query(convertedSql, sanitizedParams);
             
             // PostgreSQL 如果需要获取插入的 ID，需要使用 RETURNING 子句
             let lastID = null;
@@ -132,7 +179,9 @@ export class PostgreSQLAdapter extends BaseAdapter {
 
         try {
             const convertedSql = this.convertPlaceholders(sql);
-            const result = await this.pool.query(convertedSql, params);
+            // 清理所有参数中的 null 字节
+            const sanitizedParams = this.sanitizeParams(params);
+            const result = await this.pool.query(convertedSql, sanitizedParams);
             return result.rows[0] || null;
         } catch (error) {
             globalConfig.error(`[PostgreSQL适配器] 查询失败: ${sql}`, error);
@@ -153,7 +202,9 @@ export class PostgreSQLAdapter extends BaseAdapter {
 
         try {
             const convertedSql = this.convertPlaceholders(sql);
-            const result = await this.pool.query(convertedSql, params);
+            // 清理所有参数中的 null 字节
+            const sanitizedParams = this.sanitizeParams(params);
+            const result = await this.pool.query(convertedSql, sanitizedParams);
             return result.rows || [];
         } catch (error) {
             globalConfig.error(`[PostgreSQL适配器] 查询失败: ${sql}`, error);
