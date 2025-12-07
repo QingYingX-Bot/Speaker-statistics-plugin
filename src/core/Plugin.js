@@ -240,6 +240,10 @@ class Plugin extends plugin {
         return await this.wordCloudCommands.generatePersonalWordCloud(e);
     }
 
+    async generateTotalWordCloud(e) {
+        return await this.wordCloudCommands.generateTotalWordCloud(e);
+    }
+
     // 背景设置
     async openBackgroundPage(e) {
         return await this.backgroundCommands.openBackgroundPage(e);

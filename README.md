@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.2.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.2.1-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -162,12 +162,16 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 | 个人词云 | `#我的水群词云` | 生成当天个人词云图 |
 | 个人词云（三天） | `#我的水群词云 三天` | 生成近三天个人词云图 |
 | 个人词云（七天） | `#我的水群词云 七天` | 生成近七天个人词云图 |
+| 总词云 | `#水群总词云` | 生成当天所有群的总词云图 |
+| 总词云（三天） | `#水群总词云 三天` | 生成近三天所有群的总词云图 |
+| 总词云（七天） | `#水群总词云 七天` | 生成近七天所有群的总词云图 |
 
 > 💡 **词云功能说明**：
 > - 需要配置 Redis 才能使用词云功能
 > - 需要在配置中启用消息收集（`wordcloud.enableMessageCollection: true`）
 > - 支持词频和 TF-IDF 两种关键词提取方式
 > - 使用 Puppeteer 渲染高质量词云图片
+> - 自动过滤无效消息：排除 JSON 格式的 QQ 小程序消息、机器人特殊消息格式、特定昵称的消息等，只使用纯文本消息生成词云
 
 ### 成就功能
 

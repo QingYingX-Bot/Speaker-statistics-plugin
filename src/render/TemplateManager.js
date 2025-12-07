@@ -392,11 +392,11 @@ class TemplateManager {
         // 如果 groupId 为 null（全局统计），不获取成就（成就按群聊存储）
         const displayAchievement = groupId ? await this.getUserDisplayAchievement(groupId, userId) : null;
 
-        // 计算统计数据
-        const totalCount = userData.total || userData.total_count || 0;
-        const totalWords = userData.total_number_of_words || 0;
-        const activeDays = userData.active_days || 0;
-        const continuousDays = userData.continuous_days || 0;
+        // 计算统计数据（确保所有值都是数字类型）
+        const totalCount = parseInt(userData.total || userData.total_count || 0, 10);
+        const totalWords = parseInt(userData.total_number_of_words || 0, 10);
+        const activeDays = parseInt(userData.active_days || 0, 10);
+        const continuousDays = parseInt(userData.continuous_days || 0, 10);
         const lastSpeakingTime = this.formatDate(userData.last_speaking_time);
         
         // 计算平均每日发言数
@@ -405,11 +405,11 @@ class TemplateManager {
         // 获取排名和占比信息
         const globalRank = userData.global_rank || null;
         const messagePercentage = userData.message_percentage || '0.00';
-        const todayCount = userData.today_count || 0;
-        const todayWords = userData.today_words || 0;
-        const monthCount = userData.month_count || 0;
-        const monthWords = userData.month_words || 0;
-        const groupCount = userData.group_count || 0;
+        const todayCount = parseInt(userData.today_count || 0, 10);
+        const todayWords = parseInt(userData.today_words || 0, 10);
+        const monthCount = parseInt(userData.month_count || 0, 10);
+        const monthWords = parseInt(userData.month_words || 0, 10);
+        const groupCount = parseInt(userData.group_count || 0, 10);
         
         // 生成全局信息（群个数、总字数和总发言数）
         let globalInfo = `累计发言 ${CommonUtils.formatNumber(totalCount)} 条 · 累计字数 ${CommonUtils.formatNumber(totalWords)} 字`;
@@ -454,7 +454,7 @@ class TemplateManager {
         statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">连续发言天数</div>
-						<div class="stat-value">${continuousDays}</div>
+						<div class="stat-value">${CommonUtils.formatNumber(continuousDays)}</div>
 					</div>
         `);
         
@@ -462,12 +462,12 @@ class TemplateManager {
         statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">总发言天数</div>
-						<div class="stat-value">${activeDays}</div>
+						<div class="stat-value">${CommonUtils.formatNumber(activeDays)}</div>
 					</div>
         `);
         
         // 4. 消息占比（如果有，显示贡献度）
-        if (messagePercentage !== '0.00') {
+        if (messagePercentage !== '0.00' && messagePercentage !== '0' && parseFloat(messagePercentage) > 0) {
             statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">消息占比</div>
@@ -479,7 +479,7 @@ class TemplateManager {
             statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">平均每日发言</div>
-						<div class="stat-value">${averageDaily}</div>
+						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
 					</div>
             `);
         } else {
@@ -487,7 +487,7 @@ class TemplateManager {
             statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">平均每日发言</div>
-						<div class="stat-value">${averageDaily}</div>
+						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
 					</div>
             `);
         }

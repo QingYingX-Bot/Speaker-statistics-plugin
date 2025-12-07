@@ -174,9 +174,15 @@
 				font-size: 45px;
 				font-weight: bold;
 				margin: 15px 0;
-				background: linear-gradient(45deg, #2c3e50, #3498db);
-				background-clip: text;
-				-webkit-text-fill-color: transparent;
+				display: block;
+				min-height: 54px;
+				line-height: 1.2;
+				/* 使用深蓝色，确保文字清晰可见 */
+				color: #2c3e50;
+				/* 文字渲染优化 */
+				text-rendering: optimizeLegibility;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
 			}
 
 			.stat-label {
