@@ -90,6 +90,10 @@ class WordCloudCommands {
             });
 
             if (!img) {
+                // 检查是否因为消息太少导致失败
+                if (messages.length < 5) {
+                    return e.reply(`最近${days}天的消息太少（仅${messages.length}条），无法生成词云`, true);
+                }
                 return e.reply('词云生成失败，请查看日志', true);
             }
 
@@ -176,6 +180,10 @@ class WordCloudCommands {
             });
 
             if (!img) {
+                // 检查是否因为消息太少导致失败
+                if (messages.length < 5) {
+                    return e.reply(`您在最近${days}天内的消息太少（仅${messages.length}条），无法生成词云`, true);
+                }
                 return e.reply('词云生成失败，请查看日志', true);
             }
 

@@ -29,6 +29,106 @@
 
 ---
 
+## 🚀 安装方法
+
+### 前置要求
+
+- Node.js 16+ 
+- 数据库（二选一）：
+  - PostgreSQL 12+（需要单独安装 PostgreSQL 服务器）
+  - SQLite 3+（无需安装，插件自带支持）
+- Yunzai-Bot
+
+### 安装步骤
+
+1. **克隆插件**
+
+```bash
+cd plugins
+# 使用 Gitee（国内推荐）
+git clone https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git Speaker-statistics-plugin
+# 或使用 GitHub
+git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git Speaker-statistics-plugin
+```
+
+2. **安装依赖**
+
+```bash
+cd Speaker-statistics-plugin
+pnpm install
+```
+
+> 💡 **提示**：
+> - `better-sqlite3` 已包含在依赖中，`pnpm install` 会自动安装
+> - 如果 `better-sqlite3` 安装失败（如 bindings 文件缺失），插件会自动回退到 `sqlite3`
+> - 如果只使用 PostgreSQL，可以忽略 SQLite 相关的安装错误
+> - 如果遇到安装问题，请参考 [数据库安装教程](DATABASE_SETUP.md) 中的常见问题部分
+
+3. **配置数据库**
+
+> 📖 **详细安装教程**：请参考 [数据库安装教程](DATABASE_SETUP.md)
+
+快速配置步骤：
+
+**方式一：使用 SQLite（推荐新手，无需安装数据库）**
+
+编辑 `data/global.json` 配置 SQLite：
+
+```json
+{
+  "database": {
+    "type": "sqlite",
+    "path": "speech_statistics.db"
+  }
+}
+```
+
+> 💡 **提示**：
+> - 如果只写文件名（如 `"speech_statistics.db"`），会自动放在插件 `data` 目录下
+> - 如果写相对路径（如 `"data/my.db"`），会相对于插件目录
+> - 如果写绝对路径，则使用该路径
+> - 如果不指定 `path`，默认使用 `speech_statistics.db`（在插件 `data` 目录下）
+
+**方式二：使用 PostgreSQL（适合生产环境）**
+
+创建 PostgreSQL 数据库：
+
+```sql
+CREATE DATABASE speech_statistics;
+CREATE USER speech_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
+```
+
+编辑 `data/global.json` 配置 PostgreSQL：
+
+```json
+{
+  "database": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "database": "speech_statistics",
+    "user": "speech_user",
+    "password": "your_secure_password",
+    "pool": {
+      "max": 20,
+      "min": 5,
+      "idleTimeoutMillis": 30000
+    }
+  }
+}
+```
+
+> 💡 **提示**：如果不指定 `type`，默认使用 PostgreSQL（向后兼容）。
+
+4. **启动插件**
+
+重启 Yunzai-Bot，插件会自动初始化数据库表结构并启动Web服务器。
+
+> 💡 **Web服务器**：插件会自动启动Web服务器（默认端口39999），提供Web管理界面。可通过 `data/global.json` 中的 `webServer` 配置项修改端口等设置。
+
+---
+
 ## 📊 功能详情
 
 ### 排行榜功能
@@ -201,106 +301,6 @@
 
 ---
 
-## 🚀 安装方法
-
-### 前置要求
-
-- Node.js 16+ 
-- 数据库（二选一）：
-  - PostgreSQL 12+（需要单独安装 PostgreSQL 服务器）
-  - SQLite 3+（无需安装，插件自带支持）
-- Yunzai-Bot
-
-### 安装步骤
-
-1. **克隆插件**
-
-```bash
-cd plugins
-# 使用 Gitee（国内推荐）
-git clone https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git Speaker-statistics-plugin
-# 或使用 GitHub
-git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git Speaker-statistics-plugin
-```
-
-2. **安装依赖**
-
-```bash
-cd Speaker-statistics-plugin
-pnpm install
-```
-
-> 💡 **提示**：
-> - `better-sqlite3` 已包含在依赖中，`pnpm install` 会自动安装
-> - 如果 `better-sqlite3` 安装失败（如 bindings 文件缺失），插件会自动回退到 `sqlite3`
-> - 如果只使用 PostgreSQL，可以忽略 SQLite 相关的安装错误
-> - 如果遇到安装问题，请参考 [数据库安装教程](DATABASE_SETUP.md) 中的常见问题部分
-
-3. **配置数据库**
-
-> 📖 **详细安装教程**：请参考 [数据库安装教程](DATABASE_SETUP.md)
-
-快速配置步骤：
-
-**方式一：使用 SQLite（推荐新手，无需安装数据库）**
-
-编辑 `data/global.json` 配置 SQLite：
-
-```json
-{
-  "database": {
-    "type": "sqlite",
-    "path": "speech_statistics.db"
-  }
-}
-```
-
-> 💡 **提示**：
-> - 如果只写文件名（如 `"speech_statistics.db"`），会自动放在插件 `data` 目录下
-> - 如果写相对路径（如 `"data/my.db"`），会相对于插件目录
-> - 如果写绝对路径，则使用该路径
-> - 如果不指定 `path`，默认使用 `speech_statistics.db`（在插件 `data` 目录下）
-
-**方式二：使用 PostgreSQL（适合生产环境）**
-
-创建 PostgreSQL 数据库：
-
-```sql
-CREATE DATABASE speech_statistics;
-CREATE USER speech_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
-```
-
-编辑 `data/global.json` 配置 PostgreSQL：
-
-```json
-{
-  "database": {
-    "type": "postgresql",
-    "host": "localhost",
-    "port": 5432,
-    "database": "speech_statistics",
-    "user": "speech_user",
-    "password": "your_secure_password",
-    "pool": {
-      "max": 20,
-      "min": 5,
-      "idleTimeoutMillis": 30000
-    }
-  }
-}
-```
-
-> 💡 **提示**：如果不指定 `type`，默认使用 PostgreSQL（向后兼容）。
-
-4. **启动插件**
-
-重启 Yunzai-Bot，插件会自动初始化数据库表结构并启动Web服务器。
-
-> 💡 **Web服务器**：插件会自动启动Web服务器（默认端口39999），提供Web管理界面。可通过 `data/global.json` 中的 `webServer` 配置项修改端口等设置。
-
----
-
 ## ⚙️ 配置说明
 
 ### 数据库配置
@@ -455,22 +455,6 @@ pg_dump -U your_username -d speech_statistics > data/backups/backup_$(date +%Y%m
 # 恢复
 psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 ```
-
----
-
-## 📋 技术栈
-
-### 核心依赖
-
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| pg | ^8.11.3 | PostgreSQL 数据库驱动 |
-| better-sqlite3 | ^12.4.1 | SQLite 数据库驱动（可选） |
-| express | ^5.1.0 | Web服务器 |
-| handlebars | ^4.7.8 | 模板引擎 |
-| multer | ^2.0.2 | 文件上传 |
-
-> 💡 **可选依赖**：`better-sqlite3` 为可选依赖，仅在使用 SQLite 时需要安装。如果只使用 PostgreSQL，则无需安装。
 
 ---
 
