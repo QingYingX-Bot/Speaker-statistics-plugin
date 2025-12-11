@@ -1,4 +1,4 @@
-import { getDataService } from '../../core/DataService.js';
+import { BaseApi } from './BaseApi.js';
 import { ApiResponse } from './utils/ApiResponse.js';
 import fs from 'fs';
 import path from 'path';
@@ -8,21 +8,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * 统计数据相关API路由
+ * 统计数据相关API路由（包含排行榜功能）
  */
-export class StatsApi {
-    constructor(app) {
-        this.app = app;
-        this.dataService = getDataService();
-    }
+export class StatsApi extends BaseApi {
 
     /**
      * 注册所有统计数据相关API路由
      */
     registerRoutes() {
         // 获取用户统计
-        this.app.get('/api/stats/user/:userId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/stats/user/:userId', async (req, res) => {
                 const { userId } = req.params;
                 const { groupId } = req.query;
                 
@@ -42,12 +37,10 @@ export class StatsApi {
                     ...userData,
                     rank: userRank?.rank || null
                 });
-            }, '获取用户统计失败')
-        );
+        }, '获取用户统计失败');
 
         // 获取群统计
-        this.app.get('/api/stats/group/:groupId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/stats/group/:groupId', async (req, res) => {
                 const { groupId } = req.params;
                 
                 // 获取格式化的群名称
@@ -81,12 +74,10 @@ export class StatsApi {
                     total_messages: totalMessages,
                     total_words: totalWords
                 });
-            }, '获取群统计失败')
-        );
+        }, '获取群统计失败');
 
         // 获取用户所在的所有群列表
-        this.app.get('/api/stats/user/:userId/groups',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/stats/user/:userId/groups', async (req, res) => {
                 const { userId } = req.params;
                 const groupIds = await this.dataService.dbService.getUserGroups(userId);
                 
@@ -100,12 +91,10 @@ export class StatsApi {
                 }));
                 
                 ApiResponse.success(res, groups);
-            }, '获取用户群列表失败')
-        );
+        }, '获取用户群列表失败');
 
         // 获取系统版本信息
-        this.app.get('/api/system/version',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/system/version', async (req, res) => {
                 try {
                     // 读取 package.json 文件
                     const packagePath = path.resolve(__dirname, '../../../package.json');
@@ -126,7 +115,24 @@ export class StatsApi {
                         description: ''
                     });
                 }
-            }, '获取系统版本信息失败')
-        );
+        }, '获取系统版本信息失败');
+
+        // 获取排行榜（原 RankingApi 功能）
+        this.get('/api/rankings/:type/:groupId', async (req, res) => {
+                const { type, groupId } = req.params;
+                const { limit = 20, page = 1 } = req.query;
+                const actualLimit = parseInt(limit, 10);
+                const actualPage = parseInt(page, 10);
+                
+                // 处理全局查询（groupId为'all'）
+                const actualGroupId = groupId === 'all' ? null : groupId;
+                
+                const rankings = await this.dataService.getRankingData(actualGroupId, type, {
+                    limit: actualLimit,
+                    page: actualPage
+                });
+
+                ApiResponse.success(res, rankings);
+        }, '获取排行榜失败');
     }
 }

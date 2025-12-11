@@ -1,117 +1,39 @@
+import { BaseApi } from './BaseApi.js';
 import { getDataService } from '../../core/DataService.js';
 import { getMessageRecorder } from '../../core/MessageRecorder.js';
-import { AchievementService } from '../../core/AchievementService.js';
 import { AuthService } from '../auth/AuthService.js';
 import { AuthMiddleware } from './middleware/AuthMiddleware.js';
 import { ApiResponse } from './utils/ApiResponse.js';
 import { globalConfig } from '../../core/ConfigManager.js';
 import { TimeUtils } from '../../core/utils/TimeUtils.js';
+import { GroupManagementApi } from './admin/GroupManagementApi.js';
+import { UserManagementApi } from './admin/UserManagementApi.js';
+import { AchievementManagementApi } from './admin/AchievementManagementApi.js';
 
 /**
- * 管理员相关API路由
+ * 管理员相关API路由（核心功能：概览、统计、词云、配置）
  */
-export class AdminApi {
+export class AdminApi extends BaseApi {
     constructor(app, authService) {
-        this.app = app;
+        super(app);
         this.authService = authService;
         this.dataService = getDataService();
-        this.achievementService = new AchievementService(this.dataService);
         this.authMiddleware = new AuthMiddleware(authService);
+        
+        // 初始化子模块
+        this.groupManagementApi = new GroupManagementApi(app, authService);
+        this.userManagementApi = new UserManagementApi(app, authService);
+        this.achievementManagementApi = new AchievementManagementApi(app, authService);
     }
 
     /**
      * 注册所有管理员相关API路由
      */
     registerRoutes() {
-        // 获取所有群列表（管理员）
-        this.app.get('/api/admin/groups', 
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                // 获取所有群ID
-                const groupRows = await this.dataService.dbService.all(
-                    'SELECT DISTINCT group_id FROM user_stats'
-                );
-                
-                // 格式化群信息
-                const groups = await Promise.all(groupRows.map(async (row) => {
-                    const groupId = row.group_id;
-                    const groupName = await this.dataService.dbService.getFormattedGroupName(groupId);
-                    return {
-                        group_id: groupId,
-                        group_name: groupName
-                    };
-                }));
-                
-                ApiResponse.success(res, groups);
-            }, '获取群列表失败')
-        );
-
-        // 清除群统计（管理员）
-        this.app.delete('/api/admin/stats/:groupId',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const { groupId } = req.params;
-                await this.dataService.clearGroupStats(groupId);
-                ApiResponse.success(res, null, '清除成功');
-            }, '清除统计失败')
-        );
-
-        // 获取用户列表（管理员）
-        this.app.get('/api/admin/users',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const users = await this.authService.getAllUsers();
-                ApiResponse.success(res, users);
-            }, '获取用户列表失败')
-        );
-
-        // 获取权限信息（管理员）
-        this.app.get('/api/admin/permission',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                ApiResponse.success(res, req.auth.permission);
-            }, '获取权限信息失败')
-        );
-
-        // 更新用户角色（管理员）
-        this.app.put('/api/admin/users/:userId/role',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            this.authMiddleware.requireParams(['role']),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const { userId } = req.params;
-                const { role } = req.body;
-
-                if (role !== 'admin' && role !== 'user') {
-                    return ApiResponse.error(res, '角色必须是 admin 或 user', 400);
-                }
-
-                const result = await this.authService.updateUserRole(userId, role);
-
-                if (!result.success) {
-                    return ApiResponse.error(res, result.message || '更新角色失败', 400);
-                }
-
-                ApiResponse.success(res, null, result.message || '角色更新成功');
-            }, '更新用户角色失败')
-        );
-
-        // 重置用户密码（管理员）
-        this.app.put('/api/admin/users/:userId/password',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const { userId } = req.params;
-                const defaultPassword = '123456';
-
-                // 使用 AuthService 的 saveSecretKey 方法重置密码
-                const result = await this.authService.saveSecretKey(userId, defaultPassword);
-
-                if (!result.success) {
-                    return ApiResponse.error(res, result.message || '重置密码失败', 400);
-                }
-
-                ApiResponse.success(res, { password: defaultPassword }, result.message || '密码已重置为 123456');
-            }, '重置用户密码失败')
-        );
+        // 注册子模块路由
+        this.groupManagementApi.registerRoutes();
+        this.userManagementApi.registerRoutes();
+        this.achievementManagementApi.registerRoutes();
 
         // 获取统计概览（管理员）
         this.app.get('/api/admin/overview',
@@ -707,9 +629,6 @@ export class AdminApi {
                 }
             }, '更新配置失败')
         );
-        
-        // 注册成就管理相关路由
-        this._registerAchievementRoutes();
     }
     
     /**
@@ -841,109 +760,5 @@ export class AdminApi {
             });
         
         return wordFreqArray;
-    }
-    
-    /**
-     * 获取成就列表（管理员）
-     */
-    _registerAchievementRoutes() {
-        // 获取成就列表（管理员）
-        this.app.get('/api/admin/achievements/list/:groupId',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const { groupId } = req.params;
-                
-                const definitions = this.achievementService.getAchievementDefinitions();
-                const achievements = [];
-                
-                for (const [id, def] of Object.entries(definitions)) {
-                    achievements.push({
-                        id,
-                        name: def.name || id,
-                        description: def.description || '',
-                        category: def.category || '未分类',
-                        rarity: def.rarity || 'Common',
-                        ...def
-                    });
-                }
-                
-                ApiResponse.success(res, { achievements });
-            }, '获取成就列表失败')
-        );
-        
-        // 获取成就统计（管理员）
-        this.app.get('/api/admin/achievements/stats/:groupId',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const { groupId } = req.params;
-                const definitions = this.achievementService.getAchievementDefinitions();
-                const stats = [];
-                
-                // 获取群组总用户数（用于计算百分比）
-                const totalUsersResult = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT user_id) as total FROM user_stats WHERE group_id = $1',
-                    groupId
-                ).catch(() => ({ total: 0 }));
-                const totalUsers = parseInt(totalUsersResult?.total || 0, 10);
-                
-                for (const [id, def] of Object.entries(definitions)) {
-                    const isGlobal = def.rarity === 'Special' || def.rarity === 'Festival';
-                    const unlockCount = await this.dataService.dbService.getAchievementUnlockCount(
-                        id,
-                        isGlobal ? null : groupId,
-                        isGlobal
-                    ).catch(() => 0);
-                    
-                    const percentage = totalUsers > 0 
-                        ? ((unlockCount / totalUsers) * 100).toFixed(2)
-                        : 0;
-                    
-                    stats.push({
-                        achievement_id: id,
-                        user_count: unlockCount,
-                        percentage: parseFloat(percentage)
-                    });
-                }
-                
-                ApiResponse.success(res, stats);
-            }, '获取成就统计失败')
-        );
-        
-        // 获取全部成就统计（所有群组汇总）
-        this.app.get('/api/admin/achievements/stats/all',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                const definitions = this.achievementService.getAchievementDefinitions();
-                const stats = [];
-                
-                // 获取所有群组的总用户数（去重）
-                const totalUsersResult = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT user_id) as total FROM user_stats'
-                ).catch(() => ({ total: 0 }));
-                const totalUsers = parseInt(totalUsersResult?.total || 0, 10);
-                
-                for (const [id, def] of Object.entries(definitions)) {
-                    // 对于全部统计，需要统计所有群组的数据
-                    // 使用全局统计，不限制群组
-                    const unlockCount = await this.dataService.dbService.get(
-                        'SELECT COUNT(DISTINCT user_id) as count FROM user_achievements WHERE achievement_id = $1',
-                        id
-                    ).catch(() => ({ count: 0 }));
-                    
-                    const count = parseInt(unlockCount?.count || 0, 10);
-                    const percentage = totalUsers > 0 
-                        ? ((count / totalUsers) * 100).toFixed(2)
-                        : 0;
-                    
-                    stats.push({
-                        achievement_id: id,
-                        user_count: count,
-                        percentage: parseFloat(percentage)
-                    });
-                }
-                
-                ApiResponse.success(res, stats);
-            }, '获取全部成就统计失败')
-        );
     }
 }

@@ -1,6 +1,7 @@
 import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
 import { TextFormatter } from '../render/TextFormatter.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
@@ -67,7 +68,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 总榜应该查询所有群聊，不限制群ID
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
@@ -120,10 +121,9 @@ class RankCommands {
                 const text = this.textFormatter.formatRankingMessage(rankings, '总榜', userRankData);
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示总榜失败:', error);
+        }, '获取总榜失败', async (error) => {
             return e.reply('获取总榜失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -135,7 +135,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
@@ -188,10 +188,9 @@ class RankCommands {
                 const text = this.textFormatter.formatRankingMessage(rankings, '日榜', userRankData);
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示日榜失败:', error);
+        }, '获取日榜失败', async (error) => {
             return e.reply('获取日榜失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -203,7 +202,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
@@ -256,10 +255,9 @@ class RankCommands {
                 const text = this.textFormatter.formatRankingMessage(rankings, '周榜', userRankData);
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示周榜失败:', error);
+        }, '获取周榜失败', async (error) => {
             return e.reply('获取周榜失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -271,7 +269,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
@@ -324,10 +322,9 @@ class RankCommands {
                 const text = this.textFormatter.formatRankingMessage(rankings, '月榜', userRankData);
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示月榜失败:', error);
+        }, '获取月榜失败', async (error) => {
             return e.reply('获取月榜失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -339,7 +336,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
@@ -392,10 +389,9 @@ class RankCommands {
                 const text = this.textFormatter.formatRankingMessage(rankings, '年榜', userRankData);
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示年榜失败:', error);
+        }, '获取年榜失败', async (error) => {
             return e.reply('获取年榜失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -407,7 +403,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const groupName = e.group?.name || `群${groupId}`;
             const users = await this.dataService.dbService.getAllGroupUsers(groupId);
@@ -463,10 +459,9 @@ class RankCommands {
                 `平均消息数: ${users.length > 0 ? CommonUtils.formatNumber(Math.round(totalMessages / users.length)) : 0}`;
 
             return e.reply(text);
-        } catch (error) {
-            globalConfig.error('显示群统计失败:', error);
+        }, '获取群统计失败', async (error) => {
             return e.reply('获取群统计失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -524,7 +519,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 获取全局信息（所有群组）
             const allGroupIds = await this.dataService.dbService.getAllGroupIds();
             const groupCount = allGroupIds.length;
@@ -566,10 +561,9 @@ class RankCommands {
             text += `记录用户数: ${CommonUtils.formatNumber(totalUsers)} 人\n`;
 
             return e.reply(text);
-        } catch (error) {
-            globalConfig.error('显示群信息失败:', error);
+        }, '获取群信息失败', async (error) => {
             return e.reply('获取群信息失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -581,7 +575,7 @@ class RankCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 解析页码参数（如果有）
             const match = e.msg.match(/\s+(\d+)/);
             const page = match ? parseInt(match[1], 10) : 1;
@@ -626,10 +620,9 @@ class RankCommands {
             }
 
             return e.reply(text + '暂无群聊统计数据');
-        } catch (error) {
-            globalConfig.error('显示全局统计失败:', error);
+        }, '获取全局统计失败', async (error) => {
             return e.reply('获取全局统计失败，请稍后重试');
-        }
+        });
     }
 
 }

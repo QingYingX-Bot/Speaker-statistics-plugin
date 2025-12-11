@@ -1,6 +1,8 @@
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
+import { segment } from 'oicq';
 
 /**
  * 帮助命令处理类
@@ -31,7 +33,8 @@ class HelpCommands {
             return e.reply(validation.message);
         }
 
-        // 检查是否使用图片模式
+        return await CommandWrapper.safeExecute(async () => {
+            // 检查是否使用图片模式
         const usePicture = globalConfig.getConfig('display.usePicture');
         if (usePicture) {
             try {
@@ -103,7 +106,10 @@ class HelpCommands {
 【帮助】
 #水群帮助 - 显示此帮助信息`;
 
-        return e.reply(helpText);
+            return e.reply(helpText);
+        }, '显示帮助信息失败', async (error) => {
+            return e.reply('显示帮助信息失败，请稍后重试');
+        });
     }
 }
 

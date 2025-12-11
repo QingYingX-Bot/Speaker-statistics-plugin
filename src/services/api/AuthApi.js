@@ -1,3 +1,4 @@
+import { BaseApi } from './BaseApi.js';
 import { AuthService } from '../auth/AuthService.js';
 import { TokenManager } from '../auth/TokenManager.js';
 import { VerificationCodeManager } from '../auth/VerificationCodeManager.js';
@@ -9,9 +10,9 @@ import { WebLinkGenerator } from '../../core/utils/WebLinkGenerator.js';
 /**
  * 认证相关API路由
  */
-export class AuthApi {
+export class AuthApi extends BaseApi {
     constructor(app, authService, tokenManager, verificationCodeManager) {
-        this.app = app;
+        super(app);
         this.authService = authService;
         this.tokenManager = tokenManager;
         this.verificationCodeManager = verificationCodeManager;
@@ -24,8 +25,7 @@ export class AuthApi {
      */
     registerRoutes() {
         // 获取当前用户信息（从cookie或token）
-        this.app.get('/api/current-user',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/current-user', async (req, res) => {
                 // 优先从 cookie 获取，其次从 query 参数，最后尝试从 token 解析
                 let userId = req.cookies?.userId || req.query.userId;
                 
@@ -85,8 +85,7 @@ export class AuthApi {
                     role: role,
                     isAdmin: isAdmin
                 });
-            }, '获取当前用户信息失败')
-        );
+        }, '获取当前用户信息失败');
         
         // 生成访问token（用于QQ命令生成链接）
         this.app.post('/api/generate-token',
@@ -106,8 +105,7 @@ export class AuthApi {
         );
 
         // 获取秘钥API
-        this.app.get('/api/secret-key/:userId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/secret-key/:userId', async (req, res) => {
                 const { userId } = req.params;
                 const result = await this.authService.getSecretKey(userId);
                 
@@ -119,8 +117,7 @@ export class AuthApi {
                     secretKey: result.secretKey,
                     hasExistingKey: true
                 }, result.message || '秘钥获取成功');
-            }, '读取秘钥文件失败')
-        );
+        }, '读取秘钥文件失败');
 
         // 保存秘钥API
         this.app.post('/api/save-secret-key',

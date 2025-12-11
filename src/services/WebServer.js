@@ -10,7 +10,6 @@ import { AuthService } from './auth/AuthService.js';
 import { PageRoutes } from './routes/PageRoutes.js';
 import { AuthApi } from './api/AuthApi.js';
 import { StatsApi } from './api/StatsApi.js';
-import { RankingApi } from './api/RankingApi.js';
 import { AchievementApi } from './api/AchievementApi.js';
 import { BackgroundApi } from './api/BackgroundApi.js';
 import { AdminApi } from './api/AdminApi.js';
@@ -108,9 +107,6 @@ class WebServer {
 
         const statsApi = new StatsApi(this.app);
         statsApi.registerRoutes();
-
-        const rankingApi = new RankingApi(this.app);
-        rankingApi.registerRoutes();
 
         const achievementApi = new AchievementApi(this.app, this.achievementService, this.authService);
         achievementApi.registerRoutes();

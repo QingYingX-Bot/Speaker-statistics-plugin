@@ -1,3 +1,4 @@
+import { BaseApi } from './BaseApi.js';
 import { AchievementService } from '../../core/AchievementService.js';
 import { AuthService } from '../auth/AuthService.js';
 import { AuthMiddleware } from './middleware/AuthMiddleware.js';
@@ -6,9 +7,9 @@ import { ApiResponse } from './utils/ApiResponse.js';
 /**
  * 成就相关API路由
  */
-export class AchievementApi {
+export class AchievementApi extends BaseApi {
     constructor(app, achievementService, authService) {
-        this.app = app;
+        super(app);
         this.achievementService = achievementService;
         this.authService = authService;
         this.authMiddleware = new AuthMiddleware(authService);
@@ -19,8 +20,7 @@ export class AchievementApi {
      */
     registerRoutes() {
         // 获取成就列表
-        this.app.get('/api/achievements/list/:groupId', 
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/achievements/list/:groupId', async (req, res) => {
                 const { groupId } = req.params;
                 const { userId } = req.query;
                 
@@ -64,21 +64,17 @@ export class AchievementApi {
                     };
                 }
                 ApiResponse.success(res, responseData);
-            }, '获取成就列表失败')
-        );
+        }, '获取成就列表失败');
 
         // 获取用户成就
-        this.app.get('/api/achievements/user/:userId/:groupId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/achievements/user/:userId/:groupId', async (req, res) => {
                 const { userId, groupId } = req.params;
                 const userAchievements = await this.achievementService.getUserAchievements(groupId, userId);
                 ApiResponse.success(res, userAchievements);
-            }, '获取用户成就失败')
-        );
+        }, '获取用户成就失败');
 
         // 获取成就统计
-        this.app.get('/api/achievements/stats/:groupId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/achievements/stats/:groupId', async (req, res) => {
                 const { groupId } = req.params;
                 const definitions = this.achievementService.getAchievementDefinitions();
                 const stats = [];
@@ -111,8 +107,7 @@ export class AchievementApi {
                 });
                 
                 ApiResponse.success(res, stats);
-            }, '获取成就统计失败')
-        );
+        }, '获取成就统计失败');
 
         // 设置显示成就
         this.app.post('/api/achievements/set-display',

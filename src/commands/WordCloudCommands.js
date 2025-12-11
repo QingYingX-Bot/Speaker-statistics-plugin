@@ -1,6 +1,7 @@
 import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
 import { WordCloudServices } from '../core/services/WordCloudServices.js';
 import { segment } from 'oicq';
@@ -42,7 +43,7 @@ class WordCloudCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 获取服务实例
             const messageCollector = WordCloudServices.getMessageCollector();
             const wordCloudGenerator = WordCloudServices.getWordCloudGenerator();
@@ -102,10 +103,9 @@ class WordCloudCommands {
             }
 
             return e.reply(img);
-        } catch (error) {
-            globalConfig.error('生成词云失败:', error);
+        }, '生成词云失败', async (error) => {
             return e.reply(`词云生成失败: ${error.message || '未知错误'}`, true);
-        }
+        });
     }
 
     /**
@@ -117,7 +117,7 @@ class WordCloudCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 获取服务实例
             const messageCollector = WordCloudServices.getMessageCollector();
             const wordCloudGenerator = WordCloudServices.getWordCloudGenerator();
@@ -192,10 +192,9 @@ class WordCloudCommands {
             }
 
             return e.reply(img);
-        } catch (error) {
-            globalConfig.error('生成个人词云失败:', error);
+        }, '生成个人词云失败', async (error) => {
             return e.reply(`个人词云生成失败: ${error.message || '未知错误'}`, true);
-        }
+        });
     }
 
     /**
@@ -207,7 +206,7 @@ class WordCloudCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             // 获取服务实例
             const messageCollector = WordCloudServices.getMessageCollector();
             const wordCloudGenerator = WordCloudServices.getWordCloudGenerator();
@@ -297,10 +296,9 @@ class WordCloudCommands {
             }
 
             return e.reply(img);
-        } catch (error) {
-            globalConfig.error('生成总词云失败:', error);
+        }, '生成总词云失败', async (error) => {
             return e.reply(`总词云生成失败: ${error.message || '未知错误'}`, true);
-        }
+        });
     }
 }
 

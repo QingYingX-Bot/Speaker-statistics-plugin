@@ -1,6 +1,8 @@
 import { DataService } from '../core/DataService.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { CommonUtils } from '../core/utils/CommonUtils.js';
+import { CommandWrapper } from '../core/utils/CommandWrapper.js';
+import { UserParser } from '../core/utils/UserParser.js';
 import { TimeUtils } from '../core/utils/TimeUtils.js';
 import { ImageGenerator } from '../render/ImageGenerator.js';
 import { TextFormatter } from '../render/TextFormatter.js';
@@ -38,36 +40,6 @@ class UserCommands {
     }
 
     /**
-     * 解析 @ 用户或QQ号
-     * @param {Object} e 消息事件
-     * @returns {Object} { userId: string, nickname: string } 或 null
-     */
-    parseMentionedUser(e) {
-        // 检查消息中是否有 @
-        if (e.message) {
-            for (const item of e.message) {
-                if (item.type === 'at' && item.qq) {
-                    return {
-                        userId: String(item.qq),
-                        nickname: item.text || `用户${item.qq}`
-                    };
-                }
-            }
-        }
-        
-        // 检查文本消息中是否有 @QQ号
-        const match = e.msg?.match(/@(\d+)/);
-        if (match) {
-            return {
-                userId: match[1],
-                nickname: `用户${match[1]}`
-            };
-        }
-        
-        return null;
-    }
-
-    /**
      * 查询个人统计数据（所有群聊数据总和）
      */
     async queryUserStats(e) {
@@ -76,25 +48,15 @@ class UserCommands {
             return e.reply(validation.message);
         }
 
-        try {
-            // 解析 @ 用户
-            let userId, nickname;
-            const mentionedUser = this.parseMentionedUser(e);
-            
-            if (mentionedUser) {
-                // 查询 @ 的用户
-                userId = mentionedUser.userId;
-                nickname = mentionedUser.nickname;
-            } else {
-                // 查询自己
-                userId = String(e.sender?.user_id || e.user_id || '');
-                nickname = e.sender?.card || e.sender?.nickname || '未知用户';
-            }
-            
-            if (!userId) {
+        return await CommandWrapper.safeExecute(async () => {
+            // 使用 UserParser 解析用户
+            const userInfo = UserParser.parseUser(e, { allowMention: true, defaultToSelf: true });
+            if (!userInfo || !userInfo.userId) {
                 return e.reply('无法获取用户信息');
             }
 
+            const userId = userInfo.userId;
+            let nickname = userInfo.nickname;
             // 使用 SQL 聚合查询获取用户在所有群聊的数据总和（性能优化）
             const dbService = this.dataService.dbService;
             const userStats = await dbService.getUserStatsAllGroups(userId);
@@ -228,10 +190,9 @@ class UserCommands {
             text += `最后发言: ${lastSpeakingTime || '未知'}`;
 
             return e.reply(text);
-        } catch (error) {
-            globalConfig.error('查询用户统计失败:', error);
+        }, '查询用户统计失败', async (error) => {
             return e.reply('查询失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -243,24 +204,16 @@ class UserCommands {
             return e.reply(validation.message);
         }
 
-        try {
-            // 解析 @ 用户
-            let userId, nickname;
-            const mentionedUser = this.parseMentionedUser(e);
-            
-            if (mentionedUser) {
-                // 查询 @ 的用户
-                userId = mentionedUser.userId;
-                nickname = mentionedUser.nickname;
-            } else {
-                // 查询自己
-                userId = String(e.sender?.user_id || e.user_id || '');
-                nickname = e.sender?.card || e.sender?.nickname || '未知用户';
-            }
-            
-            if (!userId) {
+        return await CommandWrapper.safeExecute(async () => {
+            // 使用 UserParser 解析用户
+            const userInfo = UserParser.parseUser(e, { allowMention: true, defaultToSelf: true });
+            if (!userInfo || !userInfo.userId) {
                 return e.reply('无法获取用户信息');
             }
+
+            const userId = userInfo.userId;
+            let nickname = userInfo.nickname;
+            const mentionedUser = userInfo.isMentioned ? userInfo : null;
 
             const dbService = this.dataService.dbService;
             
@@ -377,17 +330,16 @@ class UserCommands {
 
             // 发送合并转发消息
             return e.reply(common.makeForwardMsg(e, msg, '水群查询群列表'));
-        } catch (error) {
-            globalConfig.error('查询用户群列表失败:', error);
+        }, '查询用户群列表失败', async (error) => {
             return e.reply('查询失败，请稍后重试');
-        }
+        });
     }
 
     /**
      * 打开网页（生成带token的链接）
      */
     async openWebPage(e) {
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const userId = String(e.user_id);
             const { WebLinkGenerator } = await import('../core/utils/WebLinkGenerator.js');
             const result = await WebLinkGenerator.generateWebPageLink(userId);
@@ -397,10 +349,9 @@ class UserCommands {
             }
             
             return e.reply(`📊 你的统计网页链接：\n${result.url}\n\n⚠️ 链接24小时内有效，请勿分享给他人`);
-        } catch (error) {
-            globalConfig.error('生成网页链接失败:', error);
+        }, '生成网页链接失败', async (error) => {
             return e.reply('❌ 生成链接失败，请稍后重试');
-        }
+        });
     }
 
 }

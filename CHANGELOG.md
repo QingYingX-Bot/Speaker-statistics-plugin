@@ -4,6 +4,106 @@
 
 ---
 
+## [3.2.12] - 2025-12-11
+
+### 🐛 问题修复
+
+#### MessageRecorder 日志方法调用错误修复
+- ✅ **修复 `TypeError: Cannot read properties of undefined (reading 'bind')` 错误**：
+  - 修复 `getRarityColor` 方法中 `global.logger` 方法可能不存在导致的错误
+  - 添加安全检查，确保 `global.logger` 存在且方法可用
+  - 如果 logger 或方法不存在，使用默认函数返回原字符串，避免程序崩溃
+  - 修复成就解锁日志输出中的 `global.logger.mark`、`global.logger.cyan`、`global.logger.green` 调用
+  - 添加降级方案：如果 logger 不可用，使用 `globalConfig.info` 输出日志
+  - 修复后，即使 `global.logger` 不存在或方法不可用，程序也能正常运行
+
+### 🔧 代码重构与优化
+
+#### 代码架构统一化
+- ✅ **统一命令验证模式**：所有命令文件统一使用 `CommandWrapper` 进行验证和错误处理
+  - 重构 `RankCommands.js`：8 个方法统一使用 `CommandWrapper`
+  - 重构 `UserCommands.js`：使用 `UserParser` 替代 `parseMentionedUser`，统一使用 `CommandWrapper`
+  - 重构 `AchievementCommands.js`：统一使用 `CommandWrapper`，移除混合验证模式
+  - 重构 `WordCloudCommands.js`：统一使用 `CommandWrapper`
+  - 重构 `HelpCommands.js`：统一使用 `CommandWrapper`
+  - 消除代码重复，统一错误处理逻辑
+
+#### 工具类统一导出
+- ✅ **创建统一导出文件**：新增 `src/core/utils/index.js`
+  - 统一导出所有工具类，简化导入语句
+  - 提供组合导出 `Utils` 对象，支持 `Utils.Common`、`Utils.Time` 等便捷访问
+  - 包含 `UserParser` 工具类导出
+
+#### 用户解析逻辑统一
+- ✅ **创建 UserParser 工具类**：新增 `src/core/utils/UserParser.js`
+  - 统一用户ID和昵称解析逻辑，消除代码重复
+  - 支持 @ 用户和文本解析
+  - 支持默认返回自己
+  - 已在 `UserCommands.js` 中应用
+
+#### API 架构统一化
+- ✅ **创建 BaseApi 基类**：新增 `src/services/api/BaseApi.js`
+  - 统一路由注册方法（get/post/put/delete）
+  - 统一错误处理模式
+  - 简化 API 类实现
+
+#### API 类重构
+- ✅ **所有 API 类继承 BaseApi**：
+  - `StatsApi.js` → 继承 `BaseApi`
+  - `AchievementApi.js` → 继承 `BaseApi`
+  - `BackgroundApi.js` → 继承 `BaseApi`
+  - `AuthApi.js` → 继承 `BaseApi`
+  - `AdminApi.js` → 继承 `BaseApi`
+  - 统一使用 `BaseApi` 提供的路由注册方法
+
+#### 文件组织优化
+- ✅ **合并 RankingApi 到 StatsApi**：
+  - 将 `RankingApi.js`（37行）合并到 `StatsApi.js`
+  - 删除 `src/services/api/RankingApi.js` 文件
+  - 更新 `WebServer.js` 中的路由注册
+  - 减少文件数量，相关功能聚合
+
+- ✅ **拆分 AdminApi 为多个模块**：
+  - 创建 `src/services/api/admin/` 目录
+  - 拆分 `GroupManagementApi.js`（群组管理，56行）
+  - 拆分 `UserManagementApi.js`（用户管理，80行）
+  - 拆分 `AchievementManagementApi.js`（成就管理，124行）
+  - 保留核心 `AdminApi.js`（系统概览、统计、词云、配置，765行）
+  - 原文件 949行 → 拆分后模块化，提高可维护性
+
+### 📊 重构统计
+
+#### 文件变化
+- **新增文件**：7 个
+  - `src/core/utils/index.js` - 工具类统一导出
+  - `src/core/utils/UserParser.js` - 用户解析工具类
+  - `src/services/api/BaseApi.js` - API 基类
+  - `src/services/api/admin/GroupManagementApi.js` - 群组管理API
+  - `src/services/api/admin/UserManagementApi.js` - 用户管理API
+  - `src/services/api/admin/AchievementManagementApi.js` - 成就管理API
+- **删除文件**：1 个
+  - `src/services/api/RankingApi.js` - 已合并到 StatsApi
+- **重构文件**：13 个
+  - 5 个命令文件（全部使用 CommandWrapper）
+  - 5 个 API 文件（全部继承 BaseApi）
+  - 1 个 WebServer 文件（更新路由注册）
+  - 1 个 AdminApi 文件（拆分为多个模块）
+
+#### 代码质量提升
+- ✅ 所有文件通过语法检查
+- ✅ 8 个 API 类正确继承 BaseApi
+- ✅ 6 个命令文件使用 CommandWrapper（43处使用）
+- ✅ UserParser 已正确导出
+- ✅ 无对已删除文件的引用
+
+### 📝 文档更新
+
+- ✅ 更新 README.md，更新版本号为 3.2.12
+- ✅ 更新 CHANGELOG.md，记录 3.2.12 版本的所有重构工作
+- ✅ 更新 package.json 版本号为 3.2.12
+
+---
+
 ## [3.2.11] - 2025-12-07
 
 ### 🐛 问题修复

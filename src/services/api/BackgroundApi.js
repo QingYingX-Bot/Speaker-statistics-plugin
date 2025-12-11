@@ -1,3 +1,4 @@
+import { BaseApi } from './BaseApi.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -8,9 +9,9 @@ import { ApiResponse } from './utils/ApiResponse.js';
 /**
  * 背景图片相关API路由 - 无Sharp版本
  */
-export class BackgroundApi {
+export class BackgroundApi extends BaseApi {
     constructor(app, authService) {
-        this.app = app;
+        super(app);
         this.authService = authService;
         this.backgroundsDir = PathResolver.getBackgroundsDir();
         this.authMiddleware = new AuthMiddleware(authService);
@@ -248,8 +249,7 @@ export class BackgroundApi {
      * 获取背景图片API
      */
     registerGetBackgroundRoute() {
-        this.app.get('/api/background/:userId', 
-            ApiResponse.asyncHandler((req, res) => {
+        this.get('/api/background/:userId', (req, res) => {
                 const userId = req.params.userId;
                 const backgroundType = req.query.type || 'ranking';
 
@@ -283,16 +283,14 @@ export class BackgroundApi {
                 res.setHeader('Content-Type', contentType);
                 res.setHeader('Cache-Control', 'public, max-age=3600');
                 res.sendFile(backgroundPath);
-            }, '获取背景图片失败')
-        );
+        }, '获取背景图片失败');
     }
 
     /**
      * 删除背景API
      */
     registerDeleteBackgroundRoute() {
-        this.app.delete('/api/background/:userId',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.delete('/api/background/:userId', async (req, res) => {
                 const userId = req.params.userId;
                 const backgroundType = req.query.type || 'normal';
 
@@ -309,16 +307,14 @@ export class BackgroundApi {
                 } else {
                     ApiResponse.error(res, '背景图片不存在', 404);
                 }
-            }, '删除背景失败')
-        );
+        }, '删除背景失败');
     }
 
     /**
      * 获取背景图片信息API
      */
     registerBackgroundInfoRoute() {
-        this.app.get('/api/background/:userId/info',
-            ApiResponse.asyncHandler(async (req, res) => {
+        this.get('/api/background/:userId/info', async (req, res) => {
                 const userId = req.params.userId;
                 const backgroundType = req.query.type || 'ranking';
 
@@ -358,8 +354,7 @@ export class BackgroundApi {
                     type: backgroundType,
                     file: fileInfo
                 });
-            }, '获取背景信息失败')
-        );
+        }, '获取背景信息失败');
     }
 
     /**

@@ -54,7 +54,7 @@ class AchievementCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
             const userId = String(e.sender.user_id);
 
@@ -100,10 +100,9 @@ class AchievementCommands {
 
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示成就列表失败:', error);
+        }, '显示成就列表失败', async (error) => {
             return e.reply('查询失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -115,7 +114,7 @@ class AchievementCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const match = e.msg.match(/^#水群设置显示成就\s+(.+)$/);
             if (!match) {
                 return e.reply('格式错误，正确格式：#水群设置显示成就 [成就名]');
@@ -157,10 +156,9 @@ class AchievementCommands {
             );
 
             return e.reply(`已设置显示成就: ${foundAchievement.name}`);
-        } catch (error) {
-            globalConfig.error('设置显示成就失败:', error);
+        }, '设置显示成就失败', async (error) => {
             return e.reply('设置失败，请稍后重试');
-        }
+        });
     }
 
     /**
@@ -172,7 +170,7 @@ class AchievementCommands {
             return e.reply(validation.message);
         }
 
-        try {
+        return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id);
 
             // 获取全局成就定义（不包括群专属）
@@ -297,34 +295,21 @@ class AchievementCommands {
 
                 return e.reply(text);
             }
-        } catch (error) {
-            globalConfig.error('显示成就统计失败:', error);
+        }, '显示成就统计失败', async (error) => {
             return e.reply('查询失败，请稍后重试');
-        }
+        });
     }
 
     /**
      * 授予用户成就（管理员命令）
      */
     async grantUserAchievement(e) {
-        // 验证管理员权限
-        const adminValidation = await CommonUtils.validateAdminPermission(e);
-        if (!adminValidation.valid) {
-            return e.reply(adminValidation.message);
-        }
-        
-        // 验证群消息
-        const groupValidation = CommonUtils.validateGroupMessage(e);
-        if (!groupValidation.valid) {
-            return e.reply(groupValidation.message);
-        }
-
-        // 双重检查：确保在群聊中且 group_id 存在
-        if (!e.group_id) {
-            return e.reply('此命令仅支持在群聊中使用');
-        }
-
-        try {
+        // 使用 CommandWrapper.wrap 统一验证和错误处理
+        return await CommandWrapper.wrap(async (e) => {
+            // 双重检查：确保在群聊中且 group_id 存在
+            if (!e.group_id) {
+                return e.reply('此命令仅支持在群聊中使用');
+            }
             const match = e.msg.match(/^#水群成就给予\s+(\d+)\s+(.+)$/);
             if (!match) {
                 return e.reply('格式错误，正确格式：#水群成就给予 <用户ID> <成就ID>\n示例：#水群成就给予 123456789 achievement_id');
@@ -356,34 +341,23 @@ class AchievementCommands {
                 }
                 return e.reply(`❌ ${result.message}`);
             }
-        } catch (error) {
-            globalConfig.error('授予用户成就失败:', error);
-            return e.reply('授予失败，请稍后重试');
-        }
+        }, {
+            requireAdmin: true,
+            requireGroup: true,
+            errorMessage: '授予用户成就失败'
+        })(e);
     }
 
     /**
      * 添加用户成就（管理员命令）
      */
     async addUserAchievement(e) {
-        // 验证管理员权限
-        const adminValidation = await CommonUtils.validateAdminPermission(e);
-        if (!adminValidation.valid) {
-            return e.reply(adminValidation.message);
-        }
-        
-        // 验证群消息
-        const groupValidation = CommonUtils.validateGroupMessage(e);
-        if (!groupValidation.valid) {
-            return e.reply(groupValidation.message);
-        }
-
-        // 双重检查：确保在群聊中且 group_id 存在
-        if (!e.group_id) {
-            return e.reply('此命令仅支持在群聊中使用');
-        }
-
-        try {
+        // 使用 CommandWrapper.wrap 统一验证和错误处理
+        return await CommandWrapper.wrap(async (e) => {
+            // 双重检查：确保在群聊中且 group_id 存在
+            if (!e.group_id) {
+                return e.reply('此命令仅支持在群聊中使用');
+            }
             // 解析命令：格式为 #水群配置成就 <成就ID> <成就名称> <成就描述>
             // 成就ID不能包含空格，名称和描述可以包含空格
             const parts = e.msg.replace(/^#水群配置成就\s+/, '').split(/\s+/);
@@ -434,10 +408,11 @@ class AchievementCommands {
             } else {
                 return e.reply('❌ 保存成就失败，请查看日志');
             }
-        } catch (error) {
-            globalConfig.error('添加用户成就失败:', error);
-            return e.reply('添加失败，请稍后重试');
-        }
+        }, {
+            requireAdmin: true,
+            requireGroup: true,
+            errorMessage: '添加用户成就失败'
+        })(e);
     }
 }
 

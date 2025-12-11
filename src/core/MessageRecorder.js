@@ -61,17 +61,40 @@ class MessageRecorder {
      * @returns {Function} chalk 颜色函数
      */
     getRarityColor(rarity) {
-        const colorMap = {
-            common: global.logger.gray.bind(global.logger),
-            uncommon: global.logger.green.bind(global.logger),
-            rare: global.logger.blue.bind(global.logger),
-            epic: global.logger.magenta.bind(global.logger),
-            legendary: global.logger.yellow.bind(global.logger),
-            mythic: global.logger.red.bind(global.logger),
-            festival: global.logger.red.bind(global.logger),
-            special: (global.logger.rainbow ? global.logger.rainbow.bind(global.logger) : global.logger.cyan.bind(global.logger))  // 特殊等级使用彩虹色，如果没有则使用青色
+        // 安全检查：确保 global.logger 存在且有所需方法
+        const logger = global.logger;
+        const hasLogger = logger && typeof logger === 'object';
+        
+        // 默认函数：如果 logger 不存在或方法不存在，返回原字符串
+        const defaultColor = (text) => text;
+        
+        // 安全获取颜色方法
+        const getColorMethod = (methodName, fallback = defaultColor) => {
+            if (hasLogger && typeof logger[methodName] === 'function') {
+                try {
+                    return logger[methodName].bind(logger);
+                } catch (error) {
+                    globalConfig.error(`[MessageRecorder] 获取颜色方法 ${methodName} 失败:`, error);
+                    return fallback;
+                }
+            }
+            return fallback;
         };
-        return colorMap[rarity] || colorMap.common;
+        
+        const colorMap = {
+            common: getColorMethod('gray', defaultColor),
+            uncommon: getColorMethod('green', defaultColor),
+            rare: getColorMethod('blue', defaultColor),
+            epic: getColorMethod('magenta', defaultColor),
+            legendary: getColorMethod('yellow', defaultColor),
+            mythic: getColorMethod('red', defaultColor),
+            festival: getColorMethod('red', defaultColor),
+            special: (hasLogger && typeof logger.rainbow === 'function') 
+                ? getColorMethod('rainbow', defaultColor)
+                : getColorMethod('cyan', defaultColor)
+        };
+        
+        return colorMap[rarity?.toLowerCase()] || colorMap.common;
     }
 
     /**
@@ -743,9 +766,22 @@ class MessageRecorder {
                                     
                                     // 输出日志（检查配置开关）
                                     if (globalConfig.getConfig('global.enableAchievementLog') !== false) {
-                                        global.logger.mark(
-                                            `${global.logger.cyan('[成就解锁]')} ${global.logger.green(userNickname)}(${userId}) 在群 ${groupId} 解锁成就: ${rarityColor(achievementName)}`
-                                        );
+                                        try {
+                                            const logger = global.logger;
+                                            if (logger && typeof logger.mark === 'function') {
+                                                const cyan = (logger.cyan && typeof logger.cyan === 'function') ? logger.cyan.bind(logger) : (text) => text;
+                                                const green = (logger.green && typeof logger.green === 'function') ? logger.green.bind(logger) : (text) => text;
+                                                logger.mark(
+                                                    `${cyan('[成就解锁]')} ${green(userNickname)}(${userId}) 在群 ${groupId} 解锁成就: ${rarityColor(achievementName)}`
+                                                );
+                                            } else {
+                                                // 降级方案：使用 globalConfig 输出日志
+                                                globalConfig.info(`[成就解锁] ${userNickname}(${userId}) 在群 ${groupId} 解锁成就: ${achievementName}`);
+                                            }
+                                        } catch (error) {
+                                            // 如果日志输出失败，使用降级方案
+                                            globalConfig.info(`[成就解锁] ${userNickname}(${userId}) 在群 ${groupId} 解锁成就: ${achievementName}`);
+                                        }
                                     }
                                 }
                             });
