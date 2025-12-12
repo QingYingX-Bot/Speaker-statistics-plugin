@@ -89,11 +89,29 @@ class MessageCollector {
     async getRecentUserMessages(groupId, userId, count = 1, beforeTime = null, days = null) {
         try {
             const userMessages = [];
-            const targetUserId = parseInt(userId);
+            // 支持字符串和数字类型的用户ID匹配
+            const targetUserIdStr = String(userId).trim();
+            const targetUserIdNum = parseInt(userId);
             const queryDays = days || this.retentionDays;
             const useCountLimit = days === null;
 
-            globalConfig.debug(`开始查询用户 ${targetUserId} 的消息，天数: ${queryDays}，数量限制: ${useCountLimit ? count : '无'}`);
+            globalConfig.debug(`[词云] 开始查询用户 ${targetUserIdStr} (${targetUserIdNum}) 的消息，群组: ${groupId}，天数: ${queryDays}，数量限制: ${useCountLimit ? count : '无'}`);
+
+            // 检查 Redis 是否可用
+            if (typeof redis === 'undefined' || !redis) {
+                globalConfig.warn('[词云] Redis 未配置，无法获取用户消息');
+                return [];
+            }
+
+            // 检查消息收集是否启用
+            const enableCollection = globalConfig.getConfig('wordcloud.enableMessageCollection');
+            if (!enableCollection) {
+                globalConfig.warn('[词云] 消息收集功能未启用，请在配置中启用 wordcloud.enableMessageCollection');
+            }
+
+            let totalMessagesChecked = 0;
+            let matchedMessages = 0;
+            let skippedMessages = 0;
 
             // 从今天开始往前查询
             for (let i = 0; i < queryDays && (useCountLimit ? userMessages.length < count : true); i++) {
@@ -102,15 +120,11 @@ class MessageCollector {
 
                 let dayMessages = [];
                 try {
-                    if (typeof redis !== 'undefined' && redis) {
-                        dayMessages = await redis.lRange(key, 0, -1);
-                        globalConfig.debug(`查询日期 ${date}，获取到 ${dayMessages.length} 条消息`);
-                    } else {
-                        globalConfig.warn('Redis 未配置，无法获取用户消息');
-                        return [];
-                    }
+                    dayMessages = await redis.lRange(key, 0, -1);
+                    totalMessagesChecked += dayMessages.length;
+                    globalConfig.debug(`[词云] 查询日期 ${date}，获取到 ${dayMessages.length} 条消息`);
                 } catch (err) {
-                    globalConfig.error(`Redis查询失败: ${err}`);
+                    globalConfig.error(`[词云] Redis查询失败 (${date}): ${err}`);
                     continue;
                 }
 
@@ -118,28 +132,51 @@ class MessageCollector {
                 for (let j = dayMessages.length - 1; j >= 0 && (useCountLimit ? userMessages.length < count : true); j--) {
                     try {
                         const msg = JSON.parse(dayMessages[j]);
+                        
+                        // 改进用户ID匹配：支持字符串和数字类型
+                        const msgUserId = msg.user_id;
+                        const isMatch = msgUserId === targetUserIdNum || 
+                                       msgUserId === targetUserIdStr || 
+                                       String(msgUserId) === targetUserIdStr ||
+                                       parseInt(msgUserId) === targetUserIdNum;
 
-                        // 检查是否是目标用户的消息
-                        if (msg.user_id === targetUserId) {
-                            globalConfig.debug(`找到用户消息: time=${msg.time}, beforeTime=${beforeTime}, message=${msg.message}`);
-
+                        if (isMatch) {
                             // 如果指定了时间限制,只获取该时间之前的消息
                             if (beforeTime && msg.time >= beforeTime) {
-                                globalConfig.debug(`消息时间 ${msg.time} >= ${beforeTime}，跳过`);
+                                globalConfig.debug(`[词云] 消息时间 ${msg.time} >= ${beforeTime}，跳过`);
+                                skippedMessages++;
+                                continue;
+                            }
+
+                            // 获取消息文本，支持多种字段名
+                            const messageText = msg.message || msg.text || '';
+                            
+                            // 过滤空消息和无效消息
+                            if (!messageText || messageText.trim().length === 0) {
+                                skippedMessages++;
+                                continue;
+                            }
+
+                            // 过滤特殊消息（JSON格式的小程序消息等）
+                            if (messageText.trim().startsWith('{') && messageText.includes('"app"')) {
+                                skippedMessages++;
                                 continue;
                             }
 
                             userMessages.push({
-                                message: msg.message || msg.text || '',
+                                message: messageText,
                                 time: msg.time,
                                 images: msg.images || [],
                                 faces: msg.faces || {}
                             });
 
-                            globalConfig.debug(`已收集 ${userMessages.length}/${count} 条消息`);
+                            matchedMessages++;
+                            if (globalConfig.getConfig('global.debugLog')) {
+                                globalConfig.debug(`[词云] 已收集 ${userMessages.length} 条消息，最新: ${messageText.substring(0, 20)}...`);
+                            }
                         }
                     } catch (err) {
-                        globalConfig.debug(`解析消息失败: ${err}`);
+                        globalConfig.debug(`[词云] 解析消息失败: ${err}`);
                     }
                 }
             }
@@ -147,10 +184,12 @@ class MessageCollector {
             // 按时间倒序排列(最新的在前)
             userMessages.sort((a, b) => b.time - a.time);
 
-            globalConfig.debug(`最终获取到 ${userMessages.length} 条用户消息`);
+            globalConfig.debug(`[词云] 查询完成：检查了 ${totalMessagesChecked} 条消息，匹配到 ${matchedMessages} 条，跳过 ${skippedMessages} 条，最终返回 ${userMessages.length} 条`);
+            
             return useCountLimit ? userMessages.slice(0, count) : userMessages;
         } catch (err) {
-            globalConfig.error(`获取用户最近消息失败: ${err}`);
+            globalConfig.error(`[词云] 获取用户最近消息失败: ${err}`);
+            globalConfig.error(err.stack);
             return [];
         }
     }

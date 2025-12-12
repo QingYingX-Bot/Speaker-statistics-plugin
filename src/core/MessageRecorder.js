@@ -930,13 +930,27 @@ class MessageRecorder {
                 return;
             }
 
+            // 过滤空消息和无效消息
+            if (!messageText || messageText.trim().length === 0) {
+                return;
+            }
+
+            // 过滤特殊消息（JSON格式的小程序消息等）
+            const trimmedText = messageText.trim();
+            if (trimmedText.startsWith('{') && (trimmedText.includes('"app"') || trimmedText.includes('"prompt"') || trimmedText.includes('com.tencent.miniapp'))) {
+                return;
+            }
+
             const moment = (await import('moment')).default;
             const date = moment.unix(messageTime).format('YYYY-MM-DD');
             const key = `Speaker-statistics:messages:${groupId}:${date}`;
             
+            // 确保用户ID格式一致（使用数字类型，便于匹配）
+            const normalizedUserId = parseInt(userId);
+            
             const messageData = {
-                user_id: parseInt(userId),
-                nickname: nickname,
+                user_id: normalizedUserId,
+                nickname: nickname || '未知用户',
                 message: messageText,
                 time: messageTime,
                 timestamp: Date.now()
@@ -945,13 +959,17 @@ class MessageRecorder {
             const messageStr = JSON.stringify(messageData);
             await redis.lPush(key, messageStr);
             
-            // 设置过期时间（保留 7 天）
+            // 设置过期时间（保留 retentionDays 天）
             const retentionDays = globalConfig.getConfig('wordcloud.retentionDays') || 7;
             await redis.expire(key, retentionDays * 24 * 60 * 60);
+            
+            if (globalConfig.getConfig('global.debugLog')) {
+                globalConfig.debug(`[词云] 已保存消息到Redis: 群组=${groupId}, 用户=${normalizedUserId}, 日期=${date}, 消息长度=${messageText.length}`);
+            }
         } catch (error) {
             // 静默处理，不影响主流程
             if (globalConfig.getConfig('global.debugLog')) {
-                globalConfig.debug(`保存消息到Redis失败: ${error.message}`);
+                globalConfig.debug(`[词云] 保存消息到Redis失败: ${error.message}`);
             }
         }
     }

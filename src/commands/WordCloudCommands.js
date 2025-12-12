@@ -140,7 +140,19 @@ class WordCloudCommands {
 
             await e.reply(`正在生成 ${userName} ${days === 1 ? '当天' : days === 3 ? '近三天' : '近七天'}的个人词云，请稍候...`);
 
+            // 检查消息收集功能是否启用
+            const enableCollection = globalConfig.getConfig('wordcloud.enableMessageCollection');
+            if (!enableCollection) {
+                return e.reply('词云功能需要启用消息收集功能。请在配置中设置 wordcloud.enableMessageCollection 为 true', true);
+            }
+
+            // 检查 Redis 是否可用
+            if (typeof redis === 'undefined' || !redis) {
+                return e.reply('词云功能需要配置 Redis。请检查 Redis 配置是否正确', true);
+            }
+
             // 获取该用户的消息
+            globalConfig.debug(`[词云] 开始获取用户 ${userId} (${userName}) 在群 ${e.group_id} 的消息，天数: ${days}`);
             const messages = await messageCollector.getRecentUserMessages(
                 e.group_id,
                 userId,
@@ -149,12 +161,14 @@ class WordCloudCommands {
                 days    // 指定天数
             );
 
+            globalConfig.debug(`[词云] 获取到 ${messages.length} 条消息`);
+
             if (messages.length === 0) {
-                return e.reply(`您在最近${days}天内没有消息记录`, true);
+                return e.reply(`您在最近${days}天内没有消息记录。\n提示：请确保消息收集功能已启用，并且您在该时间段内确实发送过消息`, true);
             }
 
             if (messages.length < 5) {
-                return e.reply(`您在最近${days}天内的消息太少（仅${messages.length}条），无法生成词云`, true);
+                return e.reply(`您在最近${days}天内的消息太少（仅${messages.length}条），无法生成词云。\n提示：至少需要5条有效消息才能生成词云`, true);
             }
 
             // 获取群名
