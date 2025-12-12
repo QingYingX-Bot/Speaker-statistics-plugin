@@ -479,9 +479,17 @@ export class PostgreSQLAdapter extends BaseAdapter {
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_group_info_group_id ON group_info(group_id);`);
 
         // 归档群组表索引（优化查询和清理性能）
+        // 清理可能存在的有问题的索引（使用 NOW() 的索引会导致 IMMUTABLE 错误）
+        try {
+            await this.pool.query(`DROP INDEX IF EXISTS idx_archived_groups_cleanup;`);
+        } catch (error) {
+            // 忽略删除索引时的错误（可能索引不存在）
+            globalConfig.debug(`[PostgreSQL适配器] 清理旧索引时出现错误（可忽略）: ${error.message}`);
+        }
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_archived_at ON archived_groups(archived_at);`);
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_last_activity ON archived_groups(last_activity_at);`);
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_cleanup ON archived_groups(archived_at, last_activity_at) WHERE archived_at < NOW() - INTERVAL '60 days';`);
+        // 注意：不能在索引 WHERE 子句中使用 NOW()，因为 NOW() 不是 IMMUTABLE 函数
+        // 清理查询会使用 archived_at 和 last_activity_at 索引，性能已经足够
     }
 
     /**

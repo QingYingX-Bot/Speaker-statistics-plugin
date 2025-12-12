@@ -81,6 +81,18 @@
 - ✅ **优化建议文档**：
   - 创建 `OPTIMIZATION_SUGGESTIONS.md` 记录优化建议和进度
 
+### 🐛 问题修复
+
+#### PostgreSQL 数据库初始化错误修复
+- ✅ **修复 PostgreSQL 索引 IMMUTABLE 错误**：
+  - 修复数据库初始化时出现的 `functions in index predicate must be marked IMMUTABLE` 错误
+  - 问题原因：`idx_archived_groups_cleanup` 索引的 WHERE 子句中使用了 `NOW()` 函数，而 `NOW()` 不是 IMMUTABLE 函数
+  - 修复方案：
+    - 移除了有问题的索引创建语句（使用 `NOW() - INTERVAL '60 days'` 的索引）
+    - 添加了自动清理旧索引的逻辑，在初始化时自动删除可能已存在的有问题的索引
+    - 保留 `archived_at` 和 `last_activity_at` 索引，这些索引已足够支持清理查询的性能需求
+  - 修复后，数据库可以正常初始化，清理查询仍能高效执行
+
 ---
 
 ## [3.2.12] - 2025-12-11

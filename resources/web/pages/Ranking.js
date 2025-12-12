@@ -34,32 +34,32 @@ export default class Ranking {
                             
                             <!-- 筛选器 -->
                             <div class="flex flex-col gap-3 sm:gap-4">
-                                <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
-                                    <div id="typeSelectContainer" class="w-full sm:w-auto sm:min-w-[140px]">
-                                        ${Select.render({
-                                            id: 'typeSelect',
-                                            name: 'type',
-                                            label: '排行榜类型',
-                                            options: [
-                                                { value: 'total', label: '总榜', selected: false },
-                                                { value: 'daily', label: '日榜', selected: false },
-                                                { value: 'weekly', label: '周榜', selected: false },
-                                                { value: 'monthly', label: '月榜', selected: false },
-                                                { value: 'yearly', label: '年榜', selected: false }
-                                            ],
-                                            className: 'select-custom'
-                                        })}
-                                    </div>
-                                    <div class="w-full sm:w-auto sm:min-w-[220px]">
-                                        ${Select.render({
-                                            id: 'groupSelect',
-                                            name: 'group',
-                                            label: '选择群聊',
-                                            options: [
-                                                { value: 'all', label: '全部群聊', selected: true }
-                                            ],
-                                            className: 'select-custom'
-                                        })}
+                            <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                <div id="typeSelectContainer" class="w-full sm:w-auto sm:min-w-[140px]">
+                                    ${Select.render({
+                                        id: 'typeSelect',
+                                        name: 'type',
+                                        label: '排行榜类型',
+                                        options: [
+                                            { value: 'total', label: '总榜', selected: false },
+                                            { value: 'daily', label: '日榜', selected: false },
+                                            { value: 'weekly', label: '周榜', selected: false },
+                                            { value: 'monthly', label: '月榜', selected: false },
+                                            { value: 'yearly', label: '年榜', selected: false }
+                                        ],
+                                        className: 'select-custom'
+                                    })}
+                                </div>
+                                <div class="w-full sm:w-auto sm:min-w-[220px]">
+                                    ${Select.render({
+                                        id: 'groupSelect',
+                                        name: 'group',
+                                        label: '选择群聊',
+                                        options: [
+                                            { value: 'all', label: '全部群聊', selected: true }
+                                        ],
+                                        className: 'select-custom'
+                                    })}
                                     </div>
                                 </div>
                                 
