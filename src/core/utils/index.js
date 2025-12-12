@@ -7,6 +7,7 @@
 export { AchievementUtils } from './AchievementUtils.js';
 export { CommandWrapper } from './CommandWrapper.js';
 export { CommonUtils } from './CommonUtils.js';
+export { ErrorHandler } from './ErrorHandler.js';
 export { KeyFileOptimizer } from './KeyFileOptimizer.js';
 export { PathResolver } from './PathResolver.js';
 export { PerformanceMonitor, getPerformanceMonitor } from './PerformanceMonitor.js';
@@ -21,6 +22,7 @@ export const Utils = {
     Achievement: AchievementUtils,
     Command: CommandWrapper,
     Common: CommonUtils,
+    Error: ErrorHandler,
     Path: PathResolver,
     Time: TimeUtils,
     Web: WebLinkGenerator,

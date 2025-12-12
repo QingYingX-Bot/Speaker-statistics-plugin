@@ -153,6 +153,7 @@ export class SQLiteAdapter extends BaseAdapter {
                 this.db.pragma('temp_store = MEMORY'); // 临时表存储在内存中
                 this.db.pragma('mmap_size = 268435456'); // 启用内存映射（256MB）
                 this.db.pragma('busy_timeout = 5000'); // 设置忙等待超时为 5 秒
+                this.db.pragma('foreign_keys = ON'); // 启用外键约束支持
             } else {
                 // sqlite3 是异步的，需要 Promise 包装
                 this.db = await new Promise((resolve, reject) => {
@@ -168,6 +169,7 @@ export class SQLiteAdapter extends BaseAdapter {
                 await this.run('PRAGMA temp_store = MEMORY');
                 await this.run('PRAGMA mmap_size = 268435456');
                 await this.run('PRAGMA busy_timeout = 5000');
+                await this.run('PRAGMA foreign_keys = ON'); // 启用外键约束支持
             }
 
             // 执行建表和建索引
@@ -613,6 +615,17 @@ export class SQLiteAdapter extends BaseAdapter {
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours'))
             )
         `);
+
+        // 归档群组表（暂存表）
+        await this.exec(`
+            CREATE TABLE IF NOT EXISTS archived_groups (
+                group_id TEXT PRIMARY KEY,
+                group_name TEXT DEFAULT '',
+                archived_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+                last_activity_at TEXT,
+                FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
+            )
+        `);
     }
 
     /**
@@ -674,6 +687,10 @@ export class SQLiteAdapter extends BaseAdapter {
 
         // 群组信息表索引
         await this.run(`CREATE INDEX IF NOT EXISTS idx_group_info_group_id ON group_info(group_id)`);
+
+        // 归档群组表索引（优化查询和清理性能）
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_archived_groups_archived_at ON archived_groups(archived_at)`);
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_archived_groups_last_activity ON archived_groups(last_activity_at)`);
     }
 
     /**

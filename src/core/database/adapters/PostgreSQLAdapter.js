@@ -405,6 +405,17 @@ export class PostgreSQLAdapter extends BaseAdapter {
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // 归档群组表（暂存表）
+        await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS archived_groups (
+                group_id VARCHAR(255) PRIMARY KEY,
+                group_name VARCHAR(255) DEFAULT '',
+                archived_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_activity_at TIMESTAMP,
+                CONSTRAINT fk_archived_group FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
+            )
+        `);
     }
 
     /**
@@ -466,6 +477,11 @@ export class PostgreSQLAdapter extends BaseAdapter {
 
         // 群组信息表索引
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_group_info_group_id ON group_info(group_id);`);
+
+        // 归档群组表索引（优化查询和清理性能）
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_archived_at ON archived_groups(archived_at);`);
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_last_activity ON archived_groups(last_activity_at);`);
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_cleanup ON archived_groups(archived_at, last_activity_at) WHERE archived_at < NOW() - INTERVAL '60 days';`);
     }
 
     /**

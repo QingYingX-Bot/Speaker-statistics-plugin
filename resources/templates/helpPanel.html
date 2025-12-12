@@ -175,8 +175,8 @@
           el('div', { class: 'category-title' }, [ '数据管理' ]),
           el('ul', { class: 'command-list' }, uniqueCommands([
             { cmd:'#水群清除统计', desc:'清除当前群统计数据' },
-            { cmd:'#水群清理僵尸群', desc:'列出所有僵尸群' },
-            { cmd:'#水群确认清理', desc:'确认清理列出的僵尸群' }
+            { cmd:'#水群归档僵尸群', desc:'列出所有僵尸群' },
+            { cmd:'#水群确认归档', desc:'确认归档列出的僵尸群' }
           ]).map(it => el('li', { class: 'command-item' }, [ el('span', { class: 'command' }, it.cmd), el('span', { class: 'command-desc' }, it.desc) ])))
         ]);
 

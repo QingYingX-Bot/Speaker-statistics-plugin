@@ -2,6 +2,7 @@ import { getDatabaseService } from './database/DatabaseService.js';
 import { globalConfig } from './ConfigManager.js';
 import { TimeUtils } from './utils/TimeUtils.js';
 import { CommonUtils } from './utils/CommonUtils.js';
+import { ErrorHandler } from './utils/ErrorHandler.js';
 
 /**
  * LRU 缓存类
@@ -966,12 +967,14 @@ class DataService {
             const monthKey = timeInfo.monthKey;
 
             // 优化：使用批量查询替代 N+1 查询，大幅提升性能
-            const [allUsersMap, allDailyStatsMap, allMonthlyStatsMap, allGroupIds, allGroupsInfoMap] = await Promise.all([
+            const [allUsersMap, allDailyStatsMap, allMonthlyStatsMap, allGroupIds, allGroupsInfoMap, archivedGroupsCount] = await Promise.all([
                 this.dbService.getAllGroupsUsersBatch(),
                 this.dbService.getAllGroupsDailyStatsBatch(todayKey),
                 this.dbService.getAllGroupsMonthlyStatsBatch(monthKey),
                 this.getGroupIds(),
-                this.dbService.getAllGroupsInfoBatch()
+                this.dbService.getAllGroupsInfoBatch(),
+                // 获取归档群组数量
+                this.dbService.get('SELECT COUNT(*) as count FROM archived_groups').then(result => parseInt(result?.count || 0, 10)).catch(() => 0)
             ]);
             
             let totalGroups = 0;
@@ -1041,7 +1044,8 @@ class DataService {
                         if (botGroupInfo && botGroupInfo.group_name) {
                             groupName = botGroupInfo.group_name;
                             // 保存到数据库（异步，不阻塞）
-                            this.dbService.saveGroupInfo(groupId, groupName).catch(() => {});
+                            this.dbService.saveGroupInfo(groupId, groupName)
+                                .catch(ErrorHandler.createNonCriticalHandler('数据服务-保存群信息'));
                             // 更新内存中的映射，避免后续重复查询
                             allGroupsInfoMap.set(groupId, groupName);
                         }
@@ -1102,6 +1106,7 @@ class DataService {
                 totalWords: totalWords,
                 todayActive: todayActiveSet.size,
                 monthActive: monthActive.size,
+                archivedGroups: archivedGroupsCount, // 归档群组数量
                 groups: pagedGroups,
                 currentPage: page,
                 totalPages: totalPages,
@@ -1123,6 +1128,7 @@ class DataService {
                 totalWords: 0,
                 todayActive: 0,
                 monthActive: 0,
+                archivedGroups: 0,
                 groups: [],
                 currentPage: 1,
                 totalPages: 0,
@@ -1132,22 +1138,582 @@ class DataService {
     }
 
     /**
-     * 清除群组统计数据
+     * 获取群组时间分布统计
+     * @param {string} groupId 群组ID
+     * @param {string} type 统计类型：'hourly' | 'daily' | 'weekly' | 'monthly'
+     * @param {Object} options 选项 { startDate, endDate }
+     * @returns {Promise<Array>} 时间分布数据
+     */
+    async getTimeDistribution(groupId, type = 'hourly', options = {}) {
+        try {
+            const now = TimeUtils.getUTC8Date();
+            let startDate = options.startDate;
+            let endDate = options.endDate || TimeUtils.formatDate(now);
+
+            // 如果没有指定开始日期，默认最近7天
+            if (!startDate) {
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                startDate = TimeUtils.formatDate(sevenDaysAgo);
+            }
+
+            const result = [];
+
+            switch (type) {
+                case 'daily':
+                    // 按日统计：查询日期范围内的日统计数据
+                    const dailyStats = await this.dbService.all(
+                        `SELECT date_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count
+                         FROM daily_stats 
+                         WHERE group_id = $1 AND date_key >= $2 AND date_key <= $3
+                         GROUP BY date_key 
+                         ORDER BY date_key`,
+                        groupId,
+                        startDate,
+                        endDate
+                    );
+
+                    for (const stat of dailyStats) {
+                        result.push({
+                            date: stat.date,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'weekly':
+                    // 按周统计：查询日期范围内的周统计数据
+                    // 计算日期范围对应的周范围（简化处理：获取最近12周）
+                    const weeklyStats = await this.dbService.all(
+                        `SELECT week_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count
+                         FROM weekly_stats 
+                         WHERE group_id = $1 
+                         GROUP BY week_key 
+                         ORDER BY week_key DESC
+                         LIMIT 12`,
+                        groupId
+                    );
+
+                    for (const stat of weeklyStats) {
+                        result.push({
+                            date: stat.date,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'monthly':
+                    // 按月统计：查询日期范围内的月统计数据
+                    // 限制返回最近12个月的数据
+                    const monthlyStats = await this.dbService.all(
+                        `SELECT month_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count
+                         FROM monthly_stats 
+                         WHERE group_id = $1 
+                         GROUP BY month_key 
+                         ORDER BY month_key DESC
+                         LIMIT 12`,
+                        groupId
+                    );
+
+                    for (const stat of monthlyStats) {
+                        result.push({
+                            date: stat.date,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'hourly':
+                default:
+                    // 按小时统计：由于 daily_stats 表没有小时级别数据，返回按日统计的数据
+                    // 注意：hourly 类型实际上返回的是 daily 数据，因为数据库中没有小时级别数据
+                    const hourlyStats = await this.dbService.all(
+                        `SELECT date_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count
+                         FROM daily_stats 
+                         WHERE group_id = $1 AND date_key >= $2 AND date_key <= $3
+                         GROUP BY date_key 
+                         ORDER BY date_key`,
+                        groupId,
+                        startDate,
+                        endDate
+                    );
+
+                    for (const stat of hourlyStats) {
+                        result.push({
+                            date: stat.date,
+                            hour: null, // 由于没有小时数据，设为 null
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+            }
+
+            return result;
+        } catch (error) {
+            this.error(`获取群组时间分布统计失败:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * 获取用户时间分布统计
+     * @param {string} userId 用户ID
+     * @param {string} groupId 群组ID
+     * @param {string} type 统计类型：'hourly' | 'daily' | 'weekly' | 'monthly'
+     * @param {Object} options 选项 { startDate, endDate }
+     * @returns {Promise<Array>} 时间分布数据
+     */
+    async getUserTimeDistribution(userId, groupId, type = 'hourly', options = {}) {
+        try {
+            const now = TimeUtils.getUTC8Date();
+            let startDate = options.startDate;
+            let endDate = options.endDate || TimeUtils.formatDate(now);
+
+            // 如果没有指定开始日期，默认最近7天
+            if (!startDate) {
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                startDate = TimeUtils.formatDate(sevenDaysAgo);
+            }
+
+            const result = [];
+
+            switch (type) {
+                case 'daily':
+                    // 按日统计：查询用户的日统计数据
+                    const dailyStats = await this.dbService.getDailyStatsByDateRange(
+                        groupId,
+                        userId,
+                        startDate,
+                        endDate
+                    );
+
+                    for (const stat of dailyStats) {
+                        result.push({
+                            date: stat.date_key,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'weekly':
+                    // 按周统计：查询用户的周统计数据
+                    // 限制返回最近12周的数据
+                    const weeklyStats = await this.dbService.all(
+                        `SELECT week_key as date, 
+                                message_count, 
+                                word_count
+                         FROM weekly_stats 
+                         WHERE group_id = $1 AND user_id = $2
+                         ORDER BY week_key DESC
+                         LIMIT 12`,
+                        groupId,
+                        userId
+                    );
+
+                    for (const stat of weeklyStats) {
+                        result.push({
+                            date: stat.date,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'monthly':
+                    // 按月统计：查询用户的月统计数据
+                    // 限制返回最近12个月的数据
+                    const monthlyStats = await this.dbService.all(
+                        `SELECT month_key as date, 
+                                message_count, 
+                                word_count
+                         FROM monthly_stats 
+                         WHERE group_id = $1 AND user_id = $2
+                         ORDER BY month_key DESC
+                         LIMIT 12`,
+                        groupId,
+                        userId
+                    );
+
+                    for (const stat of monthlyStats) {
+                        result.push({
+                            date: stat.date,
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+
+                case 'hourly':
+                default:
+                    // 按小时统计：由于 daily_stats 表没有小时级别数据，返回按日统计的数据
+                    const hourlyStats = await this.dbService.getDailyStatsByDateRange(
+                        groupId,
+                        userId,
+                        startDate,
+                        endDate
+                    );
+
+                    for (const stat of hourlyStats) {
+                        result.push({
+                            date: stat.date_key,
+                            hour: null, // 由于没有小时数据，设为 null
+                            message_count: parseInt(stat.message_count || 0, 10),
+                            word_count: parseInt(stat.word_count || 0, 10)
+                        });
+                    }
+                    break;
+            }
+
+            return result;
+        } catch (error) {
+            this.error(`获取用户时间分布统计失败:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * 获取群组消息趋势
+     * @param {string} groupId 群组ID
+     * @param {string} period 统计周期：'daily' | 'weekly' | 'monthly'
+     * @param {Object} options 选项 { days, metric }
+     * @returns {Promise<Array>} 趋势数据
+     */
+    async getGroupTrend(groupId, period = 'daily', options = {}) {
+        try {
+            const days = parseInt(options.days || 7, 10);
+            const metric = options.metric || 'messages';
+            const now = TimeUtils.getUTC8Date();
+            const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            const startDateStr = TimeUtils.formatDate(startDate);
+
+            const result = [];
+            let previousValue = null;
+
+            switch (period) {
+                case 'daily':
+                    // 按日趋势
+                    const dailyStats = await this.dbService.all(
+                        `SELECT date_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count,
+                                COUNT(DISTINCT user_id) as user_count
+                         FROM daily_stats 
+                         WHERE group_id = $1 AND date_key >= $2
+                         GROUP BY date_key 
+                         ORDER BY date_key`,
+                        groupId,
+                        startDateStr
+                    );
+
+                    for (const stat of dailyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : metric === 'words'
+                            ? parseInt(stat.word_count || 0, 10)
+                            : parseInt(stat.user_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+
+                case 'weekly':
+                    // 按周趋势
+                    // 限制最大查询数量，防止查询过多数据
+                    const safeDays = Math.min(Math.max(parseInt(days, 10) || 7, 1), 100);
+                    const weeklyStats = await this.dbService.all(
+                        `SELECT week_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count,
+                                COUNT(DISTINCT user_id) as user_count
+                         FROM weekly_stats 
+                         WHERE group_id = $1
+                         GROUP BY week_key 
+                         ORDER BY week_key DESC
+                         LIMIT ${safeDays}`,
+                        groupId
+                    );
+
+                    for (const stat of weeklyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : metric === 'words'
+                            ? parseInt(stat.word_count || 0, 10)
+                            : parseInt(stat.user_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+
+                case 'monthly':
+                    // 按月趋势
+                    // 限制最大查询数量，防止查询过多数据
+                    const safeDaysMonthly = Math.min(Math.max(parseInt(days, 10) || 7, 1), 100);
+                    const monthlyStats = await this.dbService.all(
+                        `SELECT month_key as date, 
+                                SUM(message_count) as message_count, 
+                                SUM(word_count) as word_count,
+                                COUNT(DISTINCT user_id) as user_count
+                         FROM monthly_stats 
+                         WHERE group_id = $1
+                         GROUP BY month_key 
+                         ORDER BY month_key DESC
+                         LIMIT ${safeDaysMonthly}`,
+                        groupId
+                    );
+
+                    for (const stat of monthlyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : metric === 'words'
+                            ? parseInt(stat.word_count || 0, 10)
+                            : parseInt(stat.user_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+            }
+
+            return result;
+        } catch (error) {
+            this.error(`获取群组消息趋势失败:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * 获取用户消息趋势
+     * @param {string} userId 用户ID
+     * @param {string} groupId 群组ID
+     * @param {string} period 统计周期：'daily' | 'weekly' | 'monthly'
+     * @param {Object} options 选项 { days, metric }
+     * @returns {Promise<Array>} 趋势数据
+     */
+    async getUserTrend(userId, groupId, period = 'daily', options = {}) {
+        try {
+            const days = parseInt(options.days || 7, 10);
+            const metric = options.metric || 'messages';
+            const now = TimeUtils.getUTC8Date();
+            const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            const startDateStr = TimeUtils.formatDate(startDate);
+
+            const result = [];
+            let previousValue = null;
+
+            switch (period) {
+                case 'daily':
+                    // 按日趋势
+                    const dailyStats = await this.dbService.getDailyStatsByDateRange(
+                        groupId,
+                        userId,
+                        startDateStr,
+                        TimeUtils.formatDate(now)
+                    );
+
+                    for (const stat of dailyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : parseInt(stat.word_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date_key,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+
+                case 'weekly':
+                    // 按周趋势
+                    // 限制最大查询数量，防止查询过多数据
+                    const safeDaysWeekly = Math.min(Math.max(parseInt(days, 10) || 7, 1), 100);
+                    const weeklyStats = await this.dbService.all(
+                        `SELECT week_key as date, 
+                                message_count, 
+                                word_count
+                         FROM weekly_stats 
+                         WHERE group_id = $1 AND user_id = $2
+                         ORDER BY week_key DESC
+                         LIMIT ${safeDaysWeekly}`,
+                        groupId,
+                        userId
+                    );
+
+                    for (const stat of weeklyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : parseInt(stat.word_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+
+                case 'monthly':
+                    // 按月趋势
+                    // 限制最大查询数量，防止查询过多数据
+                    const safeDaysMonthlyUser = Math.min(Math.max(parseInt(days, 10) || 7, 1), 100);
+                    const monthlyStats = await this.dbService.all(
+                        `SELECT month_key as date, 
+                                message_count, 
+                                word_count
+                         FROM monthly_stats 
+                         WHERE group_id = $1 AND user_id = $2
+                         ORDER BY month_key DESC
+                         LIMIT ${safeDaysMonthlyUser}`,
+                        groupId,
+                        userId
+                    );
+
+                    for (const stat of monthlyStats) {
+                        const value = metric === 'messages' 
+                            ? parseInt(stat.message_count || 0, 10)
+                            : parseInt(stat.word_count || 0, 10);
+
+                        const change = previousValue !== null && previousValue > 0
+                            ? ((value - previousValue) / previousValue * 100).toFixed(2)
+                            : null;
+
+                        result.push({
+                            date: stat.date,
+                            value: value,
+                            change: change ? parseFloat(change) : null
+                        });
+
+                        previousValue = value;
+                    }
+                    break;
+            }
+
+            return result;
+        } catch (error) {
+            this.error(`获取用户消息趋势失败:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * 清除群组统计数据（归档到暂存表）
      * @param {string} groupId 群号
      * @returns {Promise<boolean>} 是否成功
      */
     async clearGroupStats(groupId) {
         try {
-            // 使用数据库的删除方法清除所有相关数据
-            await this.dbService.deleteGroupData(groupId);
+            // 使用数据库的归档方法将数据移到暂存表
+            await this.dbService.archiveGroupData(groupId);
             
             // 清除缓存
             this.groupStatsCache.delete(String(groupId));
             this.clearCache(groupId);
             
+            // 更新消息记录器中的归档缓存（如果存在）
+            if (this.messageRecorder && this.messageRecorder.archivedGroupsCache) {
+                this.messageRecorder.archivedGroupsCache.set(String(groupId), true);
+                this.messageRecorder.archivedGroupsCacheTime?.set(String(groupId), Date.now());
+            }
+            
             return true;
         } catch (error) {
             this.error(`清除群组统计失败:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * 恢复归档的群组数据
+     * @param {string} groupId 群号
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async restoreGroupStats(groupId) {
+        try {
+            // 从暂存表恢复数据
+            const restored = await this.dbService.restoreGroupData(groupId);
+            
+            if (restored) {
+                // 清除缓存，强制重新加载
+                this.groupStatsCache.delete(String(groupId));
+                this.clearCache(groupId);
+                
+                // 清除消息记录器中的归档缓存（如果存在）
+                if (this.messageRecorder && this.messageRecorder.archivedGroupsCache) {
+                    this.messageRecorder.archivedGroupsCache.delete(String(groupId));
+                    this.messageRecorder.archivedGroupsCacheTime?.delete(String(groupId));
+                }
+            }
+            
+            return restored;
+        } catch (error) {
+            this.error(`恢复群组统计失败:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * 检查群组是否已归档
+     * @param {string} groupId 群号
+     * @returns {Promise<boolean>} 是否已归档
+     */
+    async isGroupArchived(groupId) {
+        try {
+            return await this.dbService.isGroupArchived(groupId);
+        } catch (error) {
+            this.error(`检查群组归档状态失败:`, error);
             return false;
         }
     }

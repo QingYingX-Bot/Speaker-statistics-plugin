@@ -48,11 +48,11 @@ class AdminCommands {
                 fnc: 'refreshAchievements'
             },
             {
-                reg: '^#水群清理僵尸群$',
+                reg: '^#水群归档僵尸群$',
                 fnc: 'cleanZombieGroups'
             },
             {
-                reg: '^#水群确认清理$',
+                reg: '^#水群确认归档$',
                 fnc: 'confirmCleanZombieGroups'
             }
         ];
@@ -695,7 +695,7 @@ class AdminCommands {
     }
 
     /**
-     * 清理僵尸群（列出待清理的群组，等待确认）
+     * 归档僵尸群（列出待归档的群组，等待确认）
      */
     async cleanZombieGroups(e) {
         // 验证管理员权限
@@ -767,7 +767,7 @@ class AdminCommands {
                 // 构建合并转发消息
                 const msg = [
                     [
-                        `🔍 找到 ${zombieGroups.length} 个僵尸群（数据库中存在但机器人已不在群中）\n\n⚠️ 警告：清理操作将删除这些群组的所有统计数据（用户统计、日统计、周统计、月统计、年统计、成就数据等）\n\n💡 如需清理，请发送：\n#水群确认清理\n\n⏰ 确认有效期为5分钟`
+                        `🔍 找到 ${zombieGroups.length} 个僵尸群（数据库中存在但机器人已不在群中）\n\n💡 归档说明：\n- 数据将移到暂存表，不会立即删除\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除\n\n💡 如需归档，请发送：\n#水群确认归档\n\n⏰ 确认有效期为5分钟`
                     ]
                 ];
                 
@@ -794,13 +794,13 @@ class AdminCommands {
                 // 发送合并转发消息
                 return e.reply(common.makeForwardMsg(e, msg, '僵尸群列表'));
             },
-            '清理僵尸群失败',
+            '归档僵尸群失败',
             () => e.reply('查询失败，请稍后重试')
         );
     }
 
     /**
-     * 确认清理僵尸群
+     * 确认归档僵尸群
      */
     async confirmCleanZombieGroups(e) {
         // 验证管理员权限
@@ -810,59 +810,59 @@ class AdminCommands {
             async () => {
                 const userId = String(e.user_id);
                 
-                // 检查是否有待清理的群组列表
+                // 检查是否有待归档的群组列表
                 const pendingData = AdminCommands.pendingCleanGroups.get(userId);
                 if (!pendingData) {
-                    return e.reply('❌ 没有待清理的群组列表，请先使用 #水群清理僵尸群 查看');
+                    return e.reply('❌ 没有待归档的群组列表，请先使用 #水群归档僵尸群 查看');
                 }
                 
                 // 检查是否过期（5分钟）
                 const now = Date.now();
                 if (now - pendingData.timestamp > 5 * 60 * 1000) {
                     AdminCommands.pendingCleanGroups.delete(userId);
-                    return e.reply('❌ 确认已过期，请重新使用 #水群清理僵尸群 查看');
+                    return e.reply('❌ 确认已过期，请重新使用 #水群归档僵尸群 查看');
                 }
                 
                 const zombieGroups = pendingData.groups;
                 if (!zombieGroups || zombieGroups.length === 0) {
                     AdminCommands.pendingCleanGroups.delete(userId);
-                    return e.reply('❌ 待清理的群组列表为空');
+                    return e.reply('❌ 待归档的群组列表为空');
                 }
                 
-                await e.reply(`🔄 开始清理 ${zombieGroups.length} 个僵尸群...`);
+                await e.reply(`🔄 开始归档 ${zombieGroups.length} 个僵尸群到暂存表...\n\n💡 提示：如果这些群有用户重新发言，数据将自动恢复\n⏰ 60天后无用户发言，数据将被永久删除`);
                 
                 let successCount = 0;
                 let failCount = 0;
                 const errors = [];
                 
-                // 逐个清理群组
+                // 逐个归档群组（移到暂存表，不删除）
                 for (const group of zombieGroups) {
                     try {
                         const success = await this.dataService.clearGroupStats(group.groupId);
                         if (success) {
                             successCount++;
                             if (globalConfig.getConfig('global.debugLog')) {
-                                globalConfig.debug(`成功清理僵尸群: ${group.groupId}`);
+                                globalConfig.debug(`成功归档僵尸群: ${group.groupId}`);
                             }
                         } else {
                             failCount++;
-                            errors.push(`${group.groupName} (${CommonUtils.maskGroupId(group.groupId)}): 清理失败`);
+                            errors.push(`${group.groupName} (${CommonUtils.maskGroupId(group.groupId)}): 归档失败`);
                         }
                     } catch (error) {
                         failCount++;
                         const maskedGroupId = CommonUtils.maskGroupId(group.groupId);
                         errors.push(`${group.groupName} (${maskedGroupId}): ${error.message || '未知错误'}`);
-                        globalConfig.error(`清理僵尸群失败: ${group.groupId}`, error);
+                        globalConfig.error(`归档僵尸群失败: ${group.groupId}`, error);
                     }
                 }
                 
-                // 清除待清理列表
+                // 清除待归档列表
                 AdminCommands.pendingCleanGroups.delete(userId);
                 
                 // 构建合并转发消息
                 const msg = [
                     [
-                        `✅ 僵尸群清理完成\n\n📊 统计信息：\n- 成功清理: ${successCount} 个\n- 清理失败: ${failCount} 个`
+                        `✅ 僵尸群归档完成\n\n📊 统计信息：\n- 成功归档: ${successCount} 个\n- 归档失败: ${failCount} 个\n\n💡 提示：\n- 如果这些群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
                     ]
                 ];
                 
@@ -881,9 +881,9 @@ class AdminCommands {
                 }
                 
                 // 发送合并转发消息
-                return e.reply(common.makeForwardMsg(e, msg, '僵尸群清理完成'));
+                return e.reply(common.makeForwardMsg(e, msg, '僵尸群归档完成'));
             },
-            '确认清理失败',
+            '确认归档失败',
             () => e.reply('清理失败，请稍后重试')
         );
     }

@@ -106,6 +106,9 @@ class API {
      * @param {Object} options 选项
      * @param {number} options.limit 每页数量
      * @param {number} options.page 页码
+     * @param {string} options.sortBy 排序字段 (count, words, active_days, continuous_days)
+     * @param {string} options.order 排序顺序 (asc, desc)
+     * @param {string} options.search 搜索关键词
      * @returns {Promise} 排行榜数据
      */
     async getRanking(type, groupId, options = {}) {
@@ -113,7 +116,131 @@ class API {
             limit: options.limit || 20,
             page: options.page || 1,
         });
+        
+        if (options.sortBy) {
+            params.append('sortBy', options.sortBy);
+        }
+        if (options.order) {
+            params.append('order', options.order);
+        }
+        if (options.search) {
+            params.append('search', options.search);
+        }
+        
         return this.request(`/api/rankings/${type}/${groupId}?${params}`);
+    }
+    
+    /**
+     * 获取群组时间分布统计
+     * @param {string} groupId 群组ID
+     * @param {Object} options 选项
+     * @param {string} options.type 统计类型 (hourly, daily, weekly, monthly)
+     * @param {string} options.startDate 开始日期 (YYYY-MM-DD)
+     * @param {string} options.endDate 结束日期 (YYYY-MM-DD)
+     * @returns {Promise} 时间分布数据
+     */
+    async getTimeDistribution(groupId, options = {}) {
+        const params = new URLSearchParams({
+            type: options.type || 'hourly',
+        });
+        
+        if (options.startDate) {
+            params.append('startDate', options.startDate);
+        }
+        if (options.endDate) {
+            params.append('endDate', options.endDate);
+        }
+        
+        return this.request(`/api/stats/group/${groupId}/time-distribution?${params}`);
+    }
+    
+    /**
+     * 获取用户时间分布统计
+     * @param {string} userId 用户ID
+     * @param {string} groupId 群组ID
+     * @param {Object} options 选项
+     * @param {string} options.type 统计类型 (hourly, daily, weekly, monthly)
+     * @param {string} options.startDate 开始日期 (YYYY-MM-DD)
+     * @param {string} options.endDate 结束日期 (YYYY-MM-DD)
+     * @returns {Promise} 时间分布数据
+     */
+    async getUserTimeDistribution(userId, groupId, options = {}) {
+        const params = new URLSearchParams({
+            groupId: groupId,
+            type: options.type || 'hourly',
+        });
+        
+        if (options.startDate) {
+            params.append('startDate', options.startDate);
+        }
+        if (options.endDate) {
+            params.append('endDate', options.endDate);
+        }
+        
+        return this.request(`/api/stats/user/${userId}/time-distribution?${params}`);
+    }
+    
+    /**
+     * 获取群组消息趋势
+     * @param {string} groupId 群组ID
+     * @param {Object} options 选项
+     * @param {string} options.period 统计周期 (daily, weekly, monthly)
+     * @param {number} options.days 天数
+     * @param {string} options.metric 指标 (messages, words, users)
+     * @returns {Promise} 趋势数据
+     */
+    async getGroupTrend(groupId, options = {}) {
+        const params = new URLSearchParams({
+            period: options.period || 'daily',
+            days: options.days || 7,
+            metric: options.metric || 'messages',
+        });
+        
+        return this.request(`/api/stats/group/${groupId}/trend?${params}`);
+    }
+    
+    /**
+     * 获取用户消息趋势
+     * @param {string} userId 用户ID
+     * @param {string} groupId 群组ID
+     * @param {Object} options 选项
+     * @param {string} options.period 统计周期 (daily, weekly, monthly)
+     * @param {number} options.days 天数
+     * @param {string} options.metric 指标 (messages, words)
+     * @returns {Promise} 趋势数据
+     */
+    async getUserTrend(userId, groupId, options = {}) {
+        const params = new URLSearchParams({
+            groupId: groupId,
+            period: options.period || 'daily',
+            days: options.days || 7,
+            metric: options.metric || 'messages',
+        });
+        
+        return this.request(`/api/stats/user/${userId}/trend?${params}`);
+    }
+    
+    /**
+     * 获取全局统计
+     * @param {Object} options 选项
+     * @param {boolean} options.includeGroups 是否包含群组列表
+     * @returns {Promise} 全局统计数据
+     */
+    async getGlobalStats(options = {}) {
+        const params = new URLSearchParams();
+        
+        if (options.includeGroups) {
+            params.append('includeGroups', 'true');
+        }
+        if (options.page) {
+            params.append('page', options.page);
+        }
+        if (options.pageSize) {
+            params.append('pageSize', options.pageSize);
+        }
+        
+        const queryString = params.toString();
+        return this.request(`/api/stats/global${queryString ? '?' + queryString : ''}`);
     }
     
     // ========== 成就API ==========

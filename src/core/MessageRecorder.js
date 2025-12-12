@@ -3,6 +3,7 @@ import { AchievementService } from './AchievementService.js';
 import { globalConfig } from './ConfigManager.js';
 import { TimeUtils } from './utils/TimeUtils.js';
 import { AchievementUtils } from './utils/AchievementUtils.js';
+import { ErrorHandler } from './utils/ErrorHandler.js';
 
 /**
  * 消息记录处理类
@@ -138,6 +139,80 @@ class MessageRecorder {
         // 只处理群消息
         if (!e.group_id || !e.sender || !e.sender.user_id) {
             return;
+        }
+
+        const groupId = String(e.group_id);
+        
+        // 检查群组是否已归档，如果是则恢复（异步执行，不阻塞消息处理）
+        // 使用缓存优化：避免每次消息都查询数据库
+        if (!this.archivedGroupsCache) {
+            this.archivedGroupsCache = new Map(); // 缓存已归档的群组ID
+            this.archivedGroupsCacheTime = new Map(); // 缓存时间戳
+            
+            // 定期清理过期缓存（每10分钟清理一次）
+            if (!this.archivedGroupsCacheCleanupTimer) {
+                this.archivedGroupsCacheCleanupTimer = setInterval(() => {
+                    this.cleanupArchivedGroupsCache();
+                }, 10 * 60 * 1000); // 10分钟
+            }
+        }
+        
+        // 检查缓存（5分钟TTL）
+        const cacheKey = groupId;
+        const cachedTime = this.archivedGroupsCacheTime.get(cacheKey) || 0;
+        const cacheTTL = 5 * 60 * 1000; // 5分钟
+        const isCached = Date.now() - cachedTime < cacheTTL;
+        
+        if (isCached && this.archivedGroupsCache.has(cacheKey)) {
+            // 从缓存中获取归档状态
+            const isArchived = this.archivedGroupsCache.get(cacheKey);
+            if (isArchived) {
+                // 恢复归档的群组（先恢复，成功后再更新活动时间）
+                this.dataService.restoreGroupStats(groupId).then(() => {
+                    // 恢复成功，清除缓存
+                    this.archivedGroupsCache.delete(cacheKey);
+                    this.archivedGroupsCacheTime.delete(cacheKey);
+                    
+                    if (globalConfig.getConfig('global.debugLog')) {
+                        globalConfig.debug(`[消息记录] 检测到归档群组 ${groupId} 有新消息，已自动恢复`);
+                    }
+                }).catch(error => {
+                    // 恢复失败，至少更新活动时间延长保留期
+                    this.dataService.dbService.updateArchivedGroupActivity(groupId)
+                        .catch(ErrorHandler.createNonCriticalHandler('消息记录-更新活动时间'));
+                    globalConfig.error(`[消息记录] 恢复归档群组失败: ${groupId}`, error);
+                });
+            }
+        } else {
+            // 缓存未命中或过期，查询数据库
+            this.dataService.isGroupArchived(groupId).then(isArchived => {
+                // 更新缓存
+                this.archivedGroupsCache.set(cacheKey, isArchived);
+                this.archivedGroupsCacheTime.set(cacheKey, Date.now());
+                
+                if (isArchived) {
+                    // 恢复归档的群组（先恢复，成功后再更新活动时间）
+                    this.dataService.restoreGroupStats(groupId).then(() => {
+                        // 恢复成功，清除缓存
+                        this.archivedGroupsCache.delete(cacheKey);
+                        this.archivedGroupsCacheTime.delete(cacheKey);
+                        
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`[消息记录] 检测到归档群组 ${groupId} 有新消息，已自动恢复`);
+                        }
+                    }).catch(error => {
+                        // 恢复失败，至少更新活动时间延长保留期
+                        this.dataService.dbService.updateArchivedGroupActivity(groupId)
+                            .catch(ErrorHandler.createNonCriticalHandler('消息记录-更新活动时间'));
+                        globalConfig.error(`[消息记录] 恢复归档群组失败: ${groupId}`, error);
+                    });
+                }
+            }).catch(error => {
+                // 静默处理错误，不影响消息记录
+                if (globalConfig.getConfig('global.debugLog')) {
+                    globalConfig.debug(`[消息记录] 检查群组归档状态失败: ${groupId}`, error);
+                }
+            });
         }
 
         // 如果正在处理消息，将消息加入队列（而不是直接跳过）
@@ -797,6 +872,46 @@ class MessageRecorder {
         } finally {
             // 清除处理标志（必须在 finally 中执行，确保锁被释放）
             this.isProcessingAchievements = false;
+        }
+    }
+
+    /**
+     * 清理归档群组缓存中的过期条目
+     */
+    cleanupArchivedGroupsCache() {
+        if (!this.archivedGroupsCache || !this.archivedGroupsCacheTime) {
+            return;
+        }
+        
+        const now = Date.now();
+        const cacheTTL = 5 * 60 * 1000; // 5分钟
+        const keysToDelete = [];
+        
+        // 找出所有过期的缓存条目
+        for (const [key, timestamp] of this.archivedGroupsCacheTime.entries()) {
+            if (now - timestamp >= cacheTTL) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        // 删除过期条目
+        for (const key of keysToDelete) {
+            this.archivedGroupsCache.delete(key);
+            this.archivedGroupsCacheTime.delete(key);
+        }
+        
+        // 限制缓存大小，防止内存泄漏（最多保留1000个条目）
+        if (this.archivedGroupsCache.size > 1000) {
+            const allKeys = Array.from(this.archivedGroupsCache.keys());
+            const keysToRemove = allKeys.slice(0, this.archivedGroupsCache.size - 1000);
+            for (const key of keysToRemove) {
+                this.archivedGroupsCache.delete(key);
+                this.archivedGroupsCacheTime.delete(key);
+            }
+        }
+        
+        if (globalConfig.getConfig('global.debugLog') && keysToDelete.length > 0) {
+            globalConfig.debug(`[消息记录] 清理归档群组缓存: 删除了 ${keysToDelete.length} 个过期条目`);
         }
     }
 

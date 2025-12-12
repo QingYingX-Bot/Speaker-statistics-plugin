@@ -18,20 +18,20 @@ export class UserManagementApi extends BaseApi {
      */
     registerRoutes() {
         // 获取用户列表（管理员）
-        this.get('/api/admin/users',
+        this.app.get('/api/admin/users',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            async (req, res) => {
+            ApiResponse.asyncHandler(async (req, res) => {
                 const users = await this.authService.getAllUsers();
                 ApiResponse.success(res, users);
-            }, '获取用户列表失败'
+            }, '获取用户列表失败')
         );
 
         // 获取权限信息（管理员）
-        this.get('/api/admin/permission',
+        this.app.get('/api/admin/permission',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            async (req, res) => {
+            ApiResponse.asyncHandler(async (req, res) => {
                 ApiResponse.success(res, req.auth.permission);
-            }, '获取权限信息失败'
+            }, '获取权限信息失败')
         );
 
         // 更新用户角色（管理员）

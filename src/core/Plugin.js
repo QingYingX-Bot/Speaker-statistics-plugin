@@ -104,6 +104,10 @@ class Plugin extends plugin {
             
             await webServer.start();
             logger.info('[发言统计] Web服务器启动成功');
+            
+            // 启动定时任务：清理超过60天的归档群组（每天执行一次）
+            this.startArchivedGroupsCleanupTask();
+            
             Plugin._initialized = true;
         } catch (error) {
             logger.error('[发言统计] Web服务器启动失败:', error);
@@ -287,7 +291,85 @@ class Plugin extends plugin {
         
         return false; // 不阻止消息传递
     }
+
+    /**
+     * 启动归档群组清理定时任务
+     * 支持通过配置文件自定义执行时间、执行间隔和清理天数
+     */
+    startArchivedGroupsCleanupTask() {
+        // 静态变量，防止重复启动
+        if (Plugin._cleanupTaskStarted) {
+            return;
+        }
+        Plugin._cleanupTaskStarted = true;
+
+        // 读取配置（支持默认值）
+        const cleanupConfig = globalConfig.getConfig('archivedGroups.cleanup') || {};
+        const enabled = cleanupConfig.enabled !== false; // 默认启用
+        const scheduleHour = cleanupConfig.scheduleHour ?? 2; // 默认凌晨2点
+        const scheduleMinute = cleanupConfig.scheduleMinute ?? 0; // 默认0分
+        const intervalHours = cleanupConfig.intervalHours ?? 24; // 默认24小时
+        const retentionDays = cleanupConfig.retentionDays ?? 60; // 默认60天
+
+        // 如果未启用，直接返回
+        if (!enabled) {
+            logger.info('[发言统计] 归档群组清理任务已禁用');
+            return;
+        }
+
+        // 计算到下一个执行时间的时间（UTC+8）
+        const now = new Date();
+        const utc8Offset = 8 * 60 * 60 * 1000;
+        const utc8Now = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset);
+        
+        // 下一个执行时间（UTC+8）
+        const nextRun = new Date(utc8Now);
+        nextRun.setHours(scheduleHour, scheduleMinute, 0, 0);
+        if (nextRun <= utc8Now) {
+            nextRun.setDate(nextRun.getDate() + 1);
+        }
+        
+        const msUntilNextRun = nextRun.getTime() - utc8Now.getTime();
+        const intervalMs = intervalHours * 60 * 60 * 1000;
+        
+        // 保存配置到实例变量，供清理方法使用
+        this.cleanupRetentionDays = retentionDays;
+        
+        // 首次延迟执行
+        setTimeout(async () => {
+            await this.runArchivedGroupsCleanup();
+            
+            // 之后按配置的间隔执行
+            setInterval(async () => {
+                await this.runArchivedGroupsCleanup();
+            }, intervalMs);
+        }, msUntilNextRun);
+        
+        logger.info(`[发言统计] 归档群组清理任务已启动，将在 ${new Date(Date.now() + msUntilNextRun).toLocaleString('zh-CN')} 首次执行`);
+        logger.info(`[发言统计] 清理配置：执行时间 ${scheduleHour}:${String(scheduleMinute).padStart(2, '0')}，执行间隔 ${intervalHours} 小时，保留天数 ${retentionDays} 天`);
+    }
+
+    /**
+     * 执行归档群组清理
+     */
+    async runArchivedGroupsCleanup() {
+        try {
+            const retentionDays = this.cleanupRetentionDays || 60;
+            logger.info(`[发言统计] 开始清理超过 ${retentionDays} 天的归档群组...`);
+            const deletedCount = await this.dataService.dbService.cleanupArchivedGroups(retentionDays);
+            if (deletedCount > 0) {
+                logger.mark(`[发言统计] 清理完成，已永久删除 ${deletedCount} 个超过 ${retentionDays} 天的归档群组`);
+            } else {
+                logger.debug('[发言统计] 没有需要清理的归档群组');
+            }
+        } catch (error) {
+            logger.error('[发言统计] 清理归档群组失败:', error);
+        }
+    }
 }
+
+// 静态变量
+Plugin._cleanupTaskStarted = false;
 
 export { Plugin };
 export default Plugin;

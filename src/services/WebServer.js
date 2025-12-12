@@ -78,9 +78,17 @@ class WebServer {
 
         // CORS设置
         this.app.use((req, res, next) => {
-            res.header('Access-Control-Allow-Origin', '*');
+            // 从配置中获取 CORS 源，默认为 '*'
+            const corsOrigin = globalConfig.getConfig('webServer.corsOrigin') || '*';
+            res.header('Access-Control-Allow-Origin', corsOrigin);
             res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+            
+            // 如果指定了具体域名（非 '*'），允许携带凭证
+            if (corsOrigin !== '*') {
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
+            
             if (req.method === 'OPTIONS') {
                 res.sendStatus(200);
             } else {

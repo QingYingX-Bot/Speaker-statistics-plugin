@@ -596,6 +596,107 @@ class DatabaseService {
      * @param {string} groupId 群号
      * @returns {Promise<boolean>} 是否成功
      */
+    /**
+     * 归档群组数据（移到暂存表，不删除）
+     * @param {string} groupId 群组ID
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async archiveGroupData(groupId) {
+        try {
+            // 检查群组是否已在归档表中（唯一约束检查）
+            const existing = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId);
+            if (existing) {
+                // 如果已存在，只更新归档时间和活动时间，不重复归档
+                const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId);
+                const groupName = groupInfo?.group_name || '';
+                
+                const lastActivity = await this.get(
+                    'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
+                    groupId
+                );
+                const lastActivityAt = lastActivity?.last_activity || null;
+                
+                const now = this.getCurrentTime();
+                await this.run(`
+                    UPDATE archived_groups 
+                    SET archived_at = $1,
+                        last_activity_at = COALESCE($2, archived_groups.last_activity_at),
+                        group_name = COALESCE($3, archived_groups.group_name)
+                    WHERE group_id = $4
+                `, now, lastActivityAt, groupName, groupId);
+                
+                return true;
+            }
+            
+            // 如果不存在，执行归档操作
+            const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId);
+            const groupName = groupInfo?.group_name || '';
+            
+            // 获取最后活动时间（从 user_stats 的 updated_at）
+            const lastActivity = await this.get(
+                'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
+                groupId
+            );
+            const lastActivityAt = lastActivity?.last_activity || null;
+            
+            // 插入到归档表（使用 ON CONFLICT 作为额外保护）
+            const now = this.getCurrentTime();
+            await this.run(`
+                INSERT INTO archived_groups (group_id, group_name, archived_at, last_activity_at)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (group_id) 
+                DO UPDATE SET 
+                    archived_at = EXCLUDED.archived_at,
+                    last_activity_at = COALESCE(EXCLUDED.last_activity_at, archived_groups.last_activity_at)
+            `, groupId, groupName, now, lastActivityAt);
+            
+            return true;
+        } catch (error) {
+            throw new Error(`归档群组数据失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 恢复归档的群组数据
+     * @param {string} groupId 群组ID
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async restoreGroupData(groupId) {
+        try {
+            // 检查是否在归档表中
+            const archived = await this.get('SELECT * FROM archived_groups WHERE group_id = $1', groupId);
+            if (!archived) {
+                return false; // 不在归档表中，无需恢复
+            }
+            
+            // 从归档表中删除
+            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId);
+            
+            return true;
+        } catch (error) {
+            throw new Error(`恢复群组数据失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 检查群组是否已归档
+     * @param {string} groupId 群组ID
+     * @returns {Promise<boolean>} 是否已归档
+     */
+    async isGroupArchived(groupId) {
+        try {
+            const archived = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId);
+            return !!archived;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * 永久删除群组数据（从归档表中删除超过60天的群组）
+     * @param {string} groupId 群组ID
+     * @returns {Promise<boolean>} 是否成功
+     */
     async deleteGroupData(groupId) {
         try {
             await this.run('DELETE FROM user_stats WHERE group_id = $1', groupId);
@@ -606,9 +707,81 @@ class DatabaseService {
             await this.run('DELETE FROM achievements WHERE group_id = $1', groupId);
             await this.run('DELETE FROM user_display_achievements WHERE group_id = $1', groupId);
             await this.run('DELETE FROM group_info WHERE group_id = $1', groupId);
+            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId);
             return true;
         } catch (error) {
             throw new Error(`删除群组数据失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 清理超过指定天数的归档群组（定时任务）
+     * 只清理归档时间超过指定天数且最后活动时间也超过指定天数的群组
+     * @param {number} retentionDays 保留天数（默认60天）
+     * @returns {Promise<number>} 清理的群组数量
+     */
+    async cleanupArchivedGroups(retentionDays = 60) {
+        try {
+            const dbType = this.getDatabaseType();
+            const now = new Date();
+            const cutoffDate = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+            
+            let cutoffDateStr;
+            if (dbType === 'postgresql') {
+                cutoffDateStr = cutoffDate.toISOString();
+            } else {
+                // SQLite 使用 ISO 字符串格式
+                cutoffDateStr = cutoffDate.toISOString();
+            }
+            
+            // 获取需要清理的群组ID列表
+            // 条件：归档时间超过指定天数 且 (最后活动时间为空 或 最后活动时间也超过指定天数)
+            const groupsToDelete = await this.all(
+                `SELECT group_id FROM archived_groups 
+                 WHERE archived_at < $1 
+                 AND (last_activity_at IS NULL OR last_activity_at < $1)`,
+                cutoffDateStr
+            );
+            
+            let deletedCount = 0;
+            for (const group of groupsToDelete) {
+                try {
+                    await this.deleteGroupData(group.group_id);
+                    deletedCount++;
+                    if (globalConfig.getConfig('global.debugLog')) {
+                        globalConfig.debug(`已永久删除归档群组: ${group.group_id}`);
+                    }
+                } catch (error) {
+                    globalConfig.error(`清理归档群组失败: ${group.group_id}`, error);
+                }
+            }
+            
+            return deletedCount;
+        } catch (error) {
+            globalConfig.error('清理归档群组失败:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * 更新归档群组的最后活动时间
+     * @param {string} groupId 群组ID
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async updateArchivedGroupActivity(groupId) {
+        try {
+            const now = this.getCurrentTime();
+            await this.run(
+                `UPDATE archived_groups 
+                 SET last_activity_at = $1 
+                 WHERE group_id = $2`,
+                now,
+                groupId
+            );
+            return true;
+        } catch (error) {
+            // 如果更新失败，不影响主流程
+            return false;
         }
     }
 

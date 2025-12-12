@@ -11,6 +11,11 @@ export default class Ranking {
         this.currentType = 'total';
         this.currentPage = 1;
         this.rankings = [];
+        this.totalPages = 1;
+        this.total = 0;
+        this.sortBy = 'count';
+        this.order = 'desc';
+        this.search = '';
     }
     
     
@@ -28,32 +33,73 @@ export default class Ranking {
                             </div>
                             
                             <!-- 筛选器 -->
-                            <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
-                                <div id="typeSelectContainer" class="w-full sm:w-auto sm:min-w-[140px]">
-                                    ${Select.render({
-                                        id: 'typeSelect',
-                                        name: 'type',
-                                        label: '排行榜类型',
-                                        options: [
-                                            { value: 'total', label: '总榜', selected: false },
-                                            { value: 'daily', label: '日榜', selected: false },
-                                            { value: 'weekly', label: '周榜', selected: false },
-                                            { value: 'monthly', label: '月榜', selected: false },
-                                            { value: 'yearly', label: '年榜', selected: false }
-                                        ],
-                                        className: 'select-custom'
-                                    })}
+                            <div class="flex flex-col gap-3 sm:gap-4">
+                                <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                    <div id="typeSelectContainer" class="w-full sm:w-auto sm:min-w-[140px]">
+                                        ${Select.render({
+                                            id: 'typeSelect',
+                                            name: 'type',
+                                            label: '排行榜类型',
+                                            options: [
+                                                { value: 'total', label: '总榜', selected: false },
+                                                { value: 'daily', label: '日榜', selected: false },
+                                                { value: 'weekly', label: '周榜', selected: false },
+                                                { value: 'monthly', label: '月榜', selected: false },
+                                                { value: 'yearly', label: '年榜', selected: false }
+                                            ],
+                                            className: 'select-custom'
+                                        })}
+                                    </div>
+                                    <div class="w-full sm:w-auto sm:min-w-[220px]">
+                                        ${Select.render({
+                                            id: 'groupSelect',
+                                            name: 'group',
+                                            label: '选择群聊',
+                                            options: [
+                                                { value: 'all', label: '全部群聊', selected: true }
+                                            ],
+                                            className: 'select-custom'
+                                        })}
+                                    </div>
                                 </div>
-                                <div class="w-full sm:w-auto sm:min-w-[220px]">
-                                    ${Select.render({
-                                        id: 'groupSelect',
-                                        name: 'group',
-                                        label: '选择群聊',
-                                        options: [
-                                            { value: 'all', label: '全部群聊', selected: true }
-                                        ],
-                                        className: 'select-custom'
-                                    })}
+                                
+                                <!-- 搜索和排序 -->
+                                <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                    <div class="w-full sm:w-auto sm:flex-1">
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">搜索用户</label>
+                                        <input 
+                                            type="text" 
+                                            id="searchInput" 
+                                            placeholder="搜索用户昵称或ID..." 
+                                            class="w-full px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-200 text-sm"
+                                        />
+                                    </div>
+                                    <div class="w-full sm:w-auto sm:min-w-[140px]">
+                                        ${Select.render({
+                                            id: 'sortBySelect',
+                                            name: 'sortBy',
+                                            label: '排序字段',
+                                            options: [
+                                                { value: 'count', label: '发言数', selected: true },
+                                                { value: 'words', label: '字数', selected: false },
+                                                { value: 'active_days', label: '活跃天数', selected: false },
+                                                { value: 'continuous_days', label: '连续天数', selected: false }
+                                            ],
+                                            className: 'select-custom'
+                                        })}
+                                    </div>
+                                    <div class="w-full sm:w-auto sm:min-w-[120px]">
+                                        ${Select.render({
+                                            id: 'orderSelect',
+                                            name: 'order',
+                                            label: '排序顺序',
+                                            options: [
+                                                { value: 'desc', label: '降序', selected: true },
+                                                { value: 'asc', label: '升序', selected: false }
+                                            ],
+                                            className: 'select-custom'
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -113,6 +159,9 @@ export default class Ranking {
         const groupSelect = document.getElementById('groupSelect');
         const typeSelect = document.getElementById('typeSelect');
         const typeSelectContainer = document.getElementById('typeSelectContainer');
+        const sortBySelect = document.getElementById('sortBySelect');
+        const orderSelect = document.getElementById('orderSelect');
+        const searchInput = document.getElementById('searchInput');
         
         // 初始化时根据当前选择显示/隐藏排行榜类型
         this.toggleTypeSelect(this.currentGroupId === 'all');
@@ -148,6 +197,35 @@ export default class Ranking {
                 this.currentType = e.target.value;
                 this.currentPage = 1;
                 this.loadRanking();
+            });
+        }
+        
+        if (sortBySelect) {
+            sortBySelect.addEventListener('change', (e) => {
+                this.sortBy = e.target.value;
+                this.currentPage = 1;
+                this.loadRanking();
+            });
+        }
+        
+        if (orderSelect) {
+            orderSelect.addEventListener('change', (e) => {
+                this.order = e.target.value;
+                this.currentPage = 1;
+                this.loadRanking();
+            });
+        }
+        
+        if (searchInput) {
+            // 防抖处理搜索输入
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.search = e.target.value.trim();
+                    this.currentPage = 1;
+                    this.loadRanking();
+                }, 300);
             });
         }
     }
@@ -218,10 +296,28 @@ export default class Ranking {
         try {
             const response = await api.getRanking(this.currentType, this.currentGroupId, {
                 limit: 50,
-                page: this.currentPage
+                page: this.currentPage,
+                sortBy: this.sortBy,
+                order: this.order,
+                search: this.search
             });
             
-            this.rankings = response.data || [];
+            // 处理新的响应格式（包含分页信息）
+            if (response.data && Array.isArray(response.data)) {
+                // 旧格式：直接返回数组
+                this.rankings = response.data;
+                this.total = response.data.length;
+                this.totalPages = 1;
+            } else if (response.data && response.data.data) {
+                // 新格式：包含分页信息
+                this.rankings = response.data.data || [];
+                this.total = response.data.total || 0;
+                this.totalPages = response.data.totalPages || 1;
+            } else {
+                this.rankings = [];
+                this.total = 0;
+                this.totalPages = 1;
+            }
             
             // 淡入渲染
             this.renderRanking();
@@ -337,6 +433,55 @@ export default class Ranking {
             </div>
         `;
         
+        // 添加分页控件
+        if (this.totalPages > 1) {
+            html += `
+                <div class="mt-6 flex items-center justify-between">
+                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                        共 ${this.total} 条记录，第 ${this.currentPage} / ${this.totalPages} 页
+                    </div>
+                    <div class="flex gap-2">
+                        <button 
+                            id="prevPageBtn"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            ${this.currentPage <= 1 ? 'disabled' : ''}
+                        >
+                            上一页
+                        </button>
+                        <button 
+                            id="nextPageBtn"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            ${this.currentPage >= this.totalPages ? 'disabled' : ''}
+                        >
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
         content.innerHTML = html;
+        
+        // 绑定分页按钮事件
+        const prevBtn = document.getElementById('prevPageBtn');
+        const nextBtn = document.getElementById('nextPageBtn');
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.loadRanking();
+                }
+            });
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (this.currentPage < this.totalPages) {
+                    this.currentPage++;
+                    this.loadRanking();
+                }
+            });
+        }
     }
 }

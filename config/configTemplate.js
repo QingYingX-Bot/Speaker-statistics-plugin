@@ -161,6 +161,23 @@ const configTemplate = {
             // 图片质量（1-100，仅对 jpeg 有效）
             quality: 100
         }
+    },
+
+    // 归档群组配置
+    archivedGroups: {
+        // 清理任务配置
+        cleanup: {
+            // 是否启用清理任务
+            enabled: true,
+            // 执行时间：小时（0-23，默认 2 表示凌晨2点）
+            scheduleHour: 2,
+            // 执行时间：分钟（0-59，默认 0）
+            scheduleMinute: 0,
+            // 执行间隔（小时，默认 24 表示每24小时执行一次）
+            intervalHours: 24,
+            // 保留天数（默认 60 天，超过此天数的归档群组将被永久删除）
+            retentionDays: 60
+        }
     }
 };
 
