@@ -205,6 +205,18 @@ class Plugin extends plugin {
         return await this.adminCommands.confirmCleanZombieGroups(e);
     }
 
+    async viewArchivedGroups(e) {
+        return await this.adminCommands.viewArchivedGroups(e);
+    }
+
+    async clearCache(e) {
+        return await this.adminCommands.clearCache(e);
+    }
+
+    async clearWordCloudData(e) {
+        return await this.adminCommands.clearWordCloudData(e);
+    }
+
     // 成就相关
     async showUserAchievements(e) {
         return await this.achievementCommands.showUserAchievements(e);

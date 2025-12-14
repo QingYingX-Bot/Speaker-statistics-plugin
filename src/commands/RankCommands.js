@@ -72,6 +72,18 @@ class RankCommands {
             // 总榜应该查询所有群聊，不限制群ID
             const limit = globalConfig.getConfig('display.displayCount') || 20;
 
+            // 为了确保数据一致性，先清除相关缓存
+            const rankingCacheKey = `ranking:total:all:${limit}`;
+            this.dataService.rankingCache.delete(rankingCacheKey);
+            // 清除全局统计缓存，确保使用最新数据
+            const globalStatsCacheKey = `globalStats:1:1`;
+            this.dataService.globalStatsCache.delete(globalStatsCacheKey);
+            
+            // 使用与 getGlobalStats 完全相同的查询逻辑
+            // 直接调用 getGlobalStats 获取总数，确保完全一致
+            const globalStats = await this.dataService.getGlobalStats(1, 1);
+            const totalMessagesResult = globalStats.totalMessages || 0;
+            
             const rankings = await this.dataService.getRankingData(null, 'total', { limit });
             
             if (rankings.length === 0) {
@@ -112,7 +124,9 @@ class RankCommands {
                     '总榜',
                     'total',
                     userInfo,
-                    {}
+                    {
+                        globalTotalMessages: totalMessagesResult // 传入全局总数，确保显示正确的总数
+                    }
                 );
                 return e.reply(segment.image(`file:///${imagePath.replace(/\\/g, '/')}`));
             } catch (error) {

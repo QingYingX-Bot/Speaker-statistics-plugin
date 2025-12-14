@@ -614,7 +614,20 @@ class DatabaseService {
                     'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
                     groupId
                 );
-                const lastActivityAt = lastActivity?.last_activity || null;
+                // 确保 lastActivityAt 是 null 或有效的日期字符串，不能是对象
+                let lastActivityAt = null;
+                if (lastActivity && lastActivity.last_activity) {
+                    const activityValue = lastActivity.last_activity;
+                    // 如果是有效的日期字符串或Date对象，转换为字符串；否则设为null
+                    if (typeof activityValue === 'string' && activityValue.trim() !== '') {
+                        lastActivityAt = activityValue;
+                    } else if (activityValue instanceof Date) {
+                        lastActivityAt = activityValue.toISOString().replace('T', ' ').substring(0, 19);
+                    } else {
+                        // 如果是对象或其他无效值，设为null
+                        lastActivityAt = null;
+                    }
+                }
                 
                 const now = this.getCurrentTime();
                 await this.run(`
@@ -637,7 +650,20 @@ class DatabaseService {
                 'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
                 groupId
             );
-            const lastActivityAt = lastActivity?.last_activity || null;
+            // 确保 lastActivityAt 是 null 或有效的日期字符串，不能是对象
+            let lastActivityAt = null;
+            if (lastActivity && lastActivity.last_activity) {
+                const activityValue = lastActivity.last_activity;
+                // 如果是有效的日期字符串或Date对象，转换为字符串；否则设为null
+                if (typeof activityValue === 'string' && activityValue.trim() !== '') {
+                    lastActivityAt = activityValue;
+                } else if (activityValue instanceof Date) {
+                    lastActivityAt = activityValue.toISOString().replace('T', ' ').substring(0, 19);
+                } else {
+                    // 如果是对象或其他无效值，设为null
+                    lastActivityAt = null;
+                }
+            }
             
             // 插入到归档表（使用 ON CONFLICT 作为额外保护）
             const now = this.getCurrentTime();
@@ -786,6 +812,41 @@ class DatabaseService {
     }
 
     /**
+     * 获取归档群组列表
+     * @param {number} limit 限制数量，默认50
+     * @param {number} offset 偏移量，默认0
+     * @returns {Promise<Array>} 归档群组列表
+     */
+    async getArchivedGroups(limit = 50, offset = 0) {
+        try {
+            const groups = await this.all(
+                `SELECT group_id, group_name, archived_at, last_activity_at 
+                 FROM archived_groups 
+                 ORDER BY archived_at DESC 
+                 LIMIT $1 OFFSET $2`,
+                limit,
+                offset
+            );
+            return groups || [];
+        } catch (error) {
+            throw new Error(`获取归档群组列表失败: ${error.message}`);
+        }
+    }
+
+    /**
+     * 获取归档群组总数
+     * @returns {Promise<number>} 归档群组总数
+     */
+    async getArchivedGroupsCount() {
+        try {
+            const result = await this.get('SELECT COUNT(*) as count FROM archived_groups');
+            return parseInt(result?.count || 0, 10);
+        } catch (error) {
+            throw new Error(`获取归档群组总数失败: ${error.message}`);
+        }
+    }
+
+    /**
      * 获取群组排行榜
      * @param {string} groupId 群号
      * @param {number} limit 限制数量
@@ -820,6 +881,7 @@ class DatabaseService {
         // 按用户ID聚合所有群聊的数据，取总和
         // 优化：使用子查询预计算 active_days，减少 JOIN 开销
         // 注意：active_days 需要从 daily_stats 统计不重复日期，不能简单求和
+        // 排除已归档的群组
         return await this.all(
             `WITH user_aggregated AS (
                 SELECT 
@@ -830,6 +892,7 @@ class DatabaseService {
                     MAX(continuous_days) as continuous_days,
                     MAX(last_speaking_time) as last_speaking_time
                 FROM user_stats
+                WHERE group_id NOT IN (SELECT group_id FROM archived_groups)
                 GROUP BY user_id
             ),
             active_days_stats AS (
@@ -837,7 +900,8 @@ class DatabaseService {
                     user_id,
                     COUNT(DISTINCT date_key) as active_days
                 FROM daily_stats
-                WHERE message_count > 0 OR word_count > 0
+                WHERE (message_count > 0 OR word_count > 0)
+                AND group_id NOT IN (SELECT group_id FROM archived_groups)
                 GROUP BY user_id
             )
             SELECT 

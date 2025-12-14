@@ -550,13 +550,14 @@ export function getConfigSchemas() {
     {
       field: 'wordcloud.extractMethod',
       label: '关键词提取方式',
-      bottomHelpMessage: '选择关键词提取方式：词频（frequency）或 TF-IDF（tfidf）',
+      bottomHelpMessage: '选择关键词提取方式：词频（frequency）、TF-IDF（tfidf）或增强模式（enhanced，综合考虑词频、长度、多样性）',
       component: 'Select',
       required: true,
       componentProps: {
         options: [
           { label: '词频', value: 'frequency' },
-          { label: 'TF-IDF', value: 'tfidf' }
+          { label: 'TF-IDF', value: 'tfidf' },
+          { label: '增强模式', value: 'enhanced' }
         ],
         placeholder: '请选择关键词提取方式'
       }

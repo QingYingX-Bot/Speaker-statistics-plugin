@@ -271,13 +271,18 @@ class MessageRecorder {
             this.saveRecentMessageText(groupId, userId, messageText);
             
             // 保存消息到 Redis（用于词云功能，如果 Redis 可用）
-            if (typeof redis !== 'undefined' && redis && globalConfig.getConfig('wordcloud.enableMessageCollection')) {
-                this.saveMessageToRedis(e, groupId, userId, nickname, messageText, messageTime).catch(err => {
-                    // 静默处理，不影响主流程
-                    if (globalConfig.getConfig('global.debugLog')) {
-                        globalConfig.debug(`保存消息到Redis失败: ${err.message}`);
-                    }
-                });
+            if (globalConfig.getConfig('wordcloud.enableMessageCollection')) {
+                // 使用新的 MessageCollector 保存消息（自动保存到个人、群、全局）
+                const { WordCloudServices } = await import('./services/WordCloudServices.js');
+                const messageCollector = WordCloudServices.getMessageCollector();
+                if (messageCollector) {
+                    messageCollector.saveMessage(groupId, userId, messageText, messageTime, nickname).catch(err => {
+                        // 静默处理，不影响主流程
+                        if (globalConfig.getConfig('global.debugLog')) {
+                            globalConfig.debug(`保存消息到Redis失败: ${err.message}`);
+                        }
+                    });
+                }
             }
 
             // 计算消息字数
@@ -916,62 +921,17 @@ class MessageRecorder {
     }
 
     /**
-     * 保存消息到 Redis（用于词云功能）
-     * @param {Object} e - 消息事件对象
-     * @param {string} groupId - 群号
-     * @param {string} userId - 用户ID
-     * @param {string} nickname - 用户昵称
-     * @param {string} messageText - 消息文本
-     * @param {number} messageTime - 消息时间戳（秒）
+     * 保存消息到 Redis（已废弃，使用 MessageCollector.saveMessage 替代）
+     * @deprecated 使用 MessageCollector.saveMessage 替代
      */
     async saveMessageToRedis(e, groupId, userId, nickname, messageText, messageTime) {
-        try {
-            if (typeof redis === 'undefined' || !redis) {
-                return;
-            }
-
-            // 过滤空消息和无效消息
-            if (!messageText || messageText.trim().length === 0) {
-                return;
-            }
-
-            // 过滤特殊消息（JSON格式的小程序消息等）
-            const trimmedText = messageText.trim();
-            if (trimmedText.startsWith('{') && (trimmedText.includes('"app"') || trimmedText.includes('"prompt"') || trimmedText.includes('com.tencent.miniapp'))) {
-                return;
-            }
-
-            const moment = (await import('moment')).default;
-            const date = moment.unix(messageTime).format('YYYY-MM-DD');
-            const key = `Speaker-statistics:messages:${groupId}:${date}`;
-            
-            // 确保用户ID格式一致（使用数字类型，便于匹配）
-            const normalizedUserId = parseInt(userId);
-            
-            const messageData = {
-                user_id: normalizedUserId,
-                nickname: nickname || '未知用户',
-                message: messageText,
-                time: messageTime,
-                timestamp: Date.now()
-            };
-
-            const messageStr = JSON.stringify(messageData);
-            await redis.lPush(key, messageStr);
-            
-            // 设置过期时间（保留 retentionDays 天）
-            const retentionDays = globalConfig.getConfig('wordcloud.retentionDays') || 7;
-            await redis.expire(key, retentionDays * 24 * 60 * 60);
-            
-            if (globalConfig.getConfig('global.debugLog')) {
-                globalConfig.debug(`[词云] 已保存消息到Redis: 群组=${groupId}, 用户=${normalizedUserId}, 日期=${date}, 消息长度=${messageText.length}`);
-            }
-        } catch (error) {
-            // 静默处理，不影响主流程
-            if (globalConfig.getConfig('global.debugLog')) {
-                globalConfig.debug(`[词云] 保存消息到Redis失败: ${error.message}`);
-            }
+        // 兼容旧代码，实际已迁移到 MessageCollector.saveMessage
+        const { WordCloudServices } = await import('./services/WordCloudServices.js');
+        const messageCollector = WordCloudServices.getMessageCollector();
+        if (messageCollector) {
+            return await messageCollector.saveMessage(groupId, userId, messageText, messageTime, nickname);
         }
+        return false;
     }
 
 }

@@ -147,7 +147,7 @@ const configTemplate = {
         minLength: 2,
         // 最小词频（出现次数）
         minFrequency: 2,
-        // 关键词提取方式：'frequency'（词频）或 'tfidf'（TF-IDF）
+        // 关键词提取方式：'frequency'（词频）、'tfidf'（TF-IDF）或 'enhanced'（增强模式，综合考虑词频、长度、多样性）
         extractMethod: 'frequency',
         // 图片尺寸
         width: 1200,

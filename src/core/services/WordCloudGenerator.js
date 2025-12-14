@@ -78,17 +78,19 @@ class WordCloudGenerator {
             // 根据提取方式准备词云数据
             let wordList;
 
-            if (extractMethod === 'tfidf') {
-                // TF-IDF 模式：wordData 格式为 [{word, weight}, ...]，weight 范围 0-1
+            if (extractMethod === 'tfidf' || extractMethod === 'enhanced') {
+                // TF-IDF 或增强模式：wordData 格式为 [{word, weight}, ...]，weight 范围 0-1
                 // 缩放到 1-10 范围供 wordcloud2.js 使用
                 wordList = wordData.map(item => {
                     const scaledWeight = 1 + item.weight * 9; // 映射 0-1 到 1-10
                     return [item.word, scaledWeight];
                 });
-                globalConfig.debug(`TF-IDF 权重范围: ${wordData[wordData.length - 1]?.weight?.toFixed(4) || 0} - ${wordData[0]?.weight?.toFixed(4) || 1}`);
+                const minWeight = wordData.length > 0 ? wordData[wordData.length - 1]?.weight?.toFixed(4) || 0 : 0;
+                const maxWeight = wordData.length > 0 ? wordData[0]?.weight?.toFixed(4) || 1 : 1;
+                globalConfig.debug(`${extractMethod === 'enhanced' ? '增强' : 'TF-IDF'} 权重范围: ${minWeight} - ${maxWeight}`);
             } else {
                 // 词频模式：wordData 格式为 [{word, count}, ...]
-                // 使用对数缩放归一化
+                // 使用对数缩放归一化（优化：更好的权重分布）
                 const frequencies = wordData.map(item => item.count);
                 const maxFreq = Math.max(...frequencies);
                 const minFreq = Math.min(...frequencies);
@@ -101,11 +103,12 @@ class WordCloudGenerator {
                     if (freqRange === 0) {
                         normalizedWeight = 5;
                     } else {
-                        const logFreq = Math.log(item.count);
-                        const logMin = Math.log(minFreq);
-                        const logMax = Math.log(maxFreq);
-                        const logRange = logMax - logMin;
-                        normalizedWeight = 1 + ((logFreq - logMin) / logRange) * 9;
+                        // 使用平方根缩放，让权重分布更平滑（比对数缩放更温和）
+                        const sqrtFreq = Math.sqrt(item.count);
+                        const sqrtMin = Math.sqrt(minFreq);
+                        const sqrtMax = Math.sqrt(maxFreq);
+                        const sqrtRange = sqrtMax - sqrtMin;
+                        normalizedWeight = 1 + ((sqrtFreq - sqrtMin) / sqrtRange) * 9;
                     }
                     return [item.word, normalizedWeight];
                 });

@@ -663,9 +663,18 @@ class DataService {
                         }
                     }
                     
-                    const topUsers = queryAllGroups 
-                        ? await this.dbService.getTopUsersAllGroups(limit, 'total_count')
-                        : await this.dbService.getTopUsers(groupId, limit, 'total_count');
+                    let topUsers;
+                    if (queryAllGroups) {
+                        // 全局总榜：已排除归档群组
+                        topUsers = await this.dbService.getTopUsersAllGroups(limit, 'total_count');
+                    } else {
+                        // 单群总榜：检查群组是否已归档
+                        const isArchived = await this.dbService.isGroupArchived(groupId);
+                        if (isArchived) {
+                            return []; // 已归档的群组不显示排行榜
+                        }
+                        topUsers = await this.dbService.getTopUsers(groupId, limit, 'total_count');
+                    }
                     
                     const result = topUsers.map(user => ({
                         user_id: user.user_id,
@@ -686,7 +695,7 @@ class DataService {
                     return result;
 
                 case 'daily':
-                    // 日榜：使用批量查询优化性能
+                    // 日榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     const todayDate = timeInfo.formattedDate;
                     const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate);
                     
@@ -699,7 +708,7 @@ class DataService {
                     }));
 
                 case 'weekly':
-                    // 周榜：使用批量查询优化性能
+                    // 周榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     const weekKey = timeInfo.weekKey;
                     const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey);
                     
@@ -712,7 +721,7 @@ class DataService {
                     }));
 
                 case 'monthly':
-                    // 月榜：使用批量查询优化性能
+                    // 月榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     if (!groupId) {
                         // 如果没有群ID，返回空数组
                         return [];
@@ -731,7 +740,7 @@ class DataService {
                     }));
 
                 case 'yearly':
-                    // 年榜：使用批量查询优化性能
+                    // 年榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     const yearKey = timeInfo.yearKey;
                     const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey);
                     
@@ -789,7 +798,13 @@ class DataService {
                             rank: userIndex + 1
                         };
                     } else {
-                        // 查询单个群聊：使用 getTopUsers 优化性能（已排序）
+                        // 查询单个群聊：先检查群组是否已归档
+                        const isArchived = await this.dbService.isGroupArchived(groupId);
+                        if (isArchived) {
+                            return null; // 已归档的群组不显示用户排名
+                        }
+                        
+                        // 使用 getTopUsers 优化性能（已排序）
                         const userStats = await this.dbService.getUserStats(groupId, userId);
                         if (!userStats || !userStats.total_count || userStats.total_count === 0) {
                             return null;
@@ -813,7 +828,7 @@ class DataService {
                     }
 
                 case 'daily':
-                    // 日榜：使用批量查询优化性能
+                    // 日榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     if (!groupId) return null;
                     const todayDate = timeInfo.formattedDate;
                     const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate);
@@ -841,7 +856,7 @@ class DataService {
                     };
 
                 case 'weekly':
-                    // 周榜：使用批量查询优化性能
+                    // 周榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     if (!groupId) return null;
                     const weekKey = timeInfo.weekKey;
                     const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey);
@@ -869,7 +884,7 @@ class DataService {
                     };
 
                 case 'monthly':
-                    // 月榜：使用批量查询优化性能
+                    // 月榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     if (!groupId) return null;
                     const monthKey = options.monthKey || timeInfo.monthKey;
                     const validMonthKey = monthKey.match(/^\d{4}-\d{2}$/) ? monthKey : timeInfo.monthKey;
@@ -898,7 +913,7 @@ class DataService {
                     };
 
                 case 'yearly':
-                    // 年榜：使用批量查询优化性能
+                    // 年榜：使用批量查询优化性能（针对当前群聊，无需检查归档）
                     if (!groupId) return null;
                     const yearKey = timeInfo.yearKey;
                     const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey);
@@ -967,27 +982,59 @@ class DataService {
             const monthKey = timeInfo.monthKey;
 
             // 优化：使用批量查询替代 N+1 查询，大幅提升性能
-            const [allUsersMap, allDailyStatsMap, allMonthlyStatsMap, allGroupIds, allGroupsInfoMap, archivedGroupsCount] = await Promise.all([
+            const [allUsersMap, allDailyStatsMap, allMonthlyStatsMap, allGroupIds, allGroupsInfoMap, archivedGroupsCount, archivedGroupIds, totalMessagesResult, totalWordsResult] = await Promise.all([
                 this.dbService.getAllGroupsUsersBatch(),
                 this.dbService.getAllGroupsDailyStatsBatch(todayKey),
                 this.dbService.getAllGroupsMonthlyStatsBatch(monthKey),
                 this.getGroupIds(),
                 this.dbService.getAllGroupsInfoBatch(),
                 // 获取归档群组数量
-                this.dbService.get('SELECT COUNT(*) as count FROM archived_groups').then(result => parseInt(result?.count || 0, 10)).catch(() => 0)
+                this.dbService.get('SELECT COUNT(*) as count FROM archived_groups').then(result => parseInt(result?.count || 0, 10)).catch(() => 0),
+                // 获取已归档的群组ID列表（用于排除）
+                this.dbService.all('SELECT group_id FROM archived_groups').then(groups => new Set(groups.map(g => String(g.group_id)))).catch(() => new Set()),
+                // 统计所有消息总数（排除归档群组，按用户聚合，与 getTopUsersAllGroups 逻辑保持一致）
+                // 注意：必须按用户聚合，因为 getTopUsersAllGroups 也是按用户聚合的
+                // 这样才能确保总数与排行榜中显示的用户数据一致
+                this.dbService.get(`
+                    SELECT SUM(total_count) as total 
+                    FROM (
+                        SELECT user_id, SUM(total_count) as total_count
+                        FROM user_stats
+                        WHERE group_id NOT IN (SELECT group_id FROM archived_groups)
+                        GROUP BY user_id
+                    ) as user_aggregated
+                `).then(result => parseInt(result?.total || 0, 10)).catch(() => 0),
+                // 统计所有字数总数（排除归档群组，按用户聚合，与 getTopUsersAllGroups 逻辑保持一致）
+                this.dbService.get(`
+                    SELECT SUM(total_words) as total 
+                    FROM (
+                        SELECT user_id, SUM(total_words) as total_words
+                        FROM user_stats
+                        WHERE group_id NOT IN (SELECT group_id FROM archived_groups)
+                        GROUP BY user_id
+                    ) as user_aggregated
+                `).then(result => parseInt(result?.total || 0, 10)).catch(() => 0)
             ]);
+            
+            // 创建已归档群组ID的Set，用于快速查找
+            const archivedGroupIdsSet = archivedGroupIds || new Set();
             
             let totalGroups = 0;
             let totalUsersSet = new Set(); // 使用 Set 来避免重复计算用户
-            let totalMessages = 0;
-            let totalWords = 0;
+            // 使用直接查询的结果，避免重复计算跨群用户
+            let totalMessages = totalMessagesResult || 0;
+            let totalWords = totalWordsResult || 0;
             let todayActiveSet = new Set();
             let monthActive = new Set();
 
             const groupStatsList = [];
 
-            // 遍历所有群组，计算统计数据（使用批量查询结果）
+            // 遍历所有群组，计算统计数据（使用批量查询结果），排除已归档的群组
             for (const groupId of allGroupIds) {
+                // 跳过已归档的群组
+                if (archivedGroupIdsSet.has(String(groupId))) {
+                    continue;
+                }
                 try {
                     const users = allUsersMap.get(groupId) || [];
                     if (users.length === 0) continue;
@@ -1028,8 +1075,7 @@ class DataService {
                         }
                     }
 
-                    totalMessages += groupMessages;
-                    totalWords += groupWords;
+                    // 注意：不再累加到 totalMessages 和 totalWords，因为已经通过 SQL 直接统计了
 
                     // 计算群组的今日和本月活跃（使用已查询的数据）
                     const groupTodayActive = dailyStatsList.length;
@@ -1742,6 +1788,31 @@ class DataService {
         this.rankingCache.clear();
         this.globalStatsCache.clear();
         this.groupStatsCache.delete(String(groupId));
+    }
+
+    /**
+     * 清理所有缓存
+     * @returns {Object} 清理结果统计
+     */
+    clearAllCache() {
+        const userCacheSize = this.cache.size();
+        const groupStatsCacheSize = this.groupStatsCache.size();
+        const rankingCacheSize = this.rankingCache.size();
+        const globalStatsCacheSize = this.globalStatsCache.size();
+        
+        // 清理所有缓存
+        this.cache.clear();
+        this.groupStatsCache.clear();
+        this.rankingCache.clear();
+        this.globalStatsCache.clear();
+        
+        return {
+            userCache: userCacheSize,
+            groupStatsCache: groupStatsCacheSize,
+            rankingCache: rankingCacheSize,
+            globalStatsCache: globalStatsCacheSize,
+            total: userCacheSize + groupStatsCacheSize + rankingCacheSize + globalStatsCacheSize
+        };
     }
 }
 

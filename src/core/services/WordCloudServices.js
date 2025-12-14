@@ -5,6 +5,12 @@ import { globalConfig } from '../ConfigManager.js';
 /**
  * 词云服务管理器（单例）
  * 管理 MessageCollector 和 WordCloudGenerator 实例
+ * 
+ * 重构说明：
+ * - 使用 Redis 分离存储个人、群、全局三种类型的消息
+ * - 个人消息：Speaker-statistics:wordcloud:user:${groupId}:${userId}:${date}
+ * - 群消息：Speaker-statistics:wordcloud:group:${groupId}:${date}
+ * - 全局消息：Speaker-statistics:wordcloud:global:${date}
  */
 class WordCloudServices {
     static _messageCollector = null;
@@ -53,4 +59,3 @@ class WordCloudServices {
 
 export { WordCloudServices };
 export default WordCloudServices;
-

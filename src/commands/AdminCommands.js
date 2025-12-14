@@ -54,6 +54,18 @@ class AdminCommands {
             {
                 reg: '^#水群确认归档$',
                 fnc: 'confirmCleanZombieGroups'
+            },
+            {
+                reg: '^#水群查看归档列表$',
+                fnc: 'viewArchivedGroups'
+            },
+            {
+                reg: '^#水群清理缓存$',
+                fnc: 'clearCache'
+            },
+            {
+                reg: '^#水群清空词云统计$',
+                fnc: 'clearWordCloudData'
             }
         ];
     }
@@ -885,6 +897,170 @@ class AdminCommands {
             },
             '确认归档失败',
             () => e.reply('清理失败，请稍后重试')
+        );
+    }
+
+    /**
+     * 查看归档群组列表
+     */
+    async viewArchivedGroups(e) {
+        // 验证管理员权限
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                // 获取归档群组总数
+                const totalCount = await this.dataService.dbService.getArchivedGroupsCount();
+                
+                if (totalCount === 0) {
+                    return e.reply('✅ 当前没有已归档的群组');
+                }
+
+                // 获取归档群组列表（最多显示50个）
+                const archivedGroups = await this.dataService.dbService.getArchivedGroups(50, 0);
+                
+                if (!archivedGroups || archivedGroups.length === 0) {
+                    return e.reply('✅ 当前没有已归档的群组');
+                }
+
+                // 构建合并转发消息
+                const msg = [
+                    [
+                        `📋 归档群组列表\n\n📊 统计信息：\n- 归档总数: ${totalCount} 个\n- 显示数量: ${archivedGroups.length} 个\n\n💡 说明：\n- 归档的群组数据已移到暂存表\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
+                    ]
+                ];
+
+                // 分批显示群组信息，每批15个
+                const batchSize = 15;
+                for (let i = 0; i < archivedGroups.length; i += batchSize) {
+                    const batch = archivedGroups.slice(i, i + batchSize);
+                    let batchText = `📋 群组列表 ${Math.floor(i / batchSize) + 1}：\n\n`;
+                    
+                    batch.forEach((group, index) => {
+                        const groupIndex = i + index + 1;
+                        const maskedGroupId = CommonUtils.maskGroupId(group.group_id);
+                        const groupName = group.group_name || group.group_id;
+                        
+                        // 格式化归档时间
+                        let archivedAt = '未知';
+                        if (group.archived_at) {
+                            if (group.archived_at instanceof Date) {
+                                archivedAt = TimeUtils.formatDateTime(group.archived_at);
+                            } else if (typeof group.archived_at === 'string') {
+                                try {
+                                    archivedAt = TimeUtils.formatDateTime(new Date(group.archived_at));
+                                } catch {
+                                    archivedAt = group.archived_at;
+                                }
+                            }
+                        }
+                        
+                        // 格式化最后活动时间
+                        let lastActivityAt = '无';
+                        if (group.last_activity_at) {
+                            if (group.last_activity_at instanceof Date) {
+                                lastActivityAt = TimeUtils.formatDateTime(group.last_activity_at);
+                            } else if (typeof group.last_activity_at === 'string') {
+                                try {
+                                    lastActivityAt = TimeUtils.formatDateTime(new Date(group.last_activity_at));
+                                } catch {
+                                    lastActivityAt = group.last_activity_at;
+                                }
+                            }
+                        }
+                        
+                        batchText += `${groupIndex}. ${groupName} (${maskedGroupId})\n`;
+                        batchText += `   归档时间: ${archivedAt}\n`;
+                        batchText += `   最后活动: ${lastActivityAt}\n\n`;
+                    });
+                    
+                    if (i + batchSize < archivedGroups.length) {
+                        batchText += `... 还有 ${archivedGroups.length - i - batchSize} 个群组\n`;
+                    }
+                    
+                    msg.push([batchText]);
+                }
+
+                // 发送合并转发消息
+                return e.reply(common.makeForwardMsg(e, msg, '归档群组列表'));
+            },
+            '查看归档列表失败',
+            () => e.reply('查询失败，请稍后重试')
+        );
+    }
+
+    /**
+     * 清理缓存
+     */
+    async clearCache(e) {
+        // 验证管理员权限
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                // 清理所有缓存
+                const result = this.dataService.clearAllCache();
+                
+                const msg = `✅ 缓存清理完成\n\n📊 清理统计：\n` +
+                    `- 用户数据缓存: ${result.userCache} 条\n` +
+                    `- 群统计缓存: ${result.groupStatsCache} 条\n` +
+                    `- 排行榜缓存: ${result.rankingCache} 条\n` +
+                    `- 全局统计缓存: ${result.globalStatsCache} 条\n` +
+                    `- 总计: ${result.total} 条\n\n` +
+                    `💡 提示：清理缓存后，下次查询将重新从数据库加载数据`;
+                
+                return e.reply(msg);
+            },
+            '清理缓存失败',
+            () => e.reply('清理缓存失败，请稍后重试')
+        );
+    }
+
+    /**
+     * 清空词云统计
+     */
+    async clearWordCloudData(e) {
+        // 验证管理员权限
+        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                // 检查 Redis 是否可用
+                if (typeof redis === 'undefined' || !redis) {
+                    return e.reply('❌ Redis 未配置，无法清空词云统计', true);
+                }
+
+                // 检查消息收集是否启用
+                const enableCollection = globalConfig.getConfig('wordcloud.enableMessageCollection');
+                if (!enableCollection) {
+                    return e.reply('❌ 消息收集功能未启用，无需清空词云统计', true);
+                }
+
+                await e.reply('🔄 正在清空词云统计数据，请稍候...');
+
+                // 获取 MessageCollector 实例
+                const { WordCloudServices } = await import('../core/services/WordCloudServices.js');
+                const messageCollector = WordCloudServices.getMessageCollector();
+
+                if (!messageCollector) {
+                    return e.reply('❌ 词云服务未初始化', true);
+                }
+
+                // 清空所有词云统计数据
+                const result = await messageCollector.clearAllWordCloudData();
+
+                const msg = `✅ 词云统计清空完成\n\n📊 清理统计：\n` +
+                    `- 个人消息键: ${result.userKeys} 个\n` +
+                    `- 群消息键: ${result.groupKeys} 个\n` +
+                    `- 全局消息键: ${result.globalKeys} 个\n` +
+                    (result.oldKeys > 0 ? `- 旧格式键: ${result.oldKeys} 个\n` : '') +
+                    `- 总计: ${result.total} 个键\n\n` +
+                    `💡 提示：清空后，词云功能将从新收集的消息开始统计`;
+
+                return e.reply(msg);
+            },
+            '清空词云统计失败',
+            () => e.reply('清空词云统计失败，请稍后重试')
         );
     }
 
