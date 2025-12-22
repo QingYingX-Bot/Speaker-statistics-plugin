@@ -583,16 +583,6 @@ class API {
         return this.request(`/api/admin/statistics?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}&startDate=${startDate}&endDate=${endDate}`);
     }
     
-    /**
-     * 获取词云数据
-     * @param {string} userId 用户ID
-     * @param {string} secretKey 秘钥
-     * @returns {Promise} 词云数据
-     */
-    async getWordCloud(userId, secretKey) {
-        return this.request(`/api/admin/wordcloud?userId=${userId}&secretKey=${encodeURIComponent(secretKey)}`);
-    }
-    
     // ========== 系统API ==========
     
     /**

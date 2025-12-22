@@ -32,6 +32,11 @@ class AchievementService {
         this.categories = null;
         this.rarities = null;
         this.definitionsLoaded = false;
+        
+        // 用户成就定义缓存（避免重复读取和日志）
+        this.userAchievementDefinitions = null;
+        this.userAchievementDefinitionsLoaded = false;
+        this.userAchievementDefinitionsTimestamp = 0;
 
         // 文件监听相关（使用静态变量）
         this.reloadTimeout = null;
@@ -167,6 +172,12 @@ class AchievementService {
         this.rarities = this.loadRaritiesFromFile();
         this.definitionsLoaded = false;
         this.cacheTimestamp = 0;
+        
+        // 清除用户成就定义缓存，强制重新加载
+        this.userAchievementDefinitions = null;
+        this.userAchievementDefinitionsLoaded = false;
+        this.userAchievementDefinitionsTimestamp = 0;
+        
         globalConfig.debug('成就配置已重新加载');
     }
 
@@ -258,10 +269,31 @@ class AchievementService {
     }
 
     /**
-     * 获取用户成就定义（来自 users.json）
+     * 获取用户成就定义（来自 users.json，带缓存优化）
+     * @param {boolean} forceReload - 是否强制重新加载（默认 false）
      * @returns {Object} 用户成就定义对象
      */
-    getUserAchievementDefinitions() {
+    getUserAchievementDefinitions(forceReload = false) {
+        // 使用缓存，避免重复读取文件和输出日志
+        if (!forceReload && this.userAchievementDefinitionsLoaded && this.userAchievementDefinitions !== null) {
+            // 检查文件修改时间，如果文件未修改则直接返回缓存
+            const usersJsonPath = path.join(this.achievementsDir, 'users.json');
+            try {
+                if (fs.existsSync(usersJsonPath)) {
+                    const stats = fs.statSync(usersJsonPath);
+                    const fileMtime = stats.mtime.getTime();
+                    // 如果文件修改时间未变，直接返回缓存
+                    if (fileMtime === this.userAchievementDefinitionsTimestamp) {
+                        return this.userAchievementDefinitions;
+                    }
+                }
+            } catch (error) {
+                // 如果检查文件失败，使用缓存
+                return this.userAchievementDefinitions || {};
+            }
+        }
+        
+        // 重新加载用户成就定义
         const usersJsonPath = path.join(this.achievementsDir, 'users.json');
         const userDefinitions = {};
         
@@ -269,11 +301,28 @@ class AchievementService {
             if (fs.existsSync(usersJsonPath)) {
                 const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'));
                 Object.assign(userDefinitions, fileData);
-                globalConfig.debug(`已加载用户成就文件: users.json`);
+                
+                // 记录文件修改时间
+                const stats = fs.statSync(usersJsonPath);
+                this.userAchievementDefinitionsTimestamp = stats.mtime.getTime();
+                
+                // 只在首次加载或强制重载时输出日志
+                if (!this.userAchievementDefinitionsLoaded || forceReload) {
+                    globalConfig.debug(`已加载用户成就文件: users.json (${Object.keys(userDefinitions).length} 个成就)`);
+                }
+            } else {
+                // 文件不存在时也记录（仅首次）
+                if (!this.userAchievementDefinitionsLoaded) {
+                    globalConfig.debug(`用户成就文件不存在: users.json`);
+                }
             }
         } catch (error) {
             globalConfig.error(`加载用户成就文件失败: users.json`, error);
         }
+        
+        // 更新缓存
+        this.userAchievementDefinitions = userDefinitions;
+        this.userAchievementDefinitionsLoaded = true;
         
         return userDefinitions;
     }

@@ -12,7 +12,6 @@ export { KeyFileOptimizer } from './KeyFileOptimizer.js';
 export { PathResolver } from './PathResolver.js';
 export { PerformanceMonitor, getPerformanceMonitor } from './PerformanceMonitor.js';
 export { PermissionManager, getPermissionManager } from './PermissionManager.js';
-export { TextProcessor } from './TextProcessor.js';
 export { TimeUtils } from './TimeUtils.js';
 export { WebLinkGenerator } from './WebLinkGenerator.js';
 export { UserParser } from './UserParser.js';
@@ -28,7 +27,6 @@ export const Utils = {
     Web: WebLinkGenerator,
     Performance: PerformanceMonitor,
     Permission: PermissionManager,
-    Text: TextProcessor,
     Key: KeyFileOptimizer,
     User: UserParser
 };

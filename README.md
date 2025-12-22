@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.2.14-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.2.15-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -19,7 +19,6 @@
 - 📊 **多维度统计**：总榜、日榜、周榜、月榜、年榜全方位统计
 - 🎨 **灵活展示**：文字、转发、图片三种模式，自定义背景
 - 🏆 **成就系统**：60个系统默认成就，支持用户自定义和群专属成就
-- ☁️ **词云功能**：群聊词云和个人词云，支持词频和 TF-IDF 关键词提取
 - 🌐 **Web管理界面**：完整的Web界面，支持查看统计、管理成就、设置背景等
 - ⚙️ **可视化配置**：支持通过 Guoba-Plugin 进行图形化配置
 - 🔒 **数据管理**：僵尸群归档、数据备份、权限控制、自动恢复机制
@@ -151,27 +150,6 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 | 查询他人群列表 | `#水群查询群列表 @用户` | 查看指定用户所在的所有群聊 |
 | 群统计 | `#水群统计` | 查看当前群聊的统计信息 |
 | 群信息 | `#水群信息` | 查看当前群聊的详细信息 |
-
-### 词云功能
-
-| 功能 | 命令 | 说明 |
-|------|------|------|
-| 群聊词云 | `#水群词云` | 生成当天群聊词云图 |
-| 群聊词云（三天） | `#水群词云 三天` | 生成近三天群聊词云图 |
-| 群聊词云（七天） | `#水群词云 七天` | 生成近七天群聊词云图 |
-| 个人词云 | `#我的水群词云` | 生成当天个人词云图 |
-| 个人词云（三天） | `#我的水群词云 三天` | 生成近三天个人词云图 |
-| 个人词云（七天） | `#我的水群词云 七天` | 生成近七天个人词云图 |
-| 总词云 | `#水群总词云` | 生成当天所有群的总词云图 |
-| 总词云（三天） | `#水群总词云 三天` | 生成近三天所有群的总词云图 |
-| 总词云（七天） | `#水群总词云 七天` | 生成近七天所有群的总词云图 |
-
-> 💡 **词云功能说明**：
-> - 需要配置 Redis 才能使用词云功能
-> - 需要在配置中启用消息收集（`wordcloud.enableMessageCollection: true`）
-> - 支持词频和 TF-IDF 两种关键词提取方式
-> - 使用 Puppeteer 渲染高质量词云图片
-> - 自动过滤无效消息：排除 JSON 格式的 QQ 小程序消息、机器人特殊消息格式、特定昵称的消息等，只使用纯文本消息生成词云
 
 ### 成就功能
 
@@ -491,6 +469,5 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 - QingYingX & AI
 - [Trss-Yunzai](https://gitee.com/TimeRainStarSky/Yunzai)
 - [Guoba-Plugin](https://gitee.com/guoba-yunzai/guoba-plugin) 作者
-- [group-insight](https://github.com/KBVsent/group-insight) 作者 水群榜插件使用其词云部分的代码
 - 所有贡献者和测试用户
 

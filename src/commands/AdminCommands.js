@@ -62,10 +62,6 @@ class AdminCommands {
             {
                 reg: '^#水群清理缓存$',
                 fnc: 'clearCache'
-            },
-            {
-                reg: '^#水群清空词云统计$',
-                fnc: 'clearWordCloudData'
             }
         ];
     }
@@ -1013,54 +1009,6 @@ class AdminCommands {
             },
             '清理缓存失败',
             () => e.reply('清理缓存失败，请稍后重试')
-        );
-    }
-
-    /**
-     * 清空词云统计
-     */
-    async clearWordCloudData(e) {
-        // 验证管理员权限
-        if (!(await CommandWrapper.validateAndReply(e, CommonUtils.validateAdminPermission(e)))) return;
-
-        return await CommandWrapper.safeExecute(
-            async () => {
-                // 检查 Redis 是否可用
-                if (typeof redis === 'undefined' || !redis) {
-                    return e.reply('❌ Redis 未配置，无法清空词云统计', true);
-                }
-
-                // 检查消息收集是否启用
-                const enableCollection = globalConfig.getConfig('wordcloud.enableMessageCollection');
-                if (!enableCollection) {
-                    return e.reply('❌ 消息收集功能未启用，无需清空词云统计', true);
-                }
-
-                await e.reply('🔄 正在清空词云统计数据，请稍候...');
-
-                // 获取 MessageCollector 实例
-                const { WordCloudServices } = await import('../core/services/WordCloudServices.js');
-                const messageCollector = WordCloudServices.getMessageCollector();
-
-                if (!messageCollector) {
-                    return e.reply('❌ 词云服务未初始化', true);
-                }
-
-                // 清空所有词云统计数据
-                const result = await messageCollector.clearAllWordCloudData();
-
-                const msg = `✅ 词云统计清空完成\n\n📊 清理统计：\n` +
-                    `- 个人消息键: ${result.userKeys} 个\n` +
-                    `- 群消息键: ${result.groupKeys} 个\n` +
-                    `- 全局消息键: ${result.globalKeys} 个\n` +
-                    (result.oldKeys > 0 ? `- 旧格式键: ${result.oldKeys} 个\n` : '') +
-                    `- 总计: ${result.total} 个键\n\n` +
-                    `💡 提示：清空后，词云功能将从新收集的消息开始统计`;
-
-                return e.reply(msg);
-            },
-            '清空词云统计失败',
-            () => e.reply('清空词云统计失败，请稍后重试')
         );
     }
 

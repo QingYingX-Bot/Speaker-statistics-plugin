@@ -11,7 +11,7 @@ import { UserManagementApi } from './admin/UserManagementApi.js';
 import { AchievementManagementApi } from './admin/AchievementManagementApi.js';
 
 /**
- * 管理员相关API路由（核心功能：概览、统计、词云、配置）
+ * 管理员相关API路由（核心功能：概览、统计、配置）
  */
 export class AdminApi extends BaseApi {
     constructor(app, authService) {
@@ -538,54 +538,6 @@ export class AdminApi extends BaseApi {
             }, '获取统计数据失败')
         );
 
-        // 获取词云数据（管理员）
-        this.app.get('/api/admin/wordcloud',
-            this.authMiddleware.requireAdmin.bind(this.authMiddleware),
-            ApiResponse.asyncHandler(async (req, res) => {
-                try {
-                    // 获取消息记录器实例
-                    const messageRecorder = getMessageRecorder(this.dataService);
-                    
-                    // 获取所有可用的消息文本
-                    const allMessages = this.getAllMessageTexts(messageRecorder);
-                    
-                    if (allMessages.length === 0) {
-                        // 如果没有消息，返回空数组
-                        return ApiResponse.success(res, {
-                            words: [],
-                            updatedAt: new Date().toISOString()
-                        });
-                    }
-                    
-                    // 合并所有消息文本
-                    const combinedText = allMessages.join(' ');
-                    
-                    // 进行中文分词和词频统计
-                    const wordFreq = this.extractWordFrequency(combinedText);
-                    
-                    // 转换为词云数据格式，取Top 100
-                    const wordCloudData = wordFreq
-                        .slice(0, 100)
-                        .map(item => ({
-                            name: item.word,
-                            value: item.count
-                        }));
-                    
-                    ApiResponse.success(res, {
-                        words: wordCloudData,
-                        updatedAt: new Date().toISOString()
-                    });
-                } catch (error) {
-                    globalConfig.error('获取词云数据失败:', error);
-                    // 返回空数据而不是错误，避免前端显示错误
-                    ApiResponse.success(res, {
-                        words: [],
-                        updatedAt: new Date().toISOString()
-                    });
-                }
-            }, '获取词云数据失败')
-        );
-
         // 获取全局配置（管理员）
         this.app.get('/api/admin/config',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),
@@ -631,134 +583,4 @@ export class AdminApi extends BaseApi {
         );
     }
     
-    /**
-     * 获取所有可用的消息文本（用于词云分析）
-     * @param {MessageRecorder} messageRecorder 消息记录器实例
-     * @param {number} hours 获取最近多少小时的消息（默认24小时）
-     * @returns {Array<string>} 消息文本数组
-     */
-    getAllMessageTexts(messageRecorder, hours = 24) {
-        if (!messageRecorder) {
-            return [];
-        }
-        
-        // 优先使用历史消息列表（24小时数据）
-        if (messageRecorder.getHistoricalMessageTexts && typeof messageRecorder.getHistoricalMessageTexts === 'function') {
-            return messageRecorder.getHistoricalMessageTexts(hours);
-        }
-        
-        // 降级方案：从 recentMessageTexts 获取（1分钟内）
-        const messages = [];
-        if (messageRecorder.recentMessageTexts) {
-            const now = Date.now();
-            const timeLimit = now - hours * 60 * 60 * 1000;
-            
-            for (const [key, data] of messageRecorder.recentMessageTexts.entries()) {
-                if (data && data.text && data.timestamp && data.timestamp >= timeLimit) {
-                    const text = String(data.text).trim();
-                    if (text.length > 0) {
-                        messages.push(text);
-                    }
-                }
-            }
-        }
-        
-        return messages;
-    }
-    
-    /**
-     * 从文本中提取词频（改进版，更准确的分词）
-     * @param {string} text 文本内容
-     * @returns {Array<{word: string, count: number}>} 词频数组（按频率降序）
-     */
-    extractWordFrequency(text) {
-        if (!text || typeof text !== 'string') {
-            return [];
-        }
-        
-        // 停用词列表（常见的中文停用词和网络用语）
-        const stopWords = new Set([
-            // 单字停用词
-            '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '那', '他', '她', '它', '们',
-            // 常见双字停用词
-            '一个', '这个', '那个', '什么', '怎么', '为什么', '因为', '所以', '但是', '如果', '然后', '还是', '可以', '应该', '可能', '也许', '大概', '好像', '似乎', '仿佛',
-            '已经', '正在', '将要', '曾经', '一直', '总是', '经常', '偶尔', '非常', '特别', '十分', '相当', '比较', '有点', '稍微',
-            '或者', '而且', '并且', '同时', '另外', '此外', '因此', '于是', '接着', '最后', '终于',
-            '虽然', '然而', '不过', '可是', '只是', '假如', '要是', '只要', '除非', '无论', '不管',
-            '为了', '由于', '从而', '关于', '对于', '至于', '等等', '之类', '什么的', '之类的',
-            // 语气词和网络用语
-            '啊', '呢', '吧', '吗', '呀', '哦', '嗯', '哈', '呵', '唉', '哎', '喂', '嗯嗯', '哈哈', '呵呵', '嘿嘿', '嘻嘻', '嘿嘿', '额', '呃',
-            // 无意义词汇
-            '图片', '表情', '语音', '视频', '文件', '链接', 'http', 'https', 'www', 'com', 'cn', 'org', 'net',
-            // 常见游戏/聊天用语
-            '这样', '那样', '这里', '那里', '这时', '那时', '现在', '刚才', '刚才', '刚才'
-        ]);
-        
-        // 改进的分词策略：提取2-4个字符的中文词汇（避免过长的无意义组合）
-        // 优先提取2-3字的词汇，4字词汇需要更严格的过滤
-        const wordFreqMap = new Map();
-        
-        // 提取2字词
-        const twoCharRegex = /[\u4e00-\u9fa5]{2}/g;
-        const twoCharWords = text.match(twoCharRegex) || [];
-        for (const word of twoCharWords) {
-            if (!stopWords.has(word) && !/^\d+$/.test(word)) {
-                const count = wordFreqMap.get(word) || 0;
-                wordFreqMap.set(word, count + 1);
-            }
-        }
-        
-        // 提取3字词
-        const threeCharRegex = /[\u4e00-\u9fa5]{3}/g;
-        const threeCharWords = text.match(threeCharRegex) || [];
-        for (const word of threeCharWords) {
-            if (!stopWords.has(word) && !/^\d+$/.test(word)) {
-                // 过滤明显无意义的组合（如：连续重复字符）
-                if (word[0] === word[1] && word[1] === word[2]) {
-                    continue;
-                }
-                const count = wordFreqMap.get(word) || 0;
-                wordFreqMap.set(word, count + 1);
-            }
-        }
-        
-        // 提取4字词（更严格过滤）
-        const fourCharRegex = /[\u4e00-\u9fa5]{4}/g;
-        const fourCharWords = text.match(fourCharRegex) || [];
-        for (const word of fourCharWords) {
-            if (!stopWords.has(word) && !/^\d+$/.test(word)) {
-                // 过滤明显无意义的组合
-                if (word[0] === word[1] && word[2] === word[3]) {
-                    continue;
-                }
-                // 过滤包含停用词的组合
-                let hasStopWord = false;
-                for (let i = 0; i < word.length - 1; i++) {
-                    const subWord = word.substring(i, i + 2);
-                    if (stopWords.has(subWord)) {
-                        hasStopWord = true;
-                        break;
-                    }
-                }
-                if (!hasStopWord) {
-                    const count = wordFreqMap.get(word) || 0;
-                    wordFreqMap.set(word, count + 1);
-                }
-            }
-        }
-        
-        // 转换为数组并按频率排序
-        const wordFreqArray = Array.from(wordFreqMap.entries())
-            .map(([word, count]) => ({ word, count }))
-            .sort((a, b) => {
-                // 先按频率排序
-                if (b.count !== a.count) {
-                    return b.count - a.count;
-                }
-                // 频率相同时，优先短词
-                return a.word.length - b.word.length;
-            });
-        
-        return wordFreqArray;
-    }
 }

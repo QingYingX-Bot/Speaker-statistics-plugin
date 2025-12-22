@@ -6,7 +6,6 @@ import { UserCommands } from '../commands/UserCommands.js';
 import { AdminCommands } from '../commands/AdminCommands.js';
 import { HelpCommands } from '../commands/HelpCommands.js';
 import { AchievementCommands } from '../commands/AchievementCommands.js';
-import { WordCloudCommands } from '../commands/WordCloudCommands.js';
 import { BackgroundManager } from '../managers/BackgroundManager.js';
 import { globalConfig } from './ConfigManager.js';
 
@@ -26,7 +25,6 @@ class Plugin extends plugin {
                 ...AdminCommands.getRules(),
                 ...HelpCommands.getRules(),
                 ...AchievementCommands.getRules(),
-                ...WordCloudCommands.getRules(),
                 ...BackgroundManager.getRules()
             ]
         });
@@ -41,7 +39,6 @@ class Plugin extends plugin {
         this.adminCommands = new AdminCommands(this.dataService);
         this.helpCommands = new HelpCommands(this.dataService);
         this.achievementCommands = new AchievementCommands(this.dataService);
-        this.wordCloudCommands = new WordCloudCommands(this.dataService);
         this.backgroundCommands = new BackgroundManager();
 
         logger.debug('[发言统计] 插件实例创建完成');
@@ -213,10 +210,6 @@ class Plugin extends plugin {
         return await this.adminCommands.clearCache(e);
     }
 
-    async clearWordCloudData(e) {
-        return await this.adminCommands.clearWordCloudData(e);
-    }
-
     // 成就相关
     async showUserAchievements(e) {
         return await this.achievementCommands.showUserAchievements(e);
@@ -245,19 +238,6 @@ class Plugin extends plugin {
     // 帮助命令
     async showHelp(e) {
         return await this.helpCommands.showHelp(e);
-    }
-
-    // 词云相关
-    async generateWordCloud(e) {
-        return await this.wordCloudCommands.generateWordCloud(e);
-    }
-
-    async generatePersonalWordCloud(e) {
-        return await this.wordCloudCommands.generatePersonalWordCloud(e);
-    }
-
-    async generateTotalWordCloud(e) {
-        return await this.wordCloudCommands.generateTotalWordCloud(e);
     }
 
     // 背景设置
