@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import { PathResolver } from '../core/utils/PathResolver.js';
 import { globalConfig } from '../core/ConfigManager.js';
 import { getDataService } from '../core/DataService.js';
@@ -33,9 +34,12 @@ class WebServer {
         this.authService = new AuthService();
         
         // 确保背景目录存在
-        PathResolver.ensureDirectory(PathResolver.getBackgroundsDir());
-        PathResolver.ensureDirectory(PathResolver.getBackgroundsDir('normal'));
-        PathResolver.ensureDirectory(PathResolver.getBackgroundsDir('ranking'));
+        const backgroundsDir = PathResolver.getBackgroundsDir();
+        if (!fs.existsSync(backgroundsDir)) fs.mkdirSync(backgroundsDir, { recursive: true });
+        const normalDir = PathResolver.getBackgroundsDir('normal');
+        if (!fs.existsSync(normalDir)) fs.mkdirSync(normalDir, { recursive: true });
+        const rankingDir = PathResolver.getBackgroundsDir('ranking');
+        if (!fs.existsSync(rankingDir)) fs.mkdirSync(rankingDir, { recursive: true });
 
         this.setupMiddleware();
         this.setupRoutes();

@@ -52,21 +52,5 @@ export class UserParser {
         return null;
     }
 
-    /**
-     * 解析 @ 用户或QQ号（兼容旧方法）
-     * @param {Object} e 消息事件
-     * @returns {Object|null} { userId: string, nickname: string } 或 null
-     * @deprecated 使用 parseUser 方法替代
-     */
-    static parseMentionedUser(e) {
-        const result = this.parseUser(e, { allowMention: true, defaultToSelf: false });
-        if (result && result.isMentioned) {
-            return {
-                userId: result.userId,
-                nickname: result.nickname
-            };
-        }
-        return null;
-    }
 }
 

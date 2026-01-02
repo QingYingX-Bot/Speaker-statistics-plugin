@@ -491,6 +491,7 @@ psql -h localhost -U speech_user -d speech_statistics
 # - achievements
 # - user_display_achievements
 # - group_info
+# - archived_groups
 
 # 退出
 \q
@@ -836,4 +837,4 @@ crontab -e
 
 ---
 
-**最后更新**：2025-12-01
+**最后更新**：2026-01-03

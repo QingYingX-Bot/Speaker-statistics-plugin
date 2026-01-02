@@ -139,15 +139,6 @@ class DataService {
         globalConfig.error(`[数据服务] ${message}`, ...args);
     }
 
-    /**
-     * 获取缓存键
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @returns {string} 缓存键
-     */
-    getCacheKey(groupId, userId) {
-        return `${groupId}_${userId}`;
-    }
 
     /**
      * 获取用户数据（带缓存）
@@ -156,7 +147,7 @@ class DataService {
      * @returns {Promise<Object|null>} 用户数据
      */
     async getUserData(groupId, userId) {
-        const cacheKey = this.getCacheKey(groupId, userId);
+        const cacheKey = `${groupId}_${userId}`;
         const cached = this.cache.get(cacheKey);
         
         if (cached) {
@@ -289,7 +280,7 @@ class DataService {
         }
 
         // 更新缓存
-        const cacheKey = this.getCacheKey(groupId, userId);
+        const cacheKey = `${groupId}_${userId}`;
         this.cache.set(cacheKey, userData);
         
         // 清除相关缓存
@@ -1771,7 +1762,7 @@ class DataService {
      */
     clearCache(groupId, userId) {
         if (userId) {
-            const cacheKey = this.getCacheKey(groupId, userId);
+            const cacheKey = `${groupId}_${userId}`;
             this.cache.delete(cacheKey);
         } else {
             // 清除该群的所有缓存

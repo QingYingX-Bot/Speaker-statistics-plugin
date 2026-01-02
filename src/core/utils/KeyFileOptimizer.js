@@ -88,7 +88,8 @@ class KeyFileOptimizer {
             // 如果有优化，保存文件
             if (optimized) {
                 // 确保目录存在
-                PathResolver.ensureDirectory(path.dirname(keyFilePath));
+                const keyFileDir = path.dirname(keyFilePath);
+                if (!fs.existsSync(keyFileDir)) fs.mkdirSync(keyFileDir, { recursive: true });
                 
                 // 保存优化后的数据
                 fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8');

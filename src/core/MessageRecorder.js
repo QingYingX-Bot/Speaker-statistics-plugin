@@ -724,7 +724,7 @@ class MessageRecorder {
                             if (shouldAutoSetDisplay && bestAchievement) {
                                 try {
                                     // 获取成就的解锁时间（UTC+8 时区的字符串格式）
-                                    const unlockedAt = bestAchievement.unlockedAt || TimeUtils.formatDateTimeForDB();
+                                    const unlockedAt = bestAchievement.unlockedAt || TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
                                     
                                     // 检查是否是全局成就（特殊成就或节日成就）
                                     const isGlobal = AchievementUtils.isGlobalAchievement(bestAchievement.rarity);

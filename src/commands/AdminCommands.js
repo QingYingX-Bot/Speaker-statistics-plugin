@@ -641,7 +641,7 @@ class AdminCommands {
                         
                         const topAchievement = epicOrHigher[0];
                         const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id];
-                        const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTimeForDB();
+                        const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
                         
                         // 检查是否是全局成就
                         const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);

@@ -4,6 +4,71 @@
 
 ---
 
+## [3.2.16] - 2026-01-03
+
+### 🚀 代码优化
+
+#### 工具类代码优化
+- ✅ **TimeUtils.js 优化**：
+  - 移除了未使用的日期比较方法：`daysBetween()`, `isToday()`, `isThisWeek()`, `isThisMonth()`, `parseMonth()`
+  - 保留所有实际使用的方法，减少代码冗余
+- ✅ **CommonUtils.js 优化**：
+  - 移除了未使用的工具方法：`generateProgressBar()`, `validateFilePath()`, `cleanupTempFiles()`, `getSystemInfo()`, `safeExecute()`, `batchProcess()`
+  - 保留所有实际使用的验证和格式化方法
+- ✅ **PathResolver.js 优化**：
+  - 移除了未使用的方法：`getBackupsDir()`
+  - 内联了简单的目录确保逻辑，直接使用 `fs.mkdirSync()` 替代 `ensureDirectory()` 方法
+- ✅ **UserParser.js 优化**：
+  - 移除了已废弃的 `parseMentionedUser()` 方法
+  - 保留核心的用户ID和昵称解析功能
+
+#### 服务类代码优化
+- ✅ **ImageGenerator.js 优化**：
+  - 移除了 `ensureDirectoryExists()` 方法（被调用7次但逻辑简单）
+  - 内联为直接调用 `if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });`
+  - 减少方法跳转层级，提升代码可读性
+- ✅ **BackgroundApi.js 优化**：
+  - 移除了 `validateImageFile()` 方法（仅被调用1次）
+  - 移除了 `copyImageFile()` 方法（仅被调用1次）
+  - 将验证和复制逻辑内联到调用处，减少不必要的抽象
+- ✅ **DataService.js 优化**：
+  - 移除了 `getCacheKey()` 方法（被调用4次但逻辑简单）
+  - 内联为直接字符串拼接：`const cacheKey = \`${groupId}_${userId}\`;`
+  - 简化代码结构，减少方法调用开销
+
+#### WebLinkGenerator 方法恢复
+- ✅ **恢复 getServerConfig() 方法**：
+  - 发现 `getServerConfig()` 方法被多处使用（WebServer.js、AuthApi.js、BackgroundManager.js）
+  - 恢复该方法，保持代码复用性
+  - 说明：优化过程中需要区分"过度提取"和"合理复用"
+
+### 📝 文档更新
+
+- ✅ **PROJECT_STRUCTURE.md 更新**：
+  - 完全更新项目结构文档，反映最新的代码组织
+  - 添加详细的工具类说明，列出主要方法和功能
+  - 更新 API 路由结构说明，包含 admin 子目录
+  - 添加代码优化说明章节，记录优化原则和已优化模块
+  - 更新文件清理机制说明
+
+### 🎯 优化原则
+
+本次优化遵循以下原则：
+1. **简单逻辑内联**：对于逻辑简单、调用次数少的方法，直接内联到调用处
+2. **移除未使用代码**：定期检查并移除未使用的方法和工具函数
+3. **保持代码清晰**：在优化的同时，确保代码易于理解和维护
+4. **区分过度提取和合理复用**：保留被多处使用且逻辑复杂的方法
+
+### 📊 优化统计
+
+- **优化文件数**：7 个核心文件
+- **移除方法数**：12 个未使用或过度提取的方法
+- **内联方法数**：4 个简单逻辑方法
+- **恢复方法数**：1 个被误删的复用方法
+- **代码质量**：所有修改通过 linter 检查，无错误
+
+---
+
 ## [3.2.15] - 2025-12-22
 
 ### 🗑️ 功能移除

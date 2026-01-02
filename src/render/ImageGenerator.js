@@ -72,14 +72,6 @@ class ImageGenerator {
         }
     }
 
-    /**
-     * 确保目录存在
-     */
-    ensureDirectoryExists(dirPath) {
-        if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-        }
-    }
 
     /**
      * 初始化浏览器
@@ -253,7 +245,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const fileKey = groupId ? `${groupId}_${type}` : `all_${type}`;
             const imagePath = path.join(tempDir, `${fileKey}_${Date.now()}.png`);
 
@@ -327,7 +319,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `${userId}_stats_${Date.now()}.jpg`);
 
             await page.screenshot({
@@ -399,7 +391,7 @@ class ImageGenerator {
             });
 
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `${groupId}_group_stats_${Date.now()}.png`);
 
             await page.screenshot({
@@ -450,7 +442,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `help_panel_${Date.now()}.png`);
 
             await page.screenshot({
@@ -502,7 +494,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `global_stats_${Date.now()}.png`);
 
             await page.screenshot({
@@ -585,7 +577,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `achievement_list_${groupId}_${userId}_${Date.now()}.png`);
 
             await page.screenshot({
@@ -666,7 +658,7 @@ class ImageGenerator {
 
             // 保存图片
             const tempDir = PathResolver.getTempDir();
-            this.ensureDirectoryExists(tempDir);
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const imagePath = path.join(tempDir, `achievement_statistics_${groupId}_${Date.now()}.png`);
 
             await page.screenshot({

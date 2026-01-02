@@ -354,7 +354,7 @@ class DatabaseService {
      */
     getCurrentTime() {
         // 使用 UTC+8 时区
-        return TimeUtils.formatDateTimeForDB();
+        return TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
     }
 
     /**

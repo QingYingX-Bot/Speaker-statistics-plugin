@@ -126,14 +126,6 @@ class PathResolver {
     }
 
     /**
-     * 获取备份目录路径
-     * @returns {string} 备份目录路径
-     */
-    static getBackupsDir() {
-        return path.join(this.getDataDir(), 'backups');
-    }
-
-    /**
      * 获取数据库文件路径
      * @returns {string} 数据库文件路径
      */
@@ -141,15 +133,6 @@ class PathResolver {
         return path.join(this.getDataDir(), 'speech_statistics.db');
     }
 
-    /**
-     * 确保目录存在
-     * @param {string} dirPath 目录路径
-     */
-    static ensureDirectory(dirPath) {
-        if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-        }
-    }
 }
 
 export { PathResolver };

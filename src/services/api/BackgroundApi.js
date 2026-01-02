@@ -24,7 +24,7 @@ export class BackgroundApi extends BaseApi {
         const storage = multer.diskStorage({
             destination: (req, file, cb) => {
                 const tempDir = path.join(this.backgroundsDir, 'temp');
-                PathResolver.ensureDirectory(tempDir);
+                if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
                 cb(null, tempDir);
             },
             filename: (req, file, cb) => {
@@ -89,54 +89,6 @@ export class BackgroundApi extends BaseApi {
         }
     }
 
-    /**
-     * 验证图片文件
-     */
-    async validateImageFile(filePath) {
-        try {
-            const stats = await fs.promises.stat(filePath);
-            if (stats.size === 0) {
-                throw new Error('文件为空');
-            }
-            if (stats.size > 2 * 1024 * 1024) {
-                throw new Error('文件大小超过2MB');
-            }
-            
-            // 读取文件头验证格式
-            const buffer = Buffer.alloc(8);
-            const fd = await fs.promises.open(filePath, 'r');
-            try {
-                await fd.read(buffer, 0, 8, 0);
-            } finally {
-                await fd.close();
-            }
-            
-            // 检查文件头
-            if (buffer[0] === 0xFF && buffer[1] === 0xD8) {
-                return 'jpeg';
-            } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
-                return 'png';
-            } else {
-                throw new Error('不支持的文件格式，只支持 JPG 和 PNG');
-            }
-            
-        } catch (error) {
-            throw new Error(`文件验证失败: ${error.message}`);
-        }
-    }
-
-    /**
-     * 简单的图片复制处理（不进行尺寸调整）
-     */
-    async copyImageFile(inputPath, outputPath) {
-        try {
-            // 直接复制文件，不进行处理
-            await fs.promises.copyFile(inputPath, outputPath);
-            console.log('图片文件复制完成:', outputPath);
-        } catch (error) {
-            throw new Error(`文件保存失败: ${error.message}`);
-        }
-    }
 
     /**
      * 参数验证中间件
@@ -191,7 +143,36 @@ export class BackgroundApi extends BaseApi {
                 const { userId } = req.auth;
 
                 // 验证文件
-                const fileType = await this.validateImageFile(tempFilePath);
+                let fileType;
+                try {
+                    const stats = await fs.promises.stat(tempFilePath);
+                    if (stats.size === 0) {
+                        throw new Error('文件为空');
+                    }
+                    if (stats.size > 2 * 1024 * 1024) {
+                        throw new Error('文件大小超过2MB');
+                    }
+                    
+                    // 读取文件头验证格式
+                    const buffer = Buffer.alloc(8);
+                    const fd = await fs.promises.open(tempFilePath, 'r');
+                    try {
+                        await fd.read(buffer, 0, 8, 0);
+                    } finally {
+                        await fd.close();
+                    }
+                    
+                    // 检查文件头
+                    if (buffer[0] === 0xFF && buffer[1] === 0xD8) {
+                        fileType = 'jpeg';
+                    } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+                        fileType = 'png';
+                    } else {
+                        throw new Error('不支持的文件格式，只支持 JPG 和 PNG');
+                    }
+                } catch (error) {
+                    throw new Error(`文件验证失败: ${error.message}`);
+                }
 
                 // 输出路径 - 统一保存为 JPG
                 const subDir = backgroundType === 'ranking' ? 'ranking' : 'normal';
@@ -200,7 +181,7 @@ export class BackgroundApi extends BaseApi {
                 const outputPath = path.join(outputDir, fileName);
 
                 // 确保目录存在
-                PathResolver.ensureDirectory(outputDir);
+                if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
                 // 如果是PNG格式，需要转换（这里简单处理，直接复制）
                 // 在实际应用中，你可能需要添加PNG到JPG的转换逻辑
@@ -209,7 +190,12 @@ export class BackgroundApi extends BaseApi {
                 }
 
                 // 复制/保存文件
-                await this.copyImageFile(tempFilePath, outputPath);
+                try {
+                    await fs.promises.copyFile(tempFilePath, outputPath);
+                    console.log('图片文件复制完成:', outputPath);
+                } catch (error) {
+                    throw new Error(`文件保存失败: ${error.message}`);
+                }
 
                 const responseData = {
                     path: outputPath,

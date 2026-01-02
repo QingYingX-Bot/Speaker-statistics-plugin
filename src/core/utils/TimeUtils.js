@@ -82,13 +82,6 @@ class TimeUtils {
         return `${this.formatDate(date)} ${this.formatTime(date)}`;
     }
 
-    /**
-     * 格式化日期时间为数据库格式 YYYY-MM-DD HH:mm:ss（UTC+8）
-     * @returns {string} 格式化后的日期时间
-     */
-    static formatDateTimeForDB() {
-        return this.formatDateTime(this.getUTC8Date());
-    }
 
     /**
      * 获取日期所在的ISO周数
@@ -135,18 +128,6 @@ class TimeUtils {
     }
 
     /**
-     * 计算两个日期之间的天数
-     * @param {Date} date1 第一个日期
-     * @param {Date} date2 第二个日期
-     * @returns {number} 天数差
-     */
-    static daysBetween(date1, date2) {
-        const oneDay = 24 * 60 * 60 * 1000;
-        const diffTime = Math.abs(date2 - date1);
-        return Math.round(diffTime / oneDay);
-    }
-
-    /**
      * 计算连续天数（从今天往前，UTC+8）
      * @param {Object} dailyStats 日统计数据对象，key 为日期字符串 YYYY-MM-DD
      * @param {boolean} maxStreak 是否计算最大连续天数，false 则计算从今天往前的连续天数（遇到中断即停止）
@@ -185,74 +166,6 @@ class TimeUtils {
         }
 
         return continuousDays;
-    }
-
-    /**
-     * 判断日期是否是今天（UTC+8）
-     * @param {string} dateString YYYY-MM-DD 格式的日期字符串
-     * @returns {boolean} 是否是今天
-     */
-    static isToday(dateString) {
-        return dateString === this.formatDate(this.getUTC8Date());
-    }
-
-    /**
-     * 判断日期是否是本周（UTC+8）
-     * @param {string} weekString YYYY-Wxx 格式的周字符串
-     * @returns {boolean} 是否是本周
-     */
-    static isThisWeek(weekString) {
-        return weekString === this.getWeekNumber(this.getUTC8Date());
-    }
-
-    /**
-     * 判断日期是否是本月（UTC+8）
-     * @param {string} monthString YYYY-MM 格式的月份字符串
-     * @returns {boolean} 是否是本月
-     */
-    static isThisMonth(monthString) {
-        return monthString === this.getMonthString(this.getUTC8Date());
-    }
-
-    /**
-     * 解析月份字符串（支持中文和数字）
-     * @param {string} input 输入字符串，如 "1月"、"一月"、"1"
-     * @returns {Object} { monthKey: "YYYY-MM", displayText: "X月" } 或 null
-     */
-    static parseMonth(input) {
-        if (!input) return null;
-
-        const now = this.getUTC8Date();
-        const currentYear = now.getFullYear();
-
-        // 匹配数字月份：1-12
-        const digitsMatch = input.match(/(1[0-2]|0?[1-9])\s*(?:月)?/);
-        let month = null;
-
-        if (digitsMatch) {
-            month = parseInt(digitsMatch[1]);
-        }
-
-        if (month == null) {
-            // 匹配中文月份
-            const cnMap = {
-                '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
-                '七': 7, '八': 8, '九': 9, '十': 10, '十一': 11, '十二': 12
-            };
-            const cnMatch = input.match(/(十二|十一|十|九|八|七|六|五|四|三|二|一)\s*(?:月)?/);
-            if (cnMatch) {
-                month = cnMap[cnMatch[1]];
-            }
-        }
-
-        if (!month || month < 1 || month > 12) {
-            return null;
-        }
-
-        const monthKey = `${currentYear}-${month.toString().padStart(2, '0')}`;
-        const displayText = `${month}月`;
-
-        return { monthKey, displayText };
     }
 }
 

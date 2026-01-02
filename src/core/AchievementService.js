@@ -517,7 +517,7 @@ class AchievementService {
                     const topAchievement = epicOrHigher[0];
                     const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id];
                     // 使用解锁时间作为 auto_display_at（24小时从解锁时间开始计算）
-                    const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTimeForDB();
+                    const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
                     
                     displayAchievement = {
                         achievement_id: topAchievement.achievement_id,
@@ -647,7 +647,7 @@ class AchievementService {
             if (matched) {
                 // 只在真正解锁时记录（不输出日志，由调用方统一输出）
                 // 解锁成就（使用 UTC+8 时区）
-                const unlockedAt = TimeUtils.formatDateTimeForDB();
+                const unlockedAt = TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
                 
                 // 确保 progress 是数字
                 let progressValue = definition.condition?.value || 1;
@@ -1034,7 +1034,7 @@ class AchievementService {
             // 如果提供了autoDisplayAt，使用提供的值（通常是解锁时间）
             let displayAt = autoDisplayAt;
             if (!isManual && !displayAt) {
-                displayAt = TimeUtils.formatDateTimeForDB();
+                displayAt = TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
             }
             
             await this.dbService.setDisplayAchievement(groupId, userId, {
@@ -1092,7 +1092,7 @@ class AchievementService {
             const isAlreadyUnlocked = userAchievements.achievements[achievementId]?.unlocked;
 
             // 解锁成就（使用 UTC+8 时区）
-            const unlockedAt = TimeUtils.formatDateTimeForDB();
+            const unlockedAt = TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
             
             const achievementDataToSave = {
                 unlocked: true,

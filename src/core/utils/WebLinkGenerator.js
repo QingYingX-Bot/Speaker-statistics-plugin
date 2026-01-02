@@ -7,6 +7,7 @@ import { globalConfig } from '../ConfigManager.js';
 export class WebLinkGenerator {
     /**
      * 获取Web服务器配置
+     * @returns {Object} 服务器配置对象
      */
     static getServerConfig() {
         try {

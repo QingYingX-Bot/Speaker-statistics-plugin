@@ -91,7 +91,7 @@ class ConfigManager {
 
         // 确保配置目录存在
         const configDir = path.dirname(this.configPath);
-        PathResolver.ensureDirectory(configDir);
+        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
 
         // 如果配置文件不存在，创建默认配置
         if (!fs.existsSync(this.configPath)) {
@@ -244,7 +244,7 @@ class ConfigManager {
     saveConfig(config) {
         try {
             const dirPath = path.dirname(this.configPath);
-            PathResolver.ensureDirectory(dirPath);
+            if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 
             // 暂时停止监听，避免触发重载
             if (this.watcher) {

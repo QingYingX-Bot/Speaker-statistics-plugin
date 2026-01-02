@@ -64,8 +64,5 @@ export {
     globalWebServer
 };
 
-// 导出
-export { Plugin as SpeechStatisticsPlugin };
-export { Plugin };
 export default Plugin;
 

@@ -174,8 +174,8 @@ class AuthService {
                 hash: hash,
                 salt: salt,
                 role: existingUser?.role || 'user', // 保留原有角色，新用户默认为 'user'
-                createdAt: existingUser?.createdAt || TimeUtils.formatDateTimeForDB(),
-                updatedAt: TimeUtils.formatDateTimeForDB()
+                createdAt: existingUser?.createdAt || TimeUtils.formatDateTime(TimeUtils.getUTC8Date()),
+                updatedAt: TimeUtils.formatDateTime(TimeUtils.getUTC8Date())
             };
             
             // 移除 originalKey 字段（如果存在），提高安全性
@@ -186,7 +186,8 @@ class AuthService {
             keyData[userId] = newUserData;
 
             // 确保目录存在
-            PathResolver.ensureDirectory(path.dirname(keyFilePath));
+            const keyFileDir = path.dirname(keyFilePath);
+            if (!fs.existsSync(keyFileDir)) fs.mkdirSync(keyFileDir, { recursive: true });
 
             // 保存文件
             fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8');
@@ -306,7 +307,7 @@ class AuthService {
             const updatedUserData = {
                 ...keyData[userId],
                 role: role,
-                updatedAt: TimeUtils.formatDateTimeForDB()
+                updatedAt: TimeUtils.formatDateTime(TimeUtils.getUTC8Date())
             };
             
             // 移除 originalKey 字段（如果存在），提高安全性
@@ -318,7 +319,8 @@ class AuthService {
             keyData[userId] = updatedUserData;
 
             // 确保目录存在
-            PathResolver.ensureDirectory(path.dirname(keyFilePath));
+            const keyFileDir = path.dirname(keyFilePath);
+            if (!fs.existsSync(keyFileDir)) fs.mkdirSync(keyFileDir, { recursive: true });
 
             // 保存文件
             fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8');
