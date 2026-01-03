@@ -54,6 +54,10 @@ class RankCommands {
             {
                 reg: '^#水群总统计(\\s+\\d+)?$|^#总水群统计(\\s+\\d+)?$',
                 fnc: 'showGlobalStats'
+            },
+            {
+                reg: '^#水群趋势(\\s+(\\d+))?$',
+                fnc: 'showTrend'
             }
         ];
     }
@@ -636,6 +640,115 @@ class RankCommands {
             return e.reply(text + '暂无群聊统计数据');
         }, '获取全局统计失败', async (error) => {
             return e.reply('获取全局统计失败，请稍后重试');
+        });
+    }
+
+    /**
+     * 显示发言趋势
+     */
+    async showTrend(e) {
+        const validation = CommonUtils.validateGroupMessage(e, false);
+        if (!validation.valid) {
+            return e.reply(validation.message);
+        }
+
+        return await CommandWrapper.safeExecute(async () => {
+            const groupId = e.group_id ? String(e.group_id) : null;
+            
+            // 解析天数参数（默认7天）
+            const match = e.msg.match(/^#水群趋势(?:\s+(\d+))?$/);
+            const days = match && match[1] ? parseInt(match[1], 10) : 7;
+            
+            // 限制天数范围（1-90天）
+            const validDays = Math.max(1, Math.min(days, 90));
+            
+            // 获取趋势数据
+            const trendData = await this.dataService.getGroupTrend(groupId, 'daily', { days: validDays });
+            
+            if (!trendData || trendData.length === 0) {
+                return e.reply('暂无趋势数据');
+            }
+
+            // 计算统计数据
+            const totalMessages = trendData.reduce((sum, item) => sum + item.value, 0);
+            const avgMessages = totalMessages / trendData.length;
+            const maxMessages = Math.max(...trendData.map(item => item.value));
+            const minMessages = Math.min(...trendData.map(item => item.value));
+            
+            // 计算趋势（最近3天 vs 前3天）
+            const recent3Days = trendData.slice(-3);
+            const previous3Days = trendData.slice(-6, -3);
+            const recentAvg = recent3Days.reduce((sum, item) => sum + item.value, 0) / recent3Days.length;
+            const previousAvg = previous3Days.length > 0 
+                ? previous3Days.reduce((sum, item) => sum + item.value, 0) / previous3Days.length 
+                : recentAvg;
+            const trendChange = previousAvg > 0 
+                ? ((recentAvg - previousAvg) / previousAvg * 100).toFixed(1)
+                : '0.0';
+            const trendIcon = parseFloat(trendChange) > 0 ? '📈' : parseFloat(trendChange) < 0 ? '📉' : '➡️';
+
+            // 构建消息
+            let text = `📊 发言趋势分析（最近${validDays}天）\n\n`;
+            
+            if (groupId) {
+                // 获取群名称
+                let groupName = `群${groupId}`;
+                try {
+                    const groupInfo = await this.dataService.dbService.getGroupInfo(groupId);
+                    if (groupInfo && groupInfo.group_name) {
+                        groupName = groupInfo.group_name;
+                    }
+                } catch (err) {
+                    // 忽略错误
+                }
+                text += `群聊: ${groupName}\n`;
+            } else {
+                text += `范围: 所有群聊\n`;
+            }
+            
+            text += `━━━━━━━━━━━━━━\n\n`;
+            text += `📈 统计概览:\n`;
+            text += `  总消息数: ${CommonUtils.formatNumber(totalMessages)} 条\n`;
+            text += `  平均每日: ${CommonUtils.formatNumber(Math.round(avgMessages))} 条\n`;
+            text += `  最高单日: ${CommonUtils.formatNumber(maxMessages)} 条\n`;
+            text += `  最低单日: ${CommonUtils.formatNumber(minMessages)} 条\n`;
+            text += `  趋势变化: ${trendIcon} ${trendChange > 0 ? '+' : ''}${trendChange}% (最近3天 vs 前3天)\n\n`;
+            
+            // 显示每日数据（最多显示20天，超过则只显示最近和最早的）
+            const displayLimit = 20;
+            let displayData = trendData;
+            
+            if (trendData.length > displayLimit) {
+                // 显示最近10天和最早10天
+                const recent = trendData.slice(-10);
+                const earliest = trendData.slice(0, 10);
+                displayData = [...earliest, { date: '...', value: null, change: null }, ...recent];
+            }
+            
+            text += `📅 每日详情:\n`;
+            displayData.forEach((item, index) => {
+                if (item.date === '...') {
+                    text += `  ... (省略 ${trendData.length - 20} 天) ...\n`;
+                } else {
+                    const date = item.date;
+                    const value = item.value;
+                    const change = item.change !== null ? (item.change > 0 ? `+${item.change}%` : `${item.change}%`) : '-';
+                    const changeIcon = item.change !== null 
+                        ? (item.change > 0 ? '↑' : item.change < 0 ? '↓' : '→')
+                        : '';
+                    
+                    // 计算进度条长度（相对于最大值）
+                    const maxValue = Math.max(...trendData.filter(d => d.value !== null).map(d => d.value));
+                    const barLength = maxValue > 0 ? Math.round((value / maxValue) * 15) : 0;
+                    const bar = '█'.repeat(barLength) + '░'.repeat(15 - barLength);
+                    
+                    text += `  ${date}: ${bar} ${CommonUtils.formatNumber(value)}条 ${changeIcon}${change}\n`;
+                }
+            });
+
+            return e.reply(text);
+        }, '获取趋势数据失败', async (error) => {
+            return e.reply('查询失败，请稍后重试');
         });
     }
 

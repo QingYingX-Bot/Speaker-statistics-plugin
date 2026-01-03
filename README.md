@@ -1,6 +1,6 @@
 # 📊 发言统计插件 (Speaker Statistics Plugin)
 
-[![version](https://img.shields.io/badge/version-3.2.15-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
+[![version](https://img.shields.io/badge/version-3.2.16-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
 
 ---
 
@@ -139,6 +139,8 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 | 周榜 | `#水群周榜` | 查看本周发言排行 |
 | 月榜 | `#水群月榜` | 查看本月发言排行 |
 | 年榜 | `#水群年榜` | 查看今年发言排行 |
+| 发言趋势 | `#水群趋势` | 查看最近7天的发言趋势（默认7天） |
+| 自定义趋势 | `#水群趋势 30` | 查看最近N天的发言趋势（1-90天） |
 
 ### 个人查询功能
 

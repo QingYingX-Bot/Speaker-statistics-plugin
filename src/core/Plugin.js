@@ -148,6 +148,10 @@ class Plugin extends plugin {
         return await this.rankCommands.showGlobalStats(e);
     }
 
+    async showTrend(e) {
+        return await this.rankCommands.showTrend(e);
+    }
+
     // 用户查询相关
     async queryUserStats(e) {
         return await this.userCommands.queryUserStats(e);
