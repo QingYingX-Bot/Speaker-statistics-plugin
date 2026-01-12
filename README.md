@@ -1,8 +1,6 @@
+![Speaker-statistics-plugin](https://socialify.git.ci/QingYingX-Bot/Speaker-statistics-plugin/image?description=1&font=Inter&forks=1&issues=1&language=1&name=1&owner=1&pattern=Circuit+Board&pulls=1&stargazers=1&theme=Dark)
+
 # 📊 发言统计插件 (Speaker Statistics Plugin)
-
-[![version](https://img.shields.io/badge/version-4.0.0-blue)]() ![license](https://img.shields.io/badge/license-MIT-green) [![Gitee](https://img.shields.io/badge/Gitee-仓库-blue)](https://gitee.com/qingyingxbot/Speaker-statistics-plugin) [![GitHub](https://img.shields.io/badge/GitHub-仓库-black)](https://github.com/QingYingX-Bot/Speaker-statistics-plugin)
-
----
 
 **✨ Yunzai-Bot 专业的群聊发言统计与成就系统**
 
@@ -42,19 +40,22 @@
 
 1. **克隆插件**
 
+#### Gitee（国内推荐）
+
 ```bash
-cd plugins
-# 使用 Gitee（国内推荐）
-git clone https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git Speaker-statistics-plugin
-# 或使用 GitHub
-git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git Speaker-statistics-plugin
+git clone https://gitee.com/qingyingxbot/Speaker-statistics-plugin.git ./plugins/Speaker-statistics-plugin
+```
+
+#### GitHub
+
+```bash
+git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git ./plugins/Speaker-statistics-plugin
 ```
 
 2. **安装依赖**
 
 ```bash
-cd Speaker-statistics-plugin
-pnpm install
+pnpm install --filter=Speaker-statistics-plugin
 ```
 
 > 💡 **提示**：
