@@ -1,5 +1,5 @@
-import crypto from 'crypto';
-import { globalConfig } from '../../core/ConfigManager.js';
+import crypto from 'crypto'
+import { globalConfig } from '../../core/ConfigManager.js'
 
 /**
  * Token管理器
@@ -8,8 +8,8 @@ import { globalConfig } from '../../core/ConfigManager.js';
 class TokenManager {
     constructor() {
         // Token存储（内存存储，key: token, value: {userId, timestamp, expiresAt}）
-        this.tokens = new Map();
-        this._tokenCleanupInterval = null;
+        this.tokens = new Map()
+        this._tokenCleanupInterval = null
     }
 
     /**
@@ -20,17 +20,17 @@ class TokenManager {
      */
     generateToken(userId, expiresIn = 24 * 60 * 60 * 1000) {
         const token = crypto.randomBytes(4).toString('hex'); // 8位十六进制字符串
-        const expiresAt = Date.now() + expiresIn;
+        const expiresAt = Date.now() + expiresIn
         this.tokens.set(token, {
             userId: userId,
             timestamp: Date.now(),
             expiresAt: expiresAt
-        });
+        })
         
         // 清理过期token（每分钟清理一次）
-        this.startCleanupInterval();
+        this.startCleanupInterval()
         
-        return token;
+        return token
     }
 
     /**
@@ -40,24 +40,24 @@ class TokenManager {
      */
     validateToken(token) {
         if (!token) {
-            return { valid: false, message: 'Token为空' };
+            return { valid: false, message: 'Token为空' }
         }
 
-        const tokenData = this.tokens.get(token);
+        const tokenData = this.tokens.get(token)
         if (!tokenData) {
-            return { valid: false, message: 'Token不存在或已使用' };
+            return { valid: false, message: 'Token不存在或已使用' }
         }
 
         // 检查token是否过期
         if (Date.now() >= tokenData.expiresAt) {
-            this.tokens.delete(token);
-            return { valid: false, message: 'Token已过期' };
+            this.tokens.delete(token)
+            return { valid: false, message: 'Token已过期' }
         }
 
         return { 
             valid: true, 
             userId: tokenData.userId 
-        };
+        }
     }
 
     /**
@@ -66,12 +66,12 @@ class TokenManager {
      * @returns {{valid: boolean, userId?: string, message?: string}}
      */
     consumeToken(token) {
-        const validation = this.validateToken(token);
+        const validation = this.validateToken(token)
         if (validation.valid) {
             // 删除已使用的token（一次性使用）
-            this.tokens.delete(token);
+            this.tokens.delete(token)
         }
-        return validation;
+        return validation
     }
 
     /**
@@ -80,16 +80,16 @@ class TokenManager {
     startCleanupInterval() {
         if (!this._tokenCleanupInterval) {
             this._tokenCleanupInterval = setInterval(() => {
-                const now = Date.now();
-                let cleanedCount = 0;
+                const now = Date.now()
+                let cleanedCount = 0
                 for (const [t, data] of this.tokens.entries()) {
                     if (now >= data.expiresAt) {
-                        this.tokens.delete(t);
-                        cleanedCount++;
+                        this.tokens.delete(t)
+                        cleanedCount++
                     }
                 }
                 if (cleanedCount > 0) {
-                    globalConfig.debug(`清理过期token: ${cleanedCount}个`);
+                    globalConfig.debug(`清理过期token: ${cleanedCount}个`)
                 }
             }, 60 * 1000); // 每分钟清理一次
         }
@@ -100,8 +100,8 @@ class TokenManager {
      */
     stopCleanupInterval() {
         if (this._tokenCleanupInterval) {
-            clearInterval(this._tokenCleanupInterval);
-            this._tokenCleanupInterval = null;
+            clearInterval(this._tokenCleanupInterval)
+            this._tokenCleanupInterval = null
         }
     }
 
@@ -109,10 +109,10 @@ class TokenManager {
      * 清理所有token
      */
     clear() {
-        this.tokens.clear();
-        this.stopCleanupInterval();
+        this.tokens.clear()
+        this.stopCleanupInterval()
     }
 }
 
-export { TokenManager };
-export default TokenManager;
+export { TokenManager }
+export default TokenManager

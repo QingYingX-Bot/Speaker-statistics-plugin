@@ -1,6 +1,6 @@
 {
   "name": "speaker-statistics-plugin",
-  "version": "3.2.16",
+  "version": "4.0.0",
   "description": "群聊水群统计插件 for Yunzai-Bot",
   "type": "module",
   "main": "index.js",

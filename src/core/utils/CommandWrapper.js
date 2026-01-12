@@ -1,5 +1,5 @@
-import { CommonUtils } from './CommonUtils.js';
-import { globalConfig } from '../ConfigManager.js';
+import { CommonUtils } from './CommonUtils.js'
+import { globalConfig } from '../ConfigManager.js'
 
 /**
  * 命令包装器工具类
@@ -20,33 +20,33 @@ class CommandWrapper {
             requireAdmin = false,
             requireGroup = true,
             errorMessage = '操作失败'
-        } = options;
+        } = options
 
         return async function(e) {
             // 验证管理员权限
             if (requireAdmin) {
-                const { getPermissionManager } = await import('./PermissionManager.js');
-                const permissionManager = getPermissionManager();
-                const adminValidation = await permissionManager.validateAdminPermission(e);
+                const { getPermissionManager } = await import('./PermissionManager.js')
+                const permissionManager = getPermissionManager()
+                const adminValidation = await permissionManager.validateAdminPermission(e)
                 if (!adminValidation.valid) {
-                    return e.reply(adminValidation.message);
+                    return e.reply(adminValidation.message)
                 }
             }
 
             // 验证群消息
-            const groupValidation = CommonUtils.validateGroupMessage(e, requireGroup);
+            const groupValidation = CommonUtils.validateGroupMessage(e, requireGroup)
             if (!groupValidation.valid) {
-                return e.reply(groupValidation.message);
+                return e.reply(groupValidation.message)
             }
 
             // 执行命令处理函数
             try {
-                return await handler.call(this, e);
-            } catch (error) {
-                globalConfig.error(`[命令包装器] ${errorMessage}:`, error);
-                return e.reply(`${errorMessage}，请稍后重试`);
+                return await handler.call(this, e)
+            } catch (err) {
+                globalConfig.error(`[命令包装器] ${errorMessage}:`, err)
+                return e.reply(`${errorMessage}，请稍后重试`)
             }
-        };
+        }
     }
 
     /**
@@ -58,14 +58,14 @@ class CommandWrapper {
      */
     static async safeExecute(operation, errorMessage = '操作失败', onError = null) {
         try {
-            const result = await operation();
-            return result;
-        } catch (error) {
-            globalConfig.error(`[命令包装器] ${errorMessage}:`, error);
+            const result = await operation()
+            return result
+        } catch (err) {
+            globalConfig.error(`[命令包装器] ${errorMessage}:`, err)
             if (onError && typeof onError === 'function') {
-                return await onError(error);
+                return await onError(err)
             }
-            throw error;
+            throw err
         }
     }
 
@@ -76,17 +76,15 @@ class CommandWrapper {
      * @returns {Promise<boolean>} 是否通过验证
      */
     static async validateAndReply(e, validation) {
-        // 如果 validation 是 Promise，等待它完成
-        const result = validation instanceof Promise ? await validation : validation;
-        
+        const result = validation instanceof Promise ? await validation : validation
         if (!result.valid) {
-            e.reply(result.message);
-            return false;
+            e.reply(result.message)
+            return false
         }
-        return true;
+        return true
     }
 }
 
-export { CommandWrapper };
-export default CommandWrapper;
+export { CommandWrapper }
+export default CommandWrapper
 

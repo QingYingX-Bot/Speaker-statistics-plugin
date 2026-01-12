@@ -1,19 +1,19 @@
-import express from 'express';
-import fs from 'fs';
-import { PathResolver } from '../core/utils/PathResolver.js';
-import { globalConfig } from '../core/ConfigManager.js';
-import { getDataService } from '../core/DataService.js';
-import { AchievementService } from '../core/AchievementService.js';
-import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js';
-import { TokenManager } from './auth/TokenManager.js';
-import { VerificationCodeManager } from './auth/VerificationCodeManager.js';
-import { AuthService } from './auth/AuthService.js';
-import { PageRoutes } from './routes/PageRoutes.js';
-import { AuthApi } from './api/AuthApi.js';
-import { StatsApi } from './api/StatsApi.js';
-import { AchievementApi } from './api/AchievementApi.js';
-import { BackgroundApi } from './api/BackgroundApi.js';
-import { AdminApi } from './api/AdminApi.js';
+import express from 'express'
+import fs from 'fs'
+import { PathResolver } from '../core/utils/PathResolver.js'
+import { globalConfig } from '../core/ConfigManager.js'
+import { getDataService } from '../core/DataService.js'
+import { AchievementService } from '../core/AchievementService.js'
+import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js'
+import { TokenManager } from './auth/TokenManager.js'
+import { VerificationCodeManager } from './auth/VerificationCodeManager.js'
+import { AuthService } from './auth/AuthService.js'
+import { PageRoutes } from './routes/PageRoutes.js'
+import { AuthApi } from './api/AuthApi.js'
+import { StatsApi } from './api/StatsApi.js'
+import { AchievementApi } from './api/AchievementApi.js'
+import { BackgroundApi } from './api/BackgroundApi.js'
+import { AdminApi } from './api/AdminApi.js'
 
 /**
  * Web服务器
@@ -21,36 +21,36 @@ import { AdminApi } from './api/AdminApi.js';
  */
 class WebServer {
     constructor() {
-        this.app = express();
-        this.server = null;
-        this.isRunning = false;
+        this.app = express()
+        this.server = null
+        this.isRunning = false
         this._starting = false; // 防止并发启动的标志
-        this.dataService = getDataService();
-        this.achievementService = new AchievementService(this.dataService);
+        this.dataService = getDataService()
+        this.achievementService = new AchievementService(this.dataService)
         
         // 服务实例
-        this.tokenManager = new TokenManager();
-        this.verificationCodeManager = new VerificationCodeManager();
-        this.authService = new AuthService();
+        this.tokenManager = new TokenManager()
+        this.verificationCodeManager = new VerificationCodeManager()
+        this.authService = new AuthService()
         
         // 确保背景目录存在
-        const backgroundsDir = PathResolver.getBackgroundsDir();
-        if (!fs.existsSync(backgroundsDir)) fs.mkdirSync(backgroundsDir, { recursive: true });
-        const normalDir = PathResolver.getBackgroundsDir('normal');
-        if (!fs.existsSync(normalDir)) fs.mkdirSync(normalDir, { recursive: true });
-        const rankingDir = PathResolver.getBackgroundsDir('ranking');
-        if (!fs.existsSync(rankingDir)) fs.mkdirSync(rankingDir, { recursive: true });
+        const backgroundsDir = PathResolver.getBackgroundsDir()
+        if (!fs.existsSync(backgroundsDir)) fs.mkdirSync(backgroundsDir, { recursive: true })
+        const normalDir = PathResolver.getBackgroundsDir('normal')
+        if (!fs.existsSync(normalDir)) fs.mkdirSync(normalDir, { recursive: true })
+        const rankingDir = PathResolver.getBackgroundsDir('ranking')
+        if (!fs.existsSync(rankingDir)) fs.mkdirSync(rankingDir, { recursive: true })
 
-        this.setupMiddleware();
-        this.setupRoutes();
-        this.setupApiRoutes();
+        this.setupMiddleware()
+        this.setupRoutes()
+        this.setupApiRoutes()
     }
 
     /**
      * 加载配置（使用统一的配置获取方法）
      */
     loadConfig() {
-        return WebLinkGenerator.getServerConfig();
+        return WebLinkGenerator.getServerConfig()
     }
 
     /**
@@ -58,55 +58,55 @@ class WebServer {
      */
     setupMiddleware() {
         // 解析JSON
-        this.app.use(express.json());
+        this.app.use(express.json())
 
         // 解析URL编码
-        this.app.use(express.urlencoded({ extended: true }));
+        this.app.use(express.urlencoded({ extended: true }))
         
         // 解析Cookie
         this.app.use((req, res, next) => {
             if (req.headers.cookie) {
-                const cookies = {};
+                const cookies = {}
                 req.headers.cookie.split(';').forEach(cookie => {
-                    const parts = cookie.split('=');
+                    const parts = cookie.split('=')
                     if (parts.length === 2) {
-                        cookies[parts[0].trim()] = decodeURIComponent(parts[1].trim());
+                        cookies[parts[0].trim()] = decodeURIComponent(parts[1].trim())
                     }
-                });
-                req.cookies = cookies;
+                })
+                req.cookies = cookies
             } else {
-                req.cookies = {};
+                req.cookies = {}
             }
-            next();
-        });
+            next()
+        })
 
         // CORS设置
         this.app.use((req, res, next) => {
             // 从配置中获取 CORS 源，默认为 '*'
-            const corsOrigin = globalConfig.getConfig('webServer.corsOrigin') || '*';
-            res.header('Access-Control-Allow-Origin', corsOrigin);
-            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+            const corsOrigin = globalConfig.getConfig('webServer.corsOrigin') || '*'
+            res.header('Access-Control-Allow-Origin', corsOrigin)
+            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization')
             
             // 如果指定了具体域名（非 '*'），允许携带凭证
             if (corsOrigin !== '*') {
-                res.header('Access-Control-Allow-Credentials', 'true');
+                res.header('Access-Control-Allow-Credentials', 'true')
             }
             
             if (req.method === 'OPTIONS') {
-                res.sendStatus(200);
+                res.sendStatus(200)
             } else {
-                next();
+                next()
             }
-        });
+        })
     }
 
     /**
      * 设置页面路由
      */
     setupRoutes() {
-        const pageRoutes = new PageRoutes(this.app, this.tokenManager);
-        pageRoutes.registerRoutes();
+        const pageRoutes = new PageRoutes(this.app, this.tokenManager)
+        pageRoutes.registerRoutes()
     }
 
     /**
@@ -114,20 +114,20 @@ class WebServer {
      */
     setupApiRoutes() {
         // 注册所有API路由
-        const authApi = new AuthApi(this.app, this.authService, this.tokenManager, this.verificationCodeManager);
-        authApi.registerRoutes();
+        const authApi = new AuthApi(this.app, this.authService, this.tokenManager, this.verificationCodeManager)
+        authApi.registerRoutes()
 
-        const statsApi = new StatsApi(this.app);
-        statsApi.registerRoutes();
+        const statsApi = new StatsApi(this.app)
+        statsApi.registerRoutes()
 
-        const achievementApi = new AchievementApi(this.app, this.achievementService, this.authService);
-        achievementApi.registerRoutes();
+        const achievementApi = new AchievementApi(this.app, this.achievementService, this.authService)
+        achievementApi.registerRoutes()
 
-        const backgroundApi = new BackgroundApi(this.app, this.authService);
-        backgroundApi.registerRoutes();
+        const backgroundApi = new BackgroundApi(this.app, this.authService)
+        backgroundApi.registerRoutes()
 
-        const adminApi = new AdminApi(this.app, this.authService);
-        adminApi.registerRoutes();
+        const adminApi = new AdminApi(this.app, this.authService)
+        adminApi.registerRoutes()
     }
 
     /**
@@ -136,44 +136,44 @@ class WebServer {
     async start() {
         // 如果已在运行或正在启动，直接返回
         if (this.isRunning) {
-            globalConfig.debug('Web服务器已在运行');
-            return;
+            globalConfig.debug('Web服务器已在运行')
+            return
         }
         
         // 如果正在启动中，等待完成
         if (this._starting) {
-            globalConfig.debug('Web服务器正在启动中，请稍候...');
+            globalConfig.debug('Web服务器正在启动中，请稍候...')
             // 等待启动完成（最多等待5秒）
-            let waitCount = 0;
+            let waitCount = 0
             while (this._starting && waitCount < 50) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                waitCount++;
+                await new Promise(resolve => setTimeout(resolve, 100))
+                waitCount++
             }
             // 等待完成后，如果已运行则返回
             if (this.isRunning) {
-                return;
+                return
             }
         }
 
         // 设置启动标志，防止并发启动
-        this._starting = true;
+        this._starting = true
 
         try {
             // 如果存在旧的服务器实例，先关闭它
             if (this.server) {
-                globalConfig.debug('[发言统计] 检测到旧的服务器实例，正在关闭...');
+                globalConfig.debug('[发言统计] 检测到旧的服务器实例，正在关闭...')
                 try {
-                    await this.stop();
-                } catch (error) {
-                    globalConfig.debug('[发言统计] 关闭旧服务器实例时出错:', error.message);
+                    await this.stop()
+                } catch (err) {
+                    globalConfig.debug('[发言统计] 关闭旧服务器实例时出错:', err.message)
                 }
             }
 
-            const config = this.loadConfig();
-            let port = config.port || 39999;
-            const host = config.host || "127.0.0.1";
+            const config = this.loadConfig()
+            let port = config.port || 39999
+            const host = config.host || "127.0.0.1"
             const maxRetries = 10; // 最多尝试10个备用端口
-            let currentRetry = 0;
+            let currentRetry = 0
 
             // 尝试启动服务器的函数
             const tryStartServer = () => {
@@ -181,53 +181,53 @@ class WebServer {
                     this.server = this.app.listen(port, host, () => {
                         // 双重检查，防止重复设置
                         if (this.isRunning) {
-                            globalConfig.debug('[发言统计] Web服务器已在运行，跳过重复初始化');
-                            resolve();
-                            return;
+                            globalConfig.debug('[发言统计] Web服务器已在运行，跳过重复初始化')
+                            resolve()
+                            return
                         }
                         
-                        this.isRunning = true;
+                        this.isRunning = true
                         this._starting = false; // 启动成功，清除启动标志
-                        const url = `${config.protocol}://${config.domain || host}:${port}`;
-                        globalConfig.debug(`[发言统计] Web服务器启动成功: ${url}`);
-                        resolve();
-                    });
+                        const url = `${config.protocol}://${config.domain || host}:${port}`
+                        globalConfig.debug(`[发言统计] Web服务器启动成功: ${url}`)
+                        resolve()
+                    })
 
-                    this.server.on('error', (error) => {
+                    this.server.on('err', (err) => {
                         this.server = null; // 清除服务器实例引用
                         
-                        if (error.code === 'EADDRINUSE') {
+                        if (err.code === 'EADDRINUSE') {
                             // 端口被占用，尝试下一个端口
-                            currentRetry++;
+                            currentRetry++
                             if (currentRetry < maxRetries) {
-                                port = port + 1;
-                                globalConfig.warn(`[发言统计] 端口 ${port - 1} 已被占用，尝试使用端口 ${port}...`);
+                                port = port + 1
+                                globalConfig.warn(`[发言统计] 端口 ${port - 1} 已被占用，尝试使用端口 ${port}...`)
                                 setTimeout(() => {
-                                    tryStartServer().then(resolve).catch(reject);
-                                }, 500);
+                                    tryStartServer().then(resolve).catch(reject)
+                                }, 500)
                             } else {
-                                this._starting = false;
-                                this.isRunning = false;
-                                reject(new Error(`端口 ${port} 及后续 ${maxRetries} 个端口均被占用，Web服务器启动失败`));
+                                this._starting = false
+                                this.isRunning = false
+                                reject(new Error(`端口 ${port} 及后续 ${maxRetries} 个端口均被占用，Web服务器启动失败`))
                             }
                         } else {
-                            this._starting = false;
-                            this.isRunning = false;
-                            reject(error);
+                            this._starting = false
+                            this.isRunning = false
+                            reject(err)
                         }
-                    });
-                });
-            };
+                    })
+                })
+            }
 
             // 尝试启动服务器
-            await tryStartServer();
+            await tryStartServer()
 
-        } catch (error) {
+        } catch (err) {
             this._starting = false; // 启动失败，清除启动标志
-            this.isRunning = false;
+            this.isRunning = false
             this.server = null; // 清除服务器实例引用
-            globalConfig.error('[发言统计] Web服务器启动失败:', error);
-            throw error;
+            globalConfig.err('[发言统计] Web服务器启动失败:', err)
+            throw err
         }
     }
 
@@ -239,13 +239,13 @@ class WebServer {
         if (this.server) {
             return new Promise((resolve) => {
                 this.server.close(() => {
-                    this.isRunning = false;
-                    this.server = null;
-                    this.tokenManager.stopCleanupInterval();
-                    globalConfig.debug('[发言统计] Web服务器已关闭');
-                    resolve();
-                });
-            });
+                    this.isRunning = false
+                    this.server = null
+                    this.tokenManager.stopCleanupInterval()
+                    globalConfig.debug('[发言统计] Web服务器已关闭')
+                    resolve()
+                })
+            })
         }
     }
 
@@ -253,12 +253,12 @@ class WebServer {
      * 生成访问token（对外接口）
      */
     generateToken(userId) {
-        return this.tokenManager.generateToken(userId);
+        return this.tokenManager.generateToken(userId)
     }
 }
 
 // 单例实例
-let webServerInstance = null;
+let webServerInstance = null
 
 /**
  * 获取WebServer单例实例
@@ -266,15 +266,15 @@ let webServerInstance = null;
  */
 export function getWebServer() {
     if (!webServerInstance) {
-        webServerInstance = new WebServer();
+        webServerInstance = new WebServer()
     }
-    return webServerInstance;
+    return webServerInstance
 }
 
 // 兼容性导出（保持向后兼容）
 export function getBackgroundServer() {
-    return getWebServer();
+    return getWebServer()
 }
 
-export { WebServer };
-export default WebServer;
+export { WebServer }
+export default WebServer

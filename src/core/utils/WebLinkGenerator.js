@@ -1,4 +1,4 @@
-import { globalConfig } from '../ConfigManager.js';
+import { globalConfig } from '../ConfigManager.js'
 
 /**
  * Web链接生成器
@@ -11,21 +11,21 @@ export class WebLinkGenerator {
      */
     static getServerConfig() {
         try {
-            const config = globalConfig.getConfig('backgroundServer') || {};
+            const config = globalConfig.getConfig('backgroundServer') || {}
             return {
                 host: config.host || "127.0.0.1",
                 port: config.port || 39999,
                 protocol: config.protocol || "http",
                 domain: config.domain || "localhost"
-            };
-        } catch (error) {
-            globalConfig.error('读取服务器配置失败:', error);
+            }
+        } catch (err) {
+            globalConfig.error('读取服务器配置失败:', err)
             return {
                 host: "127.0.0.1",
                 port: 39999,
                 protocol: "http",
                 domain: "localhost"
-            };
+            }
         }
     }
 
@@ -36,12 +36,10 @@ export class WebLinkGenerator {
      * @returns {string} 完整URL
      */
     static generateLink(token, hashRoute = '') {
-        const config = this.getServerConfig();
-        const baseUrl = `${config.protocol}://${config.domain || config.host}:${config.port}`;
-        // 生成带token的基础URL，格式：{baseUrl}/{token}/#/{route}
-        // token后面必须有斜杠，然后是hash路由
-        const hash = hashRoute ? `#${hashRoute}` : '#/';
-        return `${baseUrl}/${token}/${hash}`;
+        const config = this.getServerConfig()
+        const baseUrl = `${config.protocol}://${config.domain || config.host}:${config.port}`
+        const hash = hashRoute ? `#${hashRoute}` : '#/'
+        return `${baseUrl}/${token}/${hash}`
     }
 
     /**
@@ -51,21 +49,20 @@ export class WebLinkGenerator {
      */
     static async generateWebPageLink(userId) {
         try {
-            const { getWebServer } = await import('../../services/WebServer.js');
-            const webServer = getWebServer();
+            const { getWebServer } = await import('../../services/WebServer.js')
+            const webServer = getWebServer()
             
             if (!webServer || !webServer.isRunning) {
-                return { success: false, message: '服务器未启动，无法生成链接' };
+                return { success: false, message: '服务器未启动，无法生成链接' }
             }
             
-            const token = webServer.generateToken(userId);
-            // 生成首页链接，使用 #/ 作为hash路由
-            const url = this.generateLink(token, '/');
+            const token = webServer.generateToken(userId)
+            const url = this.generateLink(token, '/')
             
-            return { success: true, url };
-        } catch (error) {
-            globalConfig.error('生成网页链接失败:', error);
-            return { success: false, message: '生成链接失败，请稍后重试' };
+            return { success: true, url }
+        } catch (err) {
+            globalConfig.error('生成网页链接失败:', err)
+            return { success: false, message: '生成链接失败，请稍后重试' }
         }
     }
 
@@ -76,21 +73,20 @@ export class WebLinkGenerator {
      */
     static async generateBackgroundPageLink(userId) {
         try {
-            const { getWebServer } = await import('../../services/WebServer.js');
-            const webServer = getWebServer();
+            const { getWebServer } = await import('../../services/WebServer.js')
+            const webServer = getWebServer()
             
             if (!webServer || !webServer.isRunning) {
-                return { success: false, message: '服务器未启动，无法生成链接' };
+                return { success: false, message: '服务器未启动，无法生成链接' }
             }
             
-            const token = webServer.generateToken(userId);
-            // 生成背景设置页面链接，使用 #/background 作为hash路由
-            const url = this.generateLink(token, '/background');
+            const token = webServer.generateToken(userId)
+            const url = this.generateLink(token, '/background')
             
-            return { success: true, url };
-        } catch (error) {
-            globalConfig.error('生成背景设置链接失败:', error);
-            return { success: false, message: '生成链接失败，请稍后重试' };
+            return { success: true, url }
+        } catch (err) {
+            globalConfig.error('生成背景设置链接失败:', err)
+            return { success: false, message: '生成链接失败，请稍后重试' }
         }
     }
 }

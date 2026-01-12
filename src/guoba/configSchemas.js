@@ -488,7 +488,7 @@ export function getConfigSchemas() {
         schemas: getGroupAchievementSchemas()
       }
     }
-  ];
+  ]
 }
 
 /**
@@ -630,7 +630,7 @@ function getAchievementSchemas(disabled = false) {
       },
       bottomHelpMessage: disabled ? undefined : '仅用于"时间窗口"类型，ISO格式日期'
     }
-  ];
+  ]
 }
 
 /**
@@ -687,7 +687,7 @@ function getUserAchievementSchemas() {
         ]
       }
     }
-  ];
+  ]
 }
 
 /**
@@ -706,6 +706,6 @@ function getGroupAchievementSchemas() {
       }
     },
     ...getAchievementSchemas(false)
-  ];
+  ]
 }
 

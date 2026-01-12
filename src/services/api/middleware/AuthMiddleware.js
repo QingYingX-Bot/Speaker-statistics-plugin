@@ -4,7 +4,7 @@
  */
 export class AuthMiddleware {
     constructor(authService) {
-        this.authService = authService;
+        this.authService = authService
     }
 
     /**
@@ -16,19 +16,19 @@ export class AuthMiddleware {
      */
     async requireAdmin(req, res, next) {
         try {
-            const { secretKey, userId } = req.query;
+            const { secretKey, userId } = req.query
             
             // 参数验证
             if (!userId || !secretKey) {
-                return res.status(400).json({ error: '缺少必要参数' });
+                return res.status(400).json({ error: '缺少必要参数' })
             }
             
             // 权限验证（使用统一的权限管理器）
-            const { getPermissionManager } = await import('../../../core/utils/PermissionManager.js');
-            const permissionManager = getPermissionManager();
-            const permission = await permissionManager.checkWebAdminPermission(userId, secretKey);
+            const { getPermissionManager } = await import('../../../core/utils/PermissionManager.js')
+            const permissionManager = getPermissionManager()
+            const permission = await permissionManager.checkWebAdminPermission(userId, secretKey)
             if (!permission.isAdmin) {
-                return res.status(403).json({ error: '权限不足' });
+                return res.status(403).json({ error: '权限不足' })
             }
             
             // 将验证信息附加到请求对象
@@ -36,11 +36,11 @@ export class AuthMiddleware {
                 userId,
                 secretKey,
                 permission
-            };
+            }
             
-            next();
-        } catch (error) {
-            res.status(500).json({ error: '权限验证失败' });
+            next()
+        } catch (err) {
+            res.status(500).json({ error: '权限验证失败' })
         }
     }
 
@@ -54,19 +54,19 @@ export class AuthMiddleware {
     async requireSecretKey(req, res, next) {
         try {
             // 从query或body中获取参数
-            const userId = req.query.userId || req.body.userId;
-            const secretKey = req.query.secretKey || req.body.secretKey;
+            const userId = req.query.userId || req.body.userId
+            const secretKey = req.query.secretKey || req.body.secretKey
             
             if (!userId || !secretKey) {
-                return res.status(400).json({ error: '缺少必要参数' });
+                return res.status(400).json({ error: '缺少必要参数' })
             }
             
             // 验证秘钥
-            const keyValidation = await this.authService.validateSecretKey(userId, secretKey);
+            const keyValidation = await this.authService.validateSecretKey(userId, secretKey)
             if (!keyValidation.valid) {
                 return res.status(401).json({ 
                     error: keyValidation.message || '秘钥验证失败' 
-                });
+                })
             }
             
             // 将验证信息附加到请求对象
@@ -74,11 +74,11 @@ export class AuthMiddleware {
                 userId,
                 secretKey,
                 keyValidation
-            };
+            }
             
-            next();
-        } catch (error) {
-            res.status(500).json({ error: '秘钥验证失败' });
+            next()
+        } catch (err) {
+            res.status(500).json({ error: '秘钥验证失败' })
         }
     }
 
@@ -89,12 +89,12 @@ export class AuthMiddleware {
      */
     requireParams(requiredParams) {
         return (req, res, next) => {
-            const missingParams = [];
+            const missingParams = []
             
             // 检查query和body中的参数
             for (const param of requiredParams) {
                 if (!req.query[param] && !req.body[param] && !req.params[param]) {
-                    missingParams.push(param);
+                    missingParams.push(param)
                 }
             }
             
@@ -102,11 +102,11 @@ export class AuthMiddleware {
                 return res.status(400).json({ 
                     error: '缺少必要参数',
                     missing: missingParams
-                });
+                })
             }
             
-            next();
-        };
+            next()
+        }
     }
 }
 

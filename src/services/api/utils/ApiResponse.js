@@ -1,4 +1,4 @@
-import { globalConfig } from '../../../core/ConfigManager.js';
+import { globalConfig } from '../../../core/ConfigManager.js'
 
 /**
  * API响应工具类
@@ -13,35 +13,35 @@ export class ApiResponse {
      * @param {number} statusCode HTTP状态码
      */
     static success(res, data = null, message = null, statusCode = 200) {
-        const response = { success: true };
+        const response = { success: true }
         if (data !== null) {
-            response.data = data;
+            response.data = data
         }
         if (message) {
-            response.message = message;
+            response.message = message
         }
-        return res.status(statusCode).json(response);
+        return res.status(statusCode).json(response)
     }
 
     /**
      * 发送错误响应
      * @param {Object} res Express响应对象
-     * @param {string} error 错误消息
+     * @param {string} err 错误消息
      * @param {number} statusCode HTTP状态码
      * @param {Error} originalError 原始错误对象（用于日志记录）
      * @param {string} logMessage 日志消息
      */
-    static error(res, error, statusCode = 500, originalError = null, logMessage = null) {
+    static error(res, err, statusCode = 500, originalError = null, logMessage = null) {
         if (originalError && logMessage) {
-            globalConfig.error(logMessage, originalError);
+            globalConfig.error(logMessage, originalError)
         } else if (logMessage) {
-            globalConfig.error(logMessage);
+            globalConfig.error(logMessage)
         }
         
         return res.status(statusCode).json({ 
             success: false,
-            error: error || '服务器错误'
-        });
+            error: err || '服务器错误'
+        })
     }
 
     /**
@@ -53,11 +53,11 @@ export class ApiResponse {
     static asyncHandler(handler, errorMessage = '请求处理失败') {
         return async (req, res, next) => {
             try {
-                await handler(req, res, next);
-            } catch (error) {
-                ApiResponse.error(res, errorMessage, 500, error, errorMessage);
+                await handler(req, res, next)
+            } catch (err) {
+                ApiResponse.error(res, errorMessage, 500, err, errorMessage)
             }
-        };
+        }
     }
 }
 

@@ -1,15 +1,24 @@
-import { CommonUtils } from '../core/utils/CommonUtils.js';
-import { CommandWrapper } from '../core/utils/CommandWrapper.js';
-import { globalConfig } from '../core/ConfigManager.js';
-import { ImageGenerator } from '../render/ImageGenerator.js';
-import { segment } from 'oicq';
+import { CommonUtils } from '../core/utils/CommonUtils.js'
+import { CommandWrapper } from '../core/utils/CommandWrapper.js'
+import { globalConfig } from '../core/ConfigManager.js'
+import { ImageGenerator } from '../render/ImageGenerator.js'
+import { segment } from 'oicq'
 
 /**
  * 帮助命令处理类
  */
 class HelpCommands {
     constructor(dataService = null) {
-        this.imageGenerator = new ImageGenerator(dataService);
+        this.imageGenerator = new ImageGenerator(dataService)
+    }
+
+    /**
+     * 格式化图片路径为 segment 格式
+     * @param {string} imagePath 图片路径
+     * @returns {Object} segment 图片对象
+     */
+    formatImageSegment(imagePath) {
+        return segment.image(`file:///${imagePath.replace(/\\/g, '/')}`)
     }
 
     /**
@@ -21,34 +30,31 @@ class HelpCommands {
                 reg: '^#水群帮助$',
                 fnc: 'showHelp'
             }
-        ];
+        ]
     }
 
     /**
      * 显示帮助信息
      */
     async showHelp(e) {
-        const validation = CommonUtils.validateGroupMessage(e, false);
+        const validation = CommonUtils.validateGroupMessage(e, false)
         if (!validation.valid) {
-            return e.reply(validation.message);
+            return e.reply(validation.message)
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            // 检查是否使用图片模式
-        const usePicture = globalConfig.getConfig('display.usePicture');
+            const usePicture = globalConfig.getConfig('display.usePicture')
         if (usePicture) {
             try {
-                const isMaster = e.isMaster || false;
-                const imagePath = await this.imageGenerator.generateHelpPanelImage(isMaster);
-                return e.reply(segment.image(`file:///${imagePath.replace(/\\/g, '/')}`));
-            } catch (error) {
-                globalConfig.error('生成帮助面板图片失败:', error);
-                // 回退到文本模式
+                    const isMaster = e.isMaster || false
+                    const imagePath = await this.imageGenerator.generateHelpPanelImage(isMaster)
+                    return e.reply(this.formatImageSegment(imagePath))
+                } catch (err) {
+                    globalConfig.error('生成帮助面板图片失败:', err)
             }
         }
 
-        // 文本模式
-        const isMaster = e.isMaster || false;
+            const isMaster = e.isMaster || false
         
         let helpText = `📊 发言统计插件帮助
 
@@ -73,7 +79,7 @@ class HelpCommands {
 #水群背景帮助 - 查看背景设置帮助信息
 
 【网页功能】
-#水群网页 - 生成个人统计页面链接（Token访问）`;
+#水群网页 - 生成个人统计页面链接（Token访问）`
 
         if (isMaster) {
             helpText += `
@@ -94,21 +100,21 @@ class HelpCommands {
 #水群更新 - 更新插件到最新版本
 #水群强制更新 - 强制更新插件（覆盖本地修改）
 #刷新水群成就 - 刷新当前群组的所有显示成就
-#刷新全群水群成就 - 刷新所有群组的所有显示成就`;
+#刷新全群水群成就 - 刷新所有群组的所有显示成就`
         }
 
         helpText += `
 
 【帮助】
-#水群帮助 - 显示此帮助信息`;
+#水群帮助 - 显示此帮助信息`
 
-            return e.reply(helpText);
-        }, '显示帮助信息失败', async (error) => {
-            return e.reply('显示帮助信息失败，请稍后重试');
-        });
+            return e.reply(helpText)
+        }, '显示帮助信息失败', async () => {
+            return e.reply('显示帮助信息失败，请稍后重试')
+        })
     }
 }
 
-export { HelpCommands };
-export default HelpCommands;
+export { HelpCommands }
+export default HelpCommands
 

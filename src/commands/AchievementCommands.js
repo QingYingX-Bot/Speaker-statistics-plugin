@@ -1,20 +1,29 @@
-import { DataService } from '../core/DataService.js';
-import { AchievementService } from '../core/AchievementService.js';
-import { globalConfig } from '../core/ConfigManager.js';
-import { CommonUtils } from '../core/utils/CommonUtils.js';
-import { AchievementUtils } from '../core/utils/AchievementUtils.js';
-import { ImageGenerator } from '../render/ImageGenerator.js';
-import { CommandWrapper } from '../core/utils/CommandWrapper.js';
-import { segment } from 'oicq';
+import { DataService } from '../core/DataService.js'
+import { AchievementService } from '../core/AchievementService.js'
+import { globalConfig } from '../core/ConfigManager.js'
+import { CommonUtils } from '../core/utils/CommonUtils.js'
+import { AchievementUtils } from '../core/utils/AchievementUtils.js'
+import { ImageGenerator } from '../render/ImageGenerator.js'
+import { CommandWrapper } from '../core/utils/CommandWrapper.js'
+import { segment } from 'oicq'
 
 /**
  * 成就命令处理类
  */
 class AchievementCommands {
     constructor(dataService = null) {
-        this.dataService = dataService || new DataService();
-        this.achievementService = new AchievementService(dataService);
-        this.imageGenerator = new ImageGenerator(dataService);
+        this.dataService = dataService || new DataService()
+        this.achievementService = new AchievementService(dataService)
+        this.imageGenerator = new ImageGenerator(dataService)
+    }
+
+    /**
+     * 格式化图片路径为 segment 格式
+     * @param {string} imagePath 图片路径
+     * @returns {Object} segment 图片对象
+     */
+    formatImageSegment(imagePath) {
+        return segment.image(`file:///${imagePath.replace(/\\/g, '/')}`)
     }
 
     /**
@@ -42,29 +51,24 @@ class AchievementCommands {
                 reg: '^#水群配置成就\\s+.+',
                 fnc: 'addUserAchievement'
             }
-        ];
+        ]
     }
 
     /**
      * 显示用户徽章列表（所有可获取的成就：默认+自定义+群专属）
      */
     async showUserBadges(e) {
-        const validation = CommonUtils.validateGroupMessage(e);
+        const validation = CommonUtils.validateGroupMessage(e)
         if (!validation.valid) {
-            return e.reply(validation.message);
+            return e.reply(validation.message)
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            const groupId = String(e.group_id);
-            const userId = String(e.sender.user_id);
+            const groupId = String(e.group_id)
+            const userId = String(e.sender.user_id)
+            const allDefinitions = this.achievementService.getAllAchievementDefinitions(groupId)
+            const achievementData = await this.achievementService.getUserAchievements(groupId, userId)
 
-            // 获取所有成就定义（默认+自定义+群专属）
-            const allDefinitions = this.achievementService.getAllAchievementDefinitions(groupId);
-            
-            // 获取用户的成就解锁状态
-            const achievementData = await this.achievementService.getUserAchievements(groupId, userId);
-
-            // 生成成就列表图片
             try {
                 const imagePath = await this.imageGenerator.generateAchievementListImage(
                     allDefinitions,
@@ -72,350 +76,296 @@ class AchievementCommands {
                     groupId,
                     userId,
                     achievementData.displayAchievement
-                );
-                return e.reply(segment.image(`file:///${imagePath.replace(/\\/g, '/')}`));
-            } catch (error) {
-                globalConfig.error('生成成就列表图片失败:', error);
-                // 回退到文本模式
-                let text = `🏆 成就列表\n\n`;
-                text += `已解锁: ${achievementData.unlockedCount} / ${Object.keys(allDefinitions).length} 个\n\n`;
+                )
+                return e.reply(this.formatImageSegment(imagePath))
+            } catch (err) {
+                globalConfig.error('生成成就列表图片失败:', err)
                 
-                // 按稀有度排序显示
+                let text = `🏆 成就列表\n\n`
+                text += `已解锁: ${achievementData.unlockedCount} / ${Object.keys(allDefinitions).length} 个\n\n`
+                
                 const achievementEntries = Object.entries(allDefinitions)
-                    .map(([id, def]) => ({ id, definition: def }));
+                    .map(([id, def]) => ({ id, definition: def }))
                 
                 AchievementUtils.sortLockedAchievements(
                     achievementEntries,
                     (item) => item.definition.rarity,
                     (item) => item.definition.name
-                );
+                )
                 
-                const sortedAchievements = achievementEntries.map(item => [item.id, item.definition]);
+                const sortedAchievements = achievementEntries.map(item => [item.id, item.definition])
 
                 for (const [id, definition] of sortedAchievements) {
-                    const isUnlocked = achievementData.achievements[id]?.unlocked || false;
-                    const status = isUnlocked ? '✅' : '❌';
-                    text += `${status} ${definition.name} (${definition.rarity})\n`;
+                    const isUnlocked = achievementData.achievements[id]?.unlocked || false
+                    const status = isUnlocked ? '✅' : '❌'
+                    text += `${status} ${definition.name} (${definition.rarity})\n`
                 }
 
-                return e.reply(text);
+                return e.reply(text)
             }
-        }, '显示成就列表失败', async (error) => {
-            return e.reply('查询失败，请稍后重试');
-        });
+        }, '显示成就列表失败', async () => {
+            return e.reply('查询失败，请稍后重试')
+        })
     }
 
     /**
      * 设置显示成就
      */
     async setDisplayAchievement(e) {
-        const validation = CommonUtils.validateGroupMessage(e);
+        const validation = CommonUtils.validateGroupMessage(e)
         if (!validation.valid) {
-            return e.reply(validation.message);
+            return e.reply(validation.message)
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            const match = e.msg.match(/^#水群设置显示成就\s+(.+)$/);
+            const match = e.msg.match(/^#水群设置显示成就\s+(.+)$/)
             if (!match) {
-                return e.reply('格式错误，正确格式：#水群设置显示成就 [成就名]');
+                return e.reply('格式错误，正确格式：#水群设置显示成就 [成就名]')
             }
 
-            const achievementName = match[1].trim();
-            const groupId = String(e.group_id);
-            const userId = String(e.sender.user_id);
-
-            // 查找成就
-            const definitions = this.achievementService.getAllAchievementDefinitions(groupId);
-            let foundAchievement = null;
+            const achievementName = match[1].trim()
+            const groupId = String(e.group_id)
+            const userId = String(e.sender.user_id)
+            const definitions = this.achievementService.getAllAchievementDefinitions(groupId)
+            let foundAchievement = null
 
             for (const [id, def] of Object.entries(definitions)) {
                 if (def.name === achievementName || id === achievementName) {
-                    foundAchievement = { id, ...def };
-                    break;
+                    foundAchievement = { id, ...def }
+                    break
                 }
             }
 
             if (!foundAchievement) {
-                return e.reply(`未找到成就: ${achievementName}`);
+                return e.reply(`未找到成就: ${achievementName}`)
             }
 
-            // 检查是否已解锁
-            const achievementData = await this.achievementService.getUserAchievements(groupId, userId);
+            const achievementData = await this.achievementService.getUserAchievements(groupId, userId)
             if (!achievementData.achievements[foundAchievement.id]?.unlocked) {
-                return e.reply(`你尚未解锁成就: ${foundAchievement.name}`);
+                return e.reply(`你尚未解锁成就: ${foundAchievement.name}`)
             }
 
-            // 设置显示成就（手动设置，无时限）
             await this.achievementService.setDisplayAchievement(
                 groupId,
                 userId,
                 foundAchievement.id,
                 foundAchievement.name,
                 foundAchievement.rarity || 'common',
-                true  // isManual = true，手动设置无时限
-            );
+                true
+            )
 
-            return e.reply(`已设置显示成就: ${foundAchievement.name}`);
-        }, '设置显示成就失败', async (error) => {
-            return e.reply('设置失败，请稍后重试');
-        });
+            return e.reply(`已设置显示成就: ${foundAchievement.name}`)
+        }, '设置显示成就失败', async () => {
+            return e.reply('设置失败，请稍后重试')
+        })
     }
 
     /**
      * 显示成就统计（每个成就的获取情况）
      */
     async showAchievementStatistics(e) {
-        const validation = CommonUtils.validateGroupMessage(e);
+        const validation = CommonUtils.validateGroupMessage(e)
         if (!validation.valid) {
-            return e.reply(validation.message);
+            return e.reply(validation.message)
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            const groupId = String(e.group_id);
-
-            // 获取全局成就定义（不包括群专属）
-            const globalDefinitions = this.achievementService.getAchievementDefinitions();
+            const groupId = String(e.group_id)
+            const globalDefinitions = this.achievementService.getAchievementDefinitions()
+            const groupDefinitions = this.achievementService.getAllAchievementDefinitions(groupId)
+            const groupOnlyDefinitions = {}
             
-            // 获取群专属成就定义（仅当前群）
-            const groupDefinitions = this.achievementService.getAllAchievementDefinitions(groupId);
-            const groupOnlyDefinitions = {};
             for (const [id, def] of Object.entries(groupDefinitions)) {
                 if (!globalDefinitions[id]) {
-                    groupOnlyDefinitions[id] = def;
+                    groupOnlyDefinitions[id] = def
                 }
             }
 
-            // 统计全局成就
-            const globalStats = [];
+            const globalStats = []
             for (const [achievementId, definition] of Object.entries(globalDefinitions)) {
-                const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity);
-                // 全局成就（特殊成就或节日成就）统计所有群，普通成就统计当前群
+                const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity)
                 const unlockCount = await this.dataService.dbService.getAchievementUnlockCount(
                     achievementId,
-                    isGlobal ? null : groupId,  // 全局成就不传groupId，普通成就传当前groupId
+                    isGlobal ? null : groupId,
                     isGlobal
-                );
+                )
                 globalStats.push({
                     id: achievementId,
                     definition,
                     unlockCount,
                     isGlobal
-                });
+                })
             }
 
-            // 统计群专属成就（仅当前群有专属成就时）
-            const groupStats = [];
+            const groupStats = []
             if (Object.keys(groupOnlyDefinitions).length > 0) {
                 for (const [achievementId, definition] of Object.entries(groupOnlyDefinitions)) {
                     const unlockCount = await this.dataService.dbService.getAchievementUnlockCount(
                         achievementId,
                         groupId,
                         false
-                    );
+                    )
                     groupStats.push({
                         id: achievementId,
                         definition,
                         unlockCount,
                         isGlobal: false
-                    });
+                    })
                 }
             }
 
-            // 按获取人数排序（降序），然后按稀有度排序
-            globalStats.sort((a, b) => {
+            const sortStats = (a, b) => {
                 if (b.unlockCount !== a.unlockCount) {
-                    return b.unlockCount - a.unlockCount;
+                    return b.unlockCount - a.unlockCount
                 }
-                return AchievementUtils.compareRarity(b.definition.rarity, a.definition.rarity);
-            });
-            groupStats.sort((a, b) => {
-                if (b.unlockCount !== a.unlockCount) {
-                    return b.unlockCount - a.unlockCount;
-                }
-                return AchievementUtils.compareRarity(b.definition.rarity, a.definition.rarity);
-            });
+                return AchievementUtils.compareRarity(b.definition.rarity, a.definition.rarity)
+            }
+            globalStats.sort(sortStats)
+            groupStats.sort(sortStats)
 
-            // 生成成就统计图片
             try {
                 const imagePath = await this.imageGenerator.generateAchievementStatisticsImage(
                     globalStats,
                     groupStats,
                     groupId
-                );
-                return e.reply(segment.image(`file:///${imagePath.replace(/\\/g, '/')}`));
-            } catch (error) {
-                globalConfig.error('生成成就统计图片失败:', error);
-                // 回退到文本模式
-                let text = `📊 成就统计\n\n`;
+                )
+                return e.reply(this.formatImageSegment(imagePath))
+            } catch (err) {
+                globalConfig.error('生成成就统计图片失败:', err)
                 
-                // 全局成就统计
-                text += `【全局成就】\n`;
+                const rarityEmojiMap = {
+                            common: '🥉',
+                            uncommon: '🥈',
+                            rare: '🥇',
+                            epic: '💎',
+                            legendary: '👑',
+                            mythic: '🔥',
+                            festival: '🎊',
+                            special: '✨'
+                }
+                
+                let text = `📊 成就统计\n\n【全局成就】\n`
                 if (globalStats.length === 0) {
-                    text += `暂无全局成就\n\n`;
+                    text += `暂无全局成就\n\n`
                 } else {
                     for (const stat of globalStats) {
-                        const rarityEmoji = {
-                            common: '🥉',
-                            uncommon: '🥈',
-                            rare: '🥇',
-                            epic: '💎',
-                            legendary: '👑',
-                            mythic: '🔥',
-                            festival: '🎊',
-                            special: '✨'
-                        }[stat.definition.rarity] || '🏆';
-                        
-                        const scopeText = stat.isGlobal ? '（全局）' : '';
-                        text += `${rarityEmoji} ${stat.definition.name}${scopeText}\n`;
-                        text += `   获取人数: ${stat.unlockCount} 人\n`;
-                        text += `   描述: ${stat.definition.description || '暂无描述'}\n\n`;
+                        const rarityEmoji = rarityEmojiMap[stat.definition.rarity] || '🏆'
+                        const scopeText = stat.isGlobal ? '（全局）' : ''
+                        text += `${rarityEmoji} ${stat.definition.name}${scopeText}\n`
+                        text += `   获取人数: ${stat.unlockCount} 人\n`
+                        text += `   描述: ${stat.definition.description || '暂无描述'}\n\n`
                     }
                 }
 
-                // 群专属成就统计（仅当前群有专属成就时）
                 if (groupStats.length > 0) {
-                    text += `【群专属成就】\n`;
+                    text += `【群专属成就】\n`
                     for (const stat of groupStats) {
-                        const rarityEmoji = {
-                            common: '🥉',
-                            uncommon: '🥈',
-                            rare: '🥇',
-                            epic: '💎',
-                            legendary: '👑',
-                            mythic: '🔥',
-                            festival: '🎊',
-                            special: '✨'
-                        }[stat.definition.rarity] || '🏆';
-                        
-                        text += `${rarityEmoji} ${stat.definition.name}（群专属）\n`;
-                        text += `   获取人数: ${stat.unlockCount} 人\n`;
-                        text += `   描述: ${stat.definition.description || '暂无描述'}\n\n`;
+                        const rarityEmoji = rarityEmojiMap[stat.definition.rarity] || '🏆'
+                        text += `${rarityEmoji} ${stat.definition.name}（群专属）\n`
+                        text += `   获取人数: ${stat.unlockCount} 人\n`
+                        text += `   描述: ${stat.definition.description || '暂无描述'}\n\n`
                     }
                 }
 
-                return e.reply(text);
+                return e.reply(text)
             }
-        }, '显示成就统计失败', async (error) => {
-            return e.reply('查询失败，请稍后重试');
-        });
+        }, '显示成就统计失败', async () => {
+            return e.reply('查询失败，请稍后重试')
+        })
     }
 
     /**
      * 授予用户成就（管理员命令）
      */
     async grantUserAchievement(e) {
-        // 使用 CommandWrapper.wrap 统一验证和错误处理
         return await CommandWrapper.wrap(async (e) => {
-            // 双重检查：确保在群聊中且 group_id 存在
-            if (!e.group_id) {
-                return e.reply('此命令仅支持在群聊中使用');
-            }
-            const match = e.msg.match(/^#水群成就给予\s+(\d+)\s+(.+)$/);
+            const match = e.msg.match(/^#水群成就给予\s+(\d+)\s+(.+)$/)
             if (!match) {
-                return e.reply('格式错误，正确格式：#水群成就给予 <用户ID> <成就ID>\n示例：#水群成就给予 123456789 achievement_id');
+                return e.reply('格式错误，正确格式：#水群成就给予 <用户ID> <成就ID>\n示例：#水群成就给予 123456789 achievement_id')
             }
 
-            const targetUserId = match[1].trim();
-            const achievementId = match[2].trim();
-            const groupId = String(e.group_id);
+            const targetUserId = match[1].trim()
+            const achievementId = match[2].trim()
+            const groupId = String(e.group_id)
 
-            // 验证用户ID是否为数字
             if (!/^\d+$/.test(targetUserId)) {
-                return e.reply('用户ID必须是数字');
+                return e.reply('用户ID必须是数字')
             }
 
-            // 授予成就
             const result = await this.achievementService.grantUserAchievement(
                 groupId,
                 targetUserId,
                 achievementId
-            );
+            )
 
             if (result.success) {
-                // 服务已经返回包含同步信息的完整消息，直接使用
-                return e.reply(`✅ ${result.message}`);
+                return e.reply(`✅ ${result.message}`)
             } else {
-                // 如果成就不存在，提供添加建议
-                if (result.message && result.message.includes('未找到成就定义')) {
-                    return e.reply(`❌ 此成就不存在: ${achievementId}\n\n💡 可以使用以下命令添加成就：\n#水群配置成就 <成就ID> <成就名称> <成就描述>\n\n示例：\n#水群配置成就 ${achievementId} 特殊成就 这是一个特殊成就`);
+                if (result.message?.includes('未找到成就定义')) {
+                    return e.reply(`❌ 此成就不存在: ${achievementId}\n\n💡 可以使用以下命令添加成就：\n#水群配置成就 <成就ID> <成就名称> <成就描述>\n\n示例：\n#水群配置成就 ${achievementId} 特殊成就 这是一个特殊成就`)
                 }
-                return e.reply(`❌ ${result.message}`);
+                return e.reply(`❌ ${result.message}`)
             }
         }, {
             requireAdmin: true,
             requireGroup: true,
             errorMessage: '授予用户成就失败'
-        })(e);
+        })(e)
     }
 
     /**
      * 添加用户成就（管理员命令）
      */
     async addUserAchievement(e) {
-        // 使用 CommandWrapper.wrap 统一验证和错误处理
         return await CommandWrapper.wrap(async (e) => {
-            // 双重检查：确保在群聊中且 group_id 存在
-            if (!e.group_id) {
-                return e.reply('此命令仅支持在群聊中使用');
-            }
-            // 解析命令：格式为 #水群配置成就 <成就ID> <成就名称> <成就描述>
-            // 成就ID不能包含空格，名称和描述可以包含空格
-            const parts = e.msg.replace(/^#水群配置成就\s+/, '').split(/\s+/);
+            const parts = e.msg.replace(/^#水群配置成就\s+/, '').split(/\s+/)
             
             if (parts.length < 3) {
-                return e.reply('格式错误，正确格式：#水群配置成就 <成就ID> <成就名称> <成就描述>\n示例：#水群配置成就 special_1 特殊成就 这是一个特殊成就');
+                return e.reply('格式错误，正确格式：#水群配置成就 <成就ID> <成就名称> <成就描述>\n示例：#水群配置成就 special_1 特殊成就 这是一个特殊成就')
             }
 
-            const achievementId = parts[0].trim();
-            const achievementName = parts[1].trim();
-            const achievementDescription = parts.slice(2).join(' ').trim();
+            const achievementId = parts[0].trim()
+            const achievementName = parts[1].trim()
+            const achievementDescription = parts.slice(2).join(' ').trim()
 
-            // 验证成就ID格式（不能包含空格）
             if (/\s/.test(achievementId)) {
-                return e.reply('成就ID不能包含空格');
+                return e.reply('成就ID不能包含空格')
             }
 
-            // 获取现有的用户成就
-            const existingAchievements = globalConfig.getUsersAchievementsConfig();
+            const existingAchievements = globalConfig.getUsersAchievementsConfig()
 
-            // 检查成就ID是否已存在
             if (existingAchievements[achievementId]) {
-                return e.reply(`❌ 成就ID "${achievementId}" 已存在，请使用其他ID`);
+                return e.reply(`❌ 成就ID "${achievementId}" 已存在，请使用其他ID`)
             }
 
-            // 创建新成就（使用默认参数）
             const newAchievement = {
                 id: achievementId,
                 name: achievementName,
                 description: achievementDescription,
-                rarity: 'mythic',  // 默认使用神话等级
-                category: 'basic',  // 默认使用基础分类
+                rarity: 'mythic',
+                category: 'basic',
                 condition: {
-                    type: 'manual_grant'  // 手动授予类型
+                    type: 'manual_grant'
                 }
-            };
+            }
 
-            // 添加到现有成就中
-            existingAchievements[achievementId] = newAchievement;
-
-            // 保存到 users.json
-            const success = globalConfig.setUsersAchievementsConfig(existingAchievements);
+            existingAchievements[achievementId] = newAchievement
+            const success = globalConfig.setUsersAchievementsConfig(existingAchievements)
 
             if (success) {
-                // 重新加载成就定义（清除缓存）
-                this.achievementService.reloadAchievements();
-                return e.reply(`✅ 成功添加用户成就：${achievementName}\n成就ID: ${achievementId}\n稀有度: mythic（神话等级）\n\n现在可以使用 #水群成就给予 <用户ID> ${achievementId} 来授予此成就`);
+                this.achievementService.reloadAchievements()
+                return e.reply(`✅ 成功添加用户成就：${achievementName}\n成就ID: ${achievementId}\n稀有度: mythic（神话等级）\n\n现在可以使用 #水群成就给予 <用户ID> ${achievementId} 来授予此成就`)
             } else {
-                return e.reply('❌ 保存成就失败，请查看日志');
+                return e.reply('❌ 保存成就失败，请查看日志')
             }
         }, {
             requireAdmin: true,
             requireGroup: true,
             errorMessage: '添加用户成就失败'
-        })(e);
+        })(e)
     }
 }
 
-export { AchievementCommands };
-export default AchievementCommands;
+export { AchievementCommands }
+export default AchievementCommands
 

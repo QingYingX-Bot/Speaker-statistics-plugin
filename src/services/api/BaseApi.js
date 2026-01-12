@@ -1,5 +1,5 @@
-import { ApiResponse } from './utils/ApiResponse.js';
-import { getDataService } from '../../core/DataService.js';
+import { ApiResponse } from './utils/ApiResponse.js'
+import { getDataService } from '../../core/DataService.js'
 
 /**
  * API 基类
@@ -8,8 +8,8 @@ import { getDataService } from '../../core/DataService.js';
  */
 export class BaseApi {
     constructor(app) {
-        this.app = app;
-        this.dataService = getDataService();
+        this.app = app
+        this.dataService = getDataService()
     }
 
     /**
@@ -19,7 +19,7 @@ export class BaseApi {
      * @param {string} errorMessage 错误消息
      */
     get(path, handler, errorMessage = '操作失败') {
-        this.app.get(path, ApiResponse.asyncHandler(handler, errorMessage));
+        this.app.get(path, ApiResponse.asyncHandler(handler, errorMessage))
     }
 
     /**
@@ -29,7 +29,7 @@ export class BaseApi {
      * @param {string} errorMessage 错误消息
      */
     post(path, handler, errorMessage = '操作失败') {
-        this.app.post(path, ApiResponse.asyncHandler(handler, errorMessage));
+        this.app.post(path, ApiResponse.asyncHandler(handler, errorMessage))
     }
 
     /**
@@ -39,7 +39,7 @@ export class BaseApi {
      * @param {string} errorMessage 错误消息
      */
     put(path, handler, errorMessage = '操作失败') {
-        this.app.put(path, ApiResponse.asyncHandler(handler, errorMessage));
+        this.app.put(path, ApiResponse.asyncHandler(handler, errorMessage))
     }
 
     /**
@@ -49,7 +49,7 @@ export class BaseApi {
      * @param {string} errorMessage 错误消息
      */
     delete(path, handler, errorMessage = '操作失败') {
-        this.app.delete(path, ApiResponse.asyncHandler(handler, errorMessage));
+        this.app.delete(path, ApiResponse.asyncHandler(handler, errorMessage))
     }
 
     /**
@@ -57,7 +57,7 @@ export class BaseApi {
      * 所有继承 BaseApi 的类都应该实现此方法
      */
     registerRoutes() {
-        throw new Error('registerRoutes() 方法必须在子类中实现');
+        throw new Error('registerRoutes() 方法必须在子类中实现')
     }
 }
 

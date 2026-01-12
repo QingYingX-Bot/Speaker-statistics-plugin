@@ -1,13 +1,13 @@
-import plugin from '../../../../lib/plugins/plugin.js';
-import { getDataService } from './DataService.js';
-import { getMessageRecorder } from './MessageRecorder.js';
-import { RankCommands } from '../commands/RankCommands.js';
-import { UserCommands } from '../commands/UserCommands.js';
-import { AdminCommands } from '../commands/AdminCommands.js';
-import { HelpCommands } from '../commands/HelpCommands.js';
-import { AchievementCommands } from '../commands/AchievementCommands.js';
-import { BackgroundManager } from '../managers/BackgroundManager.js';
-import { globalConfig } from './ConfigManager.js';
+import plugin from '../../../../lib/plugins/plugin.js'
+import { getDataService } from './DataService.js'
+import { getMessageRecorder } from './MessageRecorder.js'
+import { RankCommands } from '../commands/RankCommands.js'
+import { UserCommands } from '../commands/UserCommands.js'
+import { AdminCommands } from '../commands/AdminCommands.js'
+import { HelpCommands } from '../commands/HelpCommands.js'
+import { AchievementCommands } from '../commands/AchievementCommands.js'
+import { BackgroundManager } from '../managers/BackgroundManager.js'
+import { globalConfig } from './ConfigManager.js'
 
 /**
  * 主插件类
@@ -30,343 +30,336 @@ class Plugin extends plugin {
         });
 
         // 获取单例的数据服务实例和消息记录器实例
-        this.dataService = getDataService();
-        this.messageRecorder = getMessageRecorder(this.dataService);
+        this.dataService = getDataService()
+        this.messageRecorder = getMessageRecorder(this.dataService)
 
-        // 创建命令处理器
-        this.rankCommands = new RankCommands(this.dataService);
-        this.userCommands = new UserCommands(this.dataService);
-        this.adminCommands = new AdminCommands(this.dataService);
-        this.helpCommands = new HelpCommands(this.dataService);
-        this.achievementCommands = new AchievementCommands(this.dataService);
-        this.backgroundCommands = new BackgroundManager();
+        this.rankCommands = new RankCommands(this.dataService)
+        this.userCommands = new UserCommands(this.dataService)
+        this.adminCommands = new AdminCommands(this.dataService)
+        this.helpCommands = new HelpCommands(this.dataService)
+        this.achievementCommands = new AchievementCommands(this.dataService)
+        this.backgroundCommands = new BackgroundManager()
 
-        logger.debug('[发言统计] 插件实例创建完成');
+        globalConfig.debug('[发言统计] 插件实例创建完成')
     }
 
-    // 静态标志，防止多次初始化
-    static _initialized = false;
-    static _initializing = false;
+    static _initialized = false
+    static _initializing = false
 
     /**
      * 插件初始化
      * 启动Web服务器
      */
     async init() {
-        // 如果已经初始化完成，直接返回
         if (Plugin._initialized) {
-            logger.debug('[发言统计] 插件已初始化，跳过重复初始化');
-            return;
+            globalConfig.debug('[发言统计] 插件已初始化，跳过重复初始化')
+            return
         }
 
-        // 如果正在初始化，等待完成
         if (Plugin._initializing) {
-            logger.debug('[发言统计] 插件正在初始化中，请稍候...');
-            let waitCount = 0;
+            globalConfig.debug('[发言统计] 插件正在初始化中，请稍候...')
+            let waitCount = 0
             while (Plugin._initializing && waitCount < 50) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                waitCount++;
+                await new Promise(resolve => setTimeout(resolve, 100))
+                waitCount++
             }
-            // 等待完成后，如果已初始化则返回
             if (Plugin._initialized) {
-                return;
+                return
             }
         }
 
-        // 设置初始化标志
-        Plugin._initializing = true;
+        Plugin._initializing = true
 
         try {
+        try {
             // 优化 key.json 文件（移除明文秘钥）
-            try {
-                const { KeyFileOptimizer } = await import('./utils/KeyFileOptimizer.js');
-                const optimizeResult = await KeyFileOptimizer.optimizeKeyFile();
-                if (optimizeResult.cleaned > 0) {
-                    logger.mark(`[发言统计] key.json 优化完成，清理了 ${optimizeResult.cleaned} 个用户的明文秘钥`);
+                const { PathResolver } = await import('./utils/PathResolver.js')
+                const fs = await import('fs')
+                const path = await import('path')
+                const keyFilePath = path.join(PathResolver.getDataDir(), 'key.json')
+                
+                if (fs.existsSync(keyFilePath)) {
+                    const content = fs.readFileSync(keyFilePath, 'utf8').trim()
+                    if (content) {
+                        const keyData = JSON.parse(content)
+                        let cleanedCount = 0
+                        let optimized = false
+                        
+                        for (const [userId, userData] of Object.entries(keyData)) {
+                            if (!userData || typeof userData !== 'object') continue
+                            
+                            if (userData.originalKey) {
+                                delete userData.originalKey
+                                cleanedCount++
+                                optimized = true
+                            }
+                            
+                            if (!userData.role) {
+                                userData.role = 'user'
+                                optimized = true
+                            } else if (userData.role !== 'admin' && userData.role !== 'user') {
+                                userData.role = 'user'
+                                optimized = true
+                            }
+                        }
+                        
+                        if (optimized) {
+                            const keyFileDir = path.dirname(keyFilePath)
+                            if (!fs.existsSync(keyFileDir)) fs.mkdirSync(keyFileDir, { recursive: true })
+                            fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8')
+                            if (cleanedCount > 0) {
+                                global.logger?.mark?.(`[发言统计] key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`) || globalConfig.debug(`[发言统计] key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`)
+                            }
+                        }
+                    }
                 }
-            } catch (optimizeError) {
-                logger.warn('[发言统计] key.json 优化失败:', optimizeError);
+            } catch (optimizeErr) {
+                globalConfig.warn('[发言统计] key.json 优化失败:', optimizeErr)
             }
 
-            const { getWebServer } = await import('../services/WebServer.js');
-            const webServer = getWebServer();
+            const { getWebServer } = await import('../services/WebServer.js')
+            const webServer = getWebServer()
             
-            // 检查是否已在运行，避免重复启动
             if (webServer.isRunning) {
-                logger.info('[发言统计] Web服务器已在运行');
-                Plugin._initialized = true;
-                Plugin._initializing = false;
-                return;
+                globalConfig.debug('[发言统计] Web服务器已在运行')
+                Plugin._initialized = true
+                Plugin._initializing = false
+                return
             }
             
-            await webServer.start();
-            logger.info('[发言统计] Web服务器启动成功');
+            await webServer.start()
+            globalConfig.debug('[发言统计] Web服务器启动成功')
             
-            // 启动定时任务：清理超过60天的归档群组（每天执行一次）
-            this.startArchivedGroupsCleanupTask();
+            this.startArchivedGroupsCleanupTask()
             
-            Plugin._initialized = true;
-        } catch (error) {
-            logger.error('[发言统计] Web服务器启动失败:', error);
-            // 即使失败也标记为已初始化，避免重复尝试
-            Plugin._initialized = true;
+            Plugin._initialized = true
+        } catch (err) {
+            globalConfig.error('[发言统计] Web服务器启动失败:', err)
+            Plugin._initialized = true
         } finally {
-            Plugin._initializing = false;
+            Plugin._initializing = false
         }
     }
 
-    // 命令处理方法 - 排行榜相关
     async showTotalRank(e) {
-        return await this.rankCommands.showTotalRank(e);
+        return await this.rankCommands.showTotalRank(e)
     }
 
     async showDailyRank(e) {
-        return await this.rankCommands.showDailyRank(e);
+        return await this.rankCommands.showDailyRank(e)
     }
 
     async showWeeklyRank(e) {
-        return await this.rankCommands.showWeeklyRank(e);
+        return await this.rankCommands.showWeeklyRank(e)
     }
 
     async showMonthlyRank(e) {
-        return await this.rankCommands.showMonthlyRank(e);
+        return await this.rankCommands.showMonthlyRank(e)
     }
 
     async showYearlyRank(e) {
-        return await this.rankCommands.showYearlyRank(e);
+        return await this.rankCommands.showYearlyRank(e)
     }
 
     async showGroupStats(e) {
-        return await this.rankCommands.showGroupStats(e);
+        return await this.rankCommands.showGroupStats(e)
     }
 
     async showGroupInfo(e) {
-        return await this.rankCommands.showGroupInfo(e);
+        return await this.rankCommands.showGroupInfo(e)
     }
 
     async showGlobalStats(e) {
-        return await this.rankCommands.showGlobalStats(e);
+        return await this.rankCommands.showGlobalStats(e)
     }
 
     async showTrend(e) {
-        return await this.rankCommands.showTrend(e);
+        return await this.rankCommands.showTrend(e)
     }
 
-    // 用户查询相关
     async queryUserStats(e) {
-        return await this.userCommands.queryUserStats(e);
+        return await this.userCommands.queryUserStats(e)
     }
 
     async listUserGroups(e) {
-        return await this.userCommands.listUserGroups(e);
+        return await this.userCommands.listUserGroups(e)
     }
 
     async openWebPage(e) {
-        return await this.userCommands.openWebPage(e);
+        return await this.userCommands.openWebPage(e)
     }
 
-    // 管理员命令
     async clearRanking(e) {
-        return await this.adminCommands.clearRanking(e);
+        return await this.adminCommands.clearRanking(e)
     }
 
     async setDisplayCount(e) {
-        return await this.adminCommands.setDisplayCount(e);
+        return await this.adminCommands.setDisplayCount(e)
     }
 
     async setUseForward(e) {
-        return await this.adminCommands.setUseForward(e);
+        return await this.adminCommands.setUseForward(e)
     }
 
     async setUsePicture(e) {
-        return await this.adminCommands.setUsePicture(e);
+        return await this.adminCommands.setUsePicture(e)
     }
 
     async toggleRecordMessage(e) {
-        return await this.adminCommands.toggleRecordMessage(e);
+        return await this.adminCommands.toggleRecordMessage(e)
     }
 
     async toggleDebugLog(e) {
-        return await this.adminCommands.toggleDebugLog(e);
+        return await this.adminCommands.toggleDebugLog(e)
     }
 
     async updatePlugin(e) {
-        return await this.adminCommands.updatePlugin(e);
+        return await this.adminCommands.updatePlugin(e)
     }
 
     async refreshAchievements(e) {
-        return await this.adminCommands.refreshAchievements(e);
+        return await this.adminCommands.refreshAchievements(e)
     }
 
     async cleanZombieGroups(e) {
-        return await this.adminCommands.cleanZombieGroups(e);
+        return await this.adminCommands.cleanZombieGroups(e)
     }
 
     async confirmCleanZombieGroups(e) {
-        return await this.adminCommands.confirmCleanZombieGroups(e);
+        return await this.adminCommands.confirmCleanZombieGroups(e)
     }
 
     async viewArchivedGroups(e) {
-        return await this.adminCommands.viewArchivedGroups(e);
+        return await this.adminCommands.viewArchivedGroups(e)
     }
 
     async clearCache(e) {
-        return await this.adminCommands.clearCache(e);
+        return await this.adminCommands.clearCache(e)
     }
 
-    // 成就相关
     async showUserAchievements(e) {
-        return await this.achievementCommands.showUserAchievements(e);
+        return await this.achievementCommands.showUserAchievements(e)
     }
 
     async showUserBadges(e) {
-        return await this.achievementCommands.showUserBadges(e);
+        return await this.achievementCommands.showUserBadges(e)
     }
 
     async setDisplayAchievement(e) {
-        return await this.achievementCommands.setDisplayAchievement(e);
+        return await this.achievementCommands.setDisplayAchievement(e)
     }
 
     async showAchievementStatistics(e) {
-        return await this.achievementCommands.showAchievementStatistics(e);
+        return await this.achievementCommands.showAchievementStatistics(e)
     }
 
     async grantUserAchievement(e) {
-        return await this.achievementCommands.grantUserAchievement(e);
+        return await this.achievementCommands.grantUserAchievement(e)
     }
 
     async addUserAchievement(e) {
-        return await this.achievementCommands.addUserAchievement(e);
+        return await this.achievementCommands.addUserAchievement(e)
     }
 
-    // 帮助命令
     async showHelp(e) {
-        return await this.helpCommands.showHelp(e);
+        return await this.helpCommands.showHelp(e)
     }
 
-    // 背景设置
     async openBackgroundPage(e) {
-        return await this.backgroundCommands.openBackgroundPage(e);
+        return await this.backgroundCommands.openBackgroundPage(e)
     }
 
     async removeBackground(e) {
-        return await this.backgroundCommands.removeBackground(e);
+        return await this.backgroundCommands.removeBackground(e)
     }
 
     async showBackgroundHelp(e) {
-        return await this.backgroundCommands.showBackgroundHelp(e);
+        return await this.backgroundCommands.showBackgroundHelp(e)
     }
 
-    // 消息处理
     async accept(e) {
-        // 清理消息文本，移除零宽字符和不可见字符，解决复制命令无法触发的问题
         if (e.msg && typeof e.msg === 'string') {
-            // 移除零宽字符（Zero-width characters）
-            e.msg = e.msg.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '');
-            // 移除其他不可见字符（但保留空格、换行等常见空白字符）
-            e.msg = e.msg.replace(/[\u2000-\u200A\u2028-\u2029]/g, ' ');
-            // 规范化空白字符：将多个连续空白字符替换为单个空格
-            e.msg = e.msg.replace(/[\s\u00A0]+/g, ' ');
-            // 移除首尾空白
-            e.msg = e.msg.trim();
+            e.msg = e.msg.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+            e.msg = e.msg.replace(/[\u2000-\u200A\u2028-\u2029]/g, ' ')
+            e.msg = e.msg.replace(/[\s\u00A0]+/g, ' ')
+            e.msg = e.msg.trim()
         }
         
-        // 记录消息（recordMessage 内部已有去重机制，这里只需要调用即可）
         if (globalConfig.getConfig('global.enableStatistics') && 
             globalConfig.getConfig('global.recordMessage')) {
-            // 使用 await 确保消息记录完成（但不会阻塞消息传递）
-            // 注意：recordMessage 内部已经有完整的去重和锁机制，不需要在这里再次去重
-            this.messageRecorder.recordMessage(e).catch(error => {
-                // 静默处理错误，不影响消息传递（不输出到控制台）
-                // 只在调试模式下输出错误
+            this.messageRecorder.recordMessage(e).catch(err => {
                 if (globalConfig.getConfig('global.debugLog')) {
-                    globalConfig.debug('[消息记录] 记录消息异常:', error.message || error);
+                    globalConfig.debug('[消息记录] 记录消息异常:', err.message || err)
                 }
-            });
+            })
         }
         
-        return false; // 不阻止消息传递
+        return false
     }
 
-    /**
-     * 启动归档群组清理定时任务
-     * 支持通过配置文件自定义执行时间、执行间隔和清理天数
-     */
     startArchivedGroupsCleanupTask() {
-        // 静态变量，防止重复启动
         if (Plugin._cleanupTaskStarted) {
-            return;
+            return
         }
-        Plugin._cleanupTaskStarted = true;
+        Plugin._cleanupTaskStarted = true
 
-        // 读取配置（支持默认值）
-        const cleanupConfig = globalConfig.getConfig('archivedGroups.cleanup') || {};
-        const enabled = cleanupConfig.enabled !== false; // 默认启用
-        const scheduleHour = cleanupConfig.scheduleHour ?? 2; // 默认凌晨2点
-        const scheduleMinute = cleanupConfig.scheduleMinute ?? 0; // 默认0分
-        const intervalHours = cleanupConfig.intervalHours ?? 24; // 默认24小时
-        const retentionDays = cleanupConfig.retentionDays ?? 60; // 默认60天
+        const cleanupConfig = globalConfig.getConfig('archivedGroups.cleanup') || {}
+        const enabled = cleanupConfig.enabled !== false
+        const scheduleHour = cleanupConfig.scheduleHour ?? 2
+        const scheduleMinute = cleanupConfig.scheduleMinute ?? 0
+        const intervalHours = cleanupConfig.intervalHours ?? 24
+        const retentionDays = cleanupConfig.retentionDays ?? 60
 
-        // 如果未启用，直接返回
         if (!enabled) {
-            logger.info('[发言统计] 归档群组清理任务已禁用');
-            return;
+            globalConfig.debug('[发言统计] 归档群组清理任务已禁用')
+            return
         }
 
-        // 计算到下一个执行时间的时间（UTC+8）
-        const now = new Date();
-        const utc8Offset = 8 * 60 * 60 * 1000;
-        const utc8Now = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset);
+        const now = new Date()
+        const utc8Offset = 8 * 60 * 60 * 1000
+        const utc8Now = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset)
         
-        // 下一个执行时间（UTC+8）
-        const nextRun = new Date(utc8Now);
-        nextRun.setHours(scheduleHour, scheduleMinute, 0, 0);
+        const nextRun = new Date(utc8Now)
+        nextRun.setHours(scheduleHour, scheduleMinute, 0, 0)
         if (nextRun <= utc8Now) {
-            nextRun.setDate(nextRun.getDate() + 1);
+            nextRun.setDate(nextRun.getDate() + 1)
         }
         
-        const msUntilNextRun = nextRun.getTime() - utc8Now.getTime();
-        const intervalMs = intervalHours * 60 * 60 * 1000;
+        const msUntilNextRun = nextRun.getTime() - utc8Now.getTime()
+        const intervalMs = intervalHours * 60 * 60 * 1000
         
-        // 保存配置到实例变量，供清理方法使用
-        this.cleanupRetentionDays = retentionDays;
+        this.cleanupRetentionDays = retentionDays
         
-        // 首次延迟执行
         setTimeout(async () => {
-            await this.runArchivedGroupsCleanup();
+            await this.runArchivedGroupsCleanup()
             
-            // 之后按配置的间隔执行
             setInterval(async () => {
-                await this.runArchivedGroupsCleanup();
-            }, intervalMs);
-        }, msUntilNextRun);
+                await this.runArchivedGroupsCleanup()
+            }, intervalMs)
+        }, msUntilNextRun)
         
-        logger.info(`[发言统计] 归档群组清理任务已启动，将在 ${new Date(Date.now() + msUntilNextRun).toLocaleString('zh-CN')} 首次执行`);
-        logger.info(`[发言统计] 清理配置：执行时间 ${scheduleHour}:${String(scheduleMinute).padStart(2, '0')}，执行间隔 ${intervalHours} 小时，保留天数 ${retentionDays} 天`);
+        globalConfig.debug(`[发言统计] 归档群组清理任务已启动，将在 ${new Date(Date.now() + msUntilNextRun).toLocaleString('zh-CN')} 首次执行`)
+        globalConfig.debug(`[发言统计] 清理配置：执行时间 ${scheduleHour}:${String(scheduleMinute).padStart(2, '0')}，执行间隔 ${intervalHours} 小时，保留天数 ${retentionDays} 天`)
     }
 
-    /**
-     * 执行归档群组清理
-     */
     async runArchivedGroupsCleanup() {
         try {
-            const retentionDays = this.cleanupRetentionDays || 60;
-            logger.info(`[发言统计] 开始清理超过 ${retentionDays} 天的归档群组...`);
-            const deletedCount = await this.dataService.dbService.cleanupArchivedGroups(retentionDays);
+            const retentionDays = this.cleanupRetentionDays || 60
+            globalConfig.debug(`[发言统计] 开始清理超过 ${retentionDays} 天的归档群组...`)
+            const deletedCount = await this.dataService.dbService.cleanupArchivedGroups(retentionDays)
             if (deletedCount > 0) {
-                logger.mark(`[发言统计] 清理完成，已永久删除 ${deletedCount} 个超过 ${retentionDays} 天的归档群组`);
+                global.logger?.mark?.(`[发言统计] 清理完成，已永久删除 ${deletedCount} 个超过 ${retentionDays} 天的归档群组`) || globalConfig.debug(`[发言统计] 清理完成，已永久删除 ${deletedCount} 个超过 ${retentionDays} 天的归档群组`)
             } else {
-                logger.debug('[发言统计] 没有需要清理的归档群组');
+                globalConfig.debug('[发言统计] 没有需要清理的归档群组')
             }
-        } catch (error) {
-            logger.error('[发言统计] 清理归档群组失败:', error);
+        } catch (err) {
+            globalConfig.error('[发言统计] 清理归档群组失败:', err)
         }
     }
 }
 
-// 静态变量
-Plugin._cleanupTaskStarted = false;
+Plugin._cleanupTaskStarted = false
 
-export { Plugin };
-export default Plugin;
+export { Plugin }
+export default Plugin
 

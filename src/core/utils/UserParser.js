@@ -13,9 +13,8 @@ export class UserParser {
      * @returns {Object|null} { userId: string, nickname: string, isMentioned: boolean } 或 null
      */
     static parseUser(e, options = {}) {
-        const { allowMention = true, defaultToSelf = true } = options;
+        const { allowMention = true, defaultToSelf = true } = options
         
-        // 检查 @ 用户
         if (allowMention && e.message) {
             for (const item of e.message) {
                 if (item.type === 'at' && item.qq) {
@@ -23,33 +22,31 @@ export class UserParser {
                         userId: String(item.qq),
                         nickname: item.text || `用户${item.qq}`,
                         isMentioned: true
-                    };
+                    }
                 }
             }
         }
         
-        // 检查文本中的 @QQ号
         if (allowMention) {
-            const match = e.msg?.match(/@(\d+)/);
+            const match = e.msg?.match(/@(\d+)/)
             if (match) {
                 return {
                     userId: match[1],
                     nickname: `用户${match[1]}`,
                     isMentioned: true
-                };
+                }
             }
         }
         
-        // 默认返回发送者信息
         if (defaultToSelf) {
             return {
                 userId: String(e.sender?.user_id || e.user_id || ''),
                 nickname: e.sender?.card || e.sender?.nickname || '未知用户',
                 isMentioned: false
-            };
+            }
         }
         
-        return null;
+        return null
     }
 
 }

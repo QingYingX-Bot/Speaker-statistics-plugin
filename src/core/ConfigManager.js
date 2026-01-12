@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { PathResolver } from './utils/PathResolver.js';
-import { configTemplate } from '../../config/configTemplate.js';
+import fs from 'fs'
+import path from 'path'
+import { PathResolver } from './utils/PathResolver.js'
+import { configTemplate } from '../../config/configTemplate.js'
 
 /**
  * 深度比较两个对象是否相等
@@ -10,33 +10,33 @@ import { configTemplate } from '../../config/configTemplate.js';
  * @returns {boolean} 是否相等
  */
 function deepEqual(obj1, obj2) {
-    if (obj1 === obj2) return true;
-    if (obj1 == null || obj2 == null) return false;
-    if (typeof obj1 !== typeof obj2) return false;
+    if (obj1 === obj2) return true
+    if (obj1 == null || obj2 == null) return false
+    if (typeof obj1 !== typeof obj2) return false
 
-    if (typeof obj1 !== 'object') return obj1 === obj2;
+    if (typeof obj1 !== 'object') return obj1 === obj2
 
-    if (Array.isArray(obj1) !== Array.isArray(obj2)) return false;
+    if (Array.isArray(obj1) !== Array.isArray(obj2)) return false
 
     if (Array.isArray(obj1)) {
-        if (obj1.length !== obj2.length) return false;
+        if (obj1.length !== obj2.length) return false
         for (let i = 0; i < obj1.length; i++) {
-            if (!deepEqual(obj1[i], obj2[i])) return false;
+            if (!deepEqual(obj1[i], obj2[i])) return false
         }
-        return true;
+        return true
     }
 
-    const keys1 = Object.keys(obj1);
-    const keys2 = Object.keys(obj2);
+    const keys1 = Object.keys(obj1)
+    const keys2 = Object.keys(obj2)
 
-    if (keys1.length !== keys2.length) return false;
+    if (keys1.length !== keys2.length) return false
 
     for (const key of keys1) {
-        if (!keys2.includes(key)) return false;
-        if (!deepEqual(obj1[key], obj2[key])) return false;
+        if (!keys2.includes(key)) return false
+        if (!deepEqual(obj1[key], obj2[key])) return false
     }
 
-    return true;
+    return true
 }
 
 /**
@@ -46,13 +46,13 @@ function deepEqual(obj1, obj2) {
 class ConfigManager {
     constructor() {
         // 使用动态路径解析
-        this.configPath = path.join(PathResolver.getDataDir(), 'global.json');
-        this.config = null;
-        this.watcher = null;
-        this.lastFileMtime = null;
-        this.reloadTimeout = null;
-        this.startWatching();
-        this.initConfig();
+        this.configPath = path.join(PathResolver.getDataDir(), 'global.json')
+        this.config = null
+        this.watcher = null
+        this.lastFileMtime = null
+        this.reloadTimeout = null
+        this.startWatching()
+        this.initConfig()
     }
 
     /**
@@ -60,14 +60,14 @@ class ConfigManager {
      */
     initConfig() {
         try {
-            this.config = this.loadConfig();
+            this.config = this.loadConfig()
             if (this.config?.global?.debugLog) {
-                this.debug(`全局配置路径: ${this.configPath}`);
-                this.debug(`当前配置: ${JSON.stringify(this.config)}`);
+                this.debug(`全局配置路径: ${this.configPath}`)
+                this.debug(`当前配置: ${JSON.stringify(this.config)}`)
             }
-        } catch (error) {
-            global.logger.error(`[发言统计] 初始化配置失败:`, error);
-            this.config = this.getDefaultConfig();
+        } catch (err) {
+            global.logger.error(`[发言统计] 初始化配置失败:`, err)
+            this.config = this.getDefaultConfig()
         }
     }
 
@@ -78,7 +78,7 @@ class ConfigManager {
     getDefaultConfig() {
         return {
             ...configTemplate
-        };
+        }
     }
 
     /**
@@ -86,16 +86,16 @@ class ConfigManager {
      */
     startWatching() {
         if (this.watcher) {
-            this.watcher.close();
+            this.watcher.close()
         }
 
         // 确保配置目录存在
-        const configDir = path.dirname(this.configPath);
-        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+        const configDir = path.dirname(this.configPath)
+        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true })
 
         // 如果配置文件不存在，创建默认配置
         if (!fs.existsSync(this.configPath)) {
-            this.saveConfig(this.getDefaultConfig());
+            this.saveConfig(this.getDefaultConfig())
         }
 
         try {
@@ -103,25 +103,25 @@ class ConfigManager {
                 if (eventType === 'change') {
                     // 增加防抖机制，避免频繁触发
                     if (this.reloadTimeout) {
-                        clearTimeout(this.reloadTimeout);
+                        clearTimeout(this.reloadTimeout)
                     }
                     this.reloadTimeout = setTimeout(() => {
                         // 只在debug模式下输出重载日志
                         if (this.config?.global?.debugLog) {
-                            this.debug('检测到配置文件变化，正在重新加载...');
+                            this.debug('检测到配置文件变化，正在重新加载...')
                         }
-                        this.reloadConfig();
+                        this.reloadConfig()
                     }, 2000); // 2秒延迟，减少频繁重载
                 }
-            });
+            })
 
             // 只在debug模式下输出启动日志
             if (this.config?.global?.debugLog) {
-                this.debug('已启动配置文件监听');
+                this.debug('已启动配置文件监听')
             }
-        } catch (error) {
-            logger.error(`[发言统计] 启动配置文件监听失败: ${error.message}`);
-            this.error('启动配置文件监听失败:', error);
+        } catch (err) {
+            globalConfig.error(`[发言统计] 启动配置文件监听失败: ${err.message}`)
+            this.error('启动配置文件监听失败:', err)
         }
     }
 
@@ -131,31 +131,31 @@ class ConfigManager {
     reloadConfig() {
         try {
             // 检查文件是否真的发生了变化
-            const stats = fs.statSync(this.configPath);
-            const currentMtime = stats.mtime.getTime();
+            const stats = fs.statSync(this.configPath)
+            const currentMtime = stats.mtime.getTime()
 
             // 如果文件修改时间没有变化，跳过重载
             if (this.lastFileMtime && this.lastFileMtime === currentMtime) {
-                this.debug('文件修改时间未变化，跳过重载');
-                return;
+                this.debug('文件修改时间未变化，跳过重载')
+                return
             }
 
-            this.lastFileMtime = currentMtime;
+            this.lastFileMtime = currentMtime
 
-            const newConfig = this.loadConfig();
-            const oldConfig = this.config ? { ...this.config } : null;
-            this.config = newConfig;
+            const newConfig = this.loadConfig()
+            const oldConfig = this.config ? { ...this.config } : null
+            this.config = newConfig
 
             // 检查并记录变化的配置项
             if (this.config?.global?.debugLog && oldConfig) {
                 if (!deepEqual(newConfig, oldConfig)) {
-                    this.debug('配置重新加载完成，检测到配置变化');
+                    this.debug('配置重新加载完成，检测到配置变化')
                 } else {
-                    this.debug('配置内容未发生变化');
+                    this.debug('配置内容未发生变化')
                 }
             }
-        } catch (error) {
-            this.error('重新加载配置失败:', error);
+        } catch (err) {
+            this.error('重新加载配置失败:', err)
         }
     }
 
@@ -166,74 +166,74 @@ class ConfigManager {
     loadConfig() {
         try {
             if (!fs.existsSync(this.configPath)) {
-                return this.getDefaultConfig();
+                return this.getDefaultConfig()
             }
 
-            const configContent = fs.readFileSync(this.configPath, 'utf8');
-            const config = JSON.parse(configContent);
+            const configContent = fs.readFileSync(this.configPath, 'utf8')
+            const config = JSON.parse(configContent)
 
             // 与默认配置合并，确保所有必要的字段都存在
-            const defaultConfig = this.getDefaultConfig();
+            const defaultConfig = this.getDefaultConfig()
             const mergedConfig = {
                 ...defaultConfig,
                 ...config
-            };
+            }
 
             // 确保嵌套对象也被正确合并
             if (mergedConfig.global && defaultConfig.global) {
                 mergedConfig.global = {
                     ...defaultConfig.global,
                     ...mergedConfig.global
-                };
+                }
             }
             if (mergedConfig.display && defaultConfig.display) {
                 mergedConfig.display = {
                     ...defaultConfig.display,
                     ...mergedConfig.display
-                };
+                }
             }
             if (mergedConfig.message && defaultConfig.message) {
                 mergedConfig.message = {
                     ...defaultConfig.message,
                     ...mergedConfig.message
-                };
+                }
             }
             if (mergedConfig.backgroundServer && defaultConfig.backgroundServer) {
                 mergedConfig.backgroundServer = {
                     ...defaultConfig.backgroundServer,
                     ...mergedConfig.backgroundServer
-                };
+                }
             }
             if (mergedConfig.webServer && defaultConfig.webServer) {
                 mergedConfig.webServer = {
                     ...defaultConfig.webServer,
                     ...mergedConfig.webServer
-                };
+                }
                 // 深度合并 umami 配置
                 if (mergedConfig.webServer.umami && defaultConfig.webServer.umami) {
                     mergedConfig.webServer.umami = {
                         ...defaultConfig.webServer.umami,
                         ...mergedConfig.webServer.umami
-                    };
+                    }
                 }
             }
             if (mergedConfig.dataStorage && defaultConfig.dataStorage) {
                 mergedConfig.dataStorage = {
                     ...defaultConfig.dataStorage,
                     ...mergedConfig.dataStorage
-                };
+                }
             }
             if (mergedConfig.achievements && defaultConfig.achievements) {
                 mergedConfig.achievements = {
                     ...defaultConfig.achievements,
                     ...mergedConfig.achievements
-                };
+                }
             }
 
-            return mergedConfig;
-        } catch (error) {
-            this.error('读取配置文件失败:', error);
-            return this.getDefaultConfig();
+            return mergedConfig
+        } catch (err) {
+            this.error('读取配置文件失败:', err)
+            return this.getDefaultConfig()
         }
     }
 
@@ -243,28 +243,28 @@ class ConfigManager {
      */
     saveConfig(config) {
         try {
-            const dirPath = path.dirname(this.configPath);
-            if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+            const dirPath = path.dirname(this.configPath)
+            if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true })
 
             // 暂时停止监听，避免触发重载
             if (this.watcher) {
-                this.watcher.close();
-                this.watcher = null;
+                this.watcher.close()
+                this.watcher = null
             }
 
-            const configContent = JSON.stringify(config, null, 2);
-            fs.writeFileSync(this.configPath, configContent);
-            this.config = config;
+            const configContent = JSON.stringify(config, null, 2)
+            fs.writeFileSync(this.configPath, configContent)
+            this.config = config
 
             // 重新开始监听
-            this.startWatching();
+            this.startWatching()
 
             if (this.config?.global?.debugLog) {
-                this.debug(`配置保存成功`);
+                this.debug(`配置保存成功`)
             }
-        } catch (error) {
-            this.error('保存全局配置失败:', error);
-            throw error;
+        } catch (err) {
+            this.error('保存全局配置失败:', err)
+            throw err
         }
     }
 
@@ -275,30 +275,30 @@ class ConfigManager {
      */
     updateConfig(key, value) {
         try {
-            const config = this.loadConfig();
+            const config = this.loadConfig()
 
             // 处理嵌套配置项
             if (key.includes('.')) {
-                const keys = key.split('.');
-                let current = config;
+                const keys = key.split('.')
+                let current = config
                 for (let i = 0; i < keys.length - 1; i++) {
                     if (!current[keys[i]]) {
-                        current[keys[i]] = {};
+                        current[keys[i]] = {}
                     }
-                    current = current[keys[i]];
+                    current = current[keys[i]]
                 }
-                current[keys[keys.length - 1]] = value;
+                current[keys[keys.length - 1]] = value
             } else {
-                config[key] = value;
+                config[key] = value
             }
 
-            this.saveConfig(config);
+            this.saveConfig(config)
             if (key === 'debugLog' || key === 'global.debugLog' || this.config?.global?.debugLog) {
-                this.debug(`更新配置 ${key}: ${value}`);
+                this.debug(`更新配置 ${key}: ${value}`)
             }
-        } catch (error) {
-            this.error('更新配置失败:', error);
-            throw error;
+        } catch (err) {
+            this.error('更新配置失败:', err)
+            throw err
         }
     }
 
@@ -307,18 +307,18 @@ class ConfigManager {
      */
     refreshConfig() {
         try {
-            const newConfig = this.loadConfig();
-            const oldConfig = this.config ? { ...this.config } : null;
-            this.config = newConfig;
+            const newConfig = this.loadConfig()
+            const oldConfig = this.config ? { ...this.config } : null
+            this.config = newConfig
 
             // 只在debug模式下记录配置变化
             if (this.config?.global?.debugLog && oldConfig) {
                 if (!deepEqual(newConfig, oldConfig)) {
-                    this.debug('配置刷新完成，检测到配置变化');
+                    this.debug('配置刷新完成，检测到配置变化')
                 }
             }
-        } catch (error) {
-            this.error('刷新配置失败:', error);
+        } catch (err) {
+            this.error('刷新配置失败:', err)
         }
     }
 
@@ -331,37 +331,37 @@ class ConfigManager {
     getConfig(key, forceRefresh = false) {
         // 如果配置未初始化，先初始化
         if (!this.config) {
-            this.initConfig();
+            this.initConfig()
         }
 
         // 如果需要强制刷新，则重新加载配置
         if (forceRefresh) {
-            this.refreshConfig();
+            this.refreshConfig()
         }
 
         // 如果没有提供key，返回完整配置
         if (!key) {
-            return this.config;
+            return this.config
         }
 
         // 处理嵌套配置项
-        let value;
+        let value
         if (key.includes('.')) {
-            const keys = key.split('.');
-            value = this.config;
+            const keys = key.split('.')
+            value = this.config
             for (const k of keys) {
                 if (value && typeof value === 'object') {
-                    value = value[k];
+                    value = value[k]
                 } else {
-                    value = undefined;
-                    break;
+                    value = undefined
+                    break
                 }
             }
         } else {
-            value = this.config?.[key];
+            value = this.config?.[key]
         }
 
-        return value;
+        return value
     }
 
     /**
@@ -371,7 +371,7 @@ class ConfigManager {
      */
     debug(message, ...args) {
         if (this.config?.global?.debugLog) {
-            global.logger.mark(`[发言统计] ${message}`, ...args);
+            global.logger.mark(`[发言统计] ${message}`, ...args)
         }
     }
 
@@ -381,7 +381,7 @@ class ConfigManager {
      * @param {any[]} args 额外参数
      */
     warn(message, ...args) {
-        global.logger.warn(`[发言统计] ${message}`, ...args);
+        global.logger.warn(`[发言统计] ${message}`, ...args)
     }
 
     /**
@@ -390,7 +390,7 @@ class ConfigManager {
      * @param {any[]} args 额外参数
      */
     error(message, ...args) {
-        global.logger.error(`[发言统计] ${message}`, ...args);
+        global.logger.error(`[发言统计] ${message}`, ...args)
     }
 
     /**
@@ -400,7 +400,7 @@ class ConfigManager {
      */
     logConfigAccess(key, value) {
         if (this.config?.global?.debugLog) {
-            this.debug(`获取配置 ${key}: ${value}`);
+            this.debug(`获取配置 ${key}: ${value}`)
         }
     }
 
@@ -408,10 +408,10 @@ class ConfigManager {
      * 手动触发配置重载（用于测试）
      */
     forceReload() {
-        logger.info('[发言统计] 开始强制重载配置...');
-        this.reloadConfig();
-        logger.info('[发言统计] 配置重载完成');
-        return this.config;
+        logger.info('[发言统计] 开始强制重载配置...')
+        this.reloadConfig()
+        logger.info('[发言统计] 配置重载完成')
+        return this.config
     }
 
     /**
@@ -420,33 +420,33 @@ class ConfigManager {
      */
     setConfigData(data) {
         try {
-            const config = this.loadConfig();
+            const config = this.loadConfig()
             
             // 处理嵌套配置项
             for (const [keyPath, value] of Object.entries(data)) {
                 if (keyPath.includes('.')) {
-                    const keys = keyPath.split('.');
-                    let current = config;
+                    const keys = keyPath.split('.')
+                    let current = config
                     for (let i = 0; i < keys.length - 1; i++) {
                         if (!current[keys[i]]) {
-                            current[keys[i]] = {};
+                            current[keys[i]] = {}
                         }
-                        current = current[keys[i]];
+                        current = current[keys[i]]
                     }
-                    current[keys[keys.length - 1]] = value;
+                    current[keys[keys.length - 1]] = value
                 } else {
-                    config[keyPath] = value;
+                    config[keyPath] = value
                 }
             }
             
-            this.saveConfig(config);
+            this.saveConfig(config)
             if (this.config?.global?.debugLog) {
-                this.debug('批量设置配置成功');
+                this.debug('批量设置配置成功')
             }
-            return true;
-        } catch (error) {
-            this.error('批量设置配置失败:', error);
-            return false;
+            return true
+        } catch (err) {
+            this.error('批量设置配置失败:', err)
+            return false
         }
     }
 
@@ -457,44 +457,44 @@ class ConfigManager {
      */
     getDefaultAchievementsConfig() {
         try {
-            const configDir = PathResolver.getConfigDir();
-            const achievementsDir = path.join(configDir, 'achievements');
-            const achievementsConfigPath = path.join(configDir, 'achievements-config.json');
-            const achievements = {};
-            let categories = {};
-            let rarities = {};
+            const configDir = PathResolver.getConfigDir()
+            const achievementsDir = path.join(configDir, 'achievements')
+            const achievementsConfigPath = path.join(configDir, 'achievements-config.json')
+            const achievements = {}
+            let categories = {}
+            let rarities = {}
 
             // 加载成就配置（分类和稀有度）
             if (fs.existsSync(achievementsConfigPath)) {
                 try {
-                    const configContent = fs.readFileSync(achievementsConfigPath, 'utf8');
-                    const config = JSON.parse(configContent);
-                    categories = config.categories || {};
-                    rarities = config.rarities || {};
-                } catch (error) {
-                    this.error('读取成就配置文件失败:', error);
+                    const configContent = fs.readFileSync(achievementsConfigPath, 'utf8')
+                    const config = JSON.parse(configContent)
+                    categories = config.categories || {}
+                    rarities = config.rarities || {}
+                } catch (err) {
+                    this.error('读取成就配置文件失败:', err)
                 }
             }
 
             // 加载所有成就文件
             if (fs.existsSync(achievementsDir)) {
-                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'));
+                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'))
                 for (const file of files) {
-                    const filePath = path.join(achievementsDir, file);
+                    const filePath = path.join(achievementsDir, file)
                     try {
-                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                        const fileData = JSON.parse(fileContent);
-                        Object.assign(achievements, fileData);
-                    } catch (fileError) {
-                        this.error(`加载成就文件失败: ${file}`, fileError);
+                        const fileContent = fs.readFileSync(filePath, 'utf8')
+                        const fileData = JSON.parse(fileContent)
+                        Object.assign(achievements, fileData)
+                    } catch (err) {
+                        this.error(`加载成就文件失败: ${file}`, err)
                     }
                 }
             }
 
-            return { achievements, categories, rarities };
-        } catch (error) {
-            this.error('读取默认成就配置失败:', error);
-            return { achievements: {}, categories: {}, rarities: {} };
+            return { achievements, categories, rarities }
+        } catch (err) {
+            this.error('读取默认成就配置失败:', err)
+            return { achievements: {}, categories: {}, rarities: {} }
         }
     }
 
@@ -504,30 +504,30 @@ class ConfigManager {
      */
     getUserAchievementsConfig() {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const achievementsDir = path.join(dataDir, 'achievements');
-            const achievements = {};
+            const dataDir = PathResolver.getDataDir()
+            const achievementsDir = path.join(dataDir, 'achievements')
+            const achievements = {}
 
             // 检查是否存在用户自定义目录
             if (fs.existsSync(achievementsDir)) {
                 const files = fs.readdirSync(achievementsDir).filter(file => 
                     file.endsWith('.json') && file !== 'users.json'  // 排除 users.json
-                );
+                )
                 for (const file of files) {
-                    const filePath = path.join(achievementsDir, file);
+                    const filePath = path.join(achievementsDir, file)
                     try {
-                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                        Object.assign(achievements, fileData);
-                    } catch (fileError) {
-                        this.error(`加载用户成就文件失败: ${file}`, fileError);
+                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+                        Object.assign(achievements, fileData)
+                    } catch (err) {
+                        this.error(`加载用户成就文件失败: ${file}`, err)
                     }
                 }
             }
 
-            return achievements;
-        } catch (error) {
-            this.error('读取用户成就配置失败:', error);
-            return {};
+            return achievements
+        } catch (err) {
+            this.error('读取用户成就配置失败:', err)
+            return {}
         }
     }
 
@@ -537,23 +537,23 @@ class ConfigManager {
      */
     getUsersAchievementsConfig() {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const usersJsonPath = path.join(dataDir, 'achievements', 'users.json');
-            const achievements = {};
+            const dataDir = PathResolver.getDataDir()
+            const usersJsonPath = path.join(dataDir, 'achievements', 'users.json')
+            const achievements = {}
 
             if (fs.existsSync(usersJsonPath)) {
                 try {
-                    const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'));
-                    Object.assign(achievements, fileData);
-                } catch (fileError) {
-                    this.error('加载用户成就文件失败: users.json', fileError);
+                    const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'))
+                    Object.assign(achievements, fileData)
+                } catch (err) {
+                    this.error('加载用户成就文件失败: users.json', err)
                 }
             }
 
-            return achievements;
-        } catch (error) {
-            this.error('读取用户成就配置失败:', error);
-            return {};
+            return achievements
+        } catch (err) {
+            this.error('读取用户成就配置失败:', err)
+            return {}
         }
     }
 
@@ -564,23 +564,23 @@ class ConfigManager {
      */
     setUsersAchievementsConfig(achievements) {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const achievementsDir = path.join(dataDir, 'achievements');
+            const dataDir = PathResolver.getDataDir()
+            const achievementsDir = path.join(dataDir, 'achievements')
             
             // 确保目录存在
-            PathResolver.ensureDirectory(achievementsDir);
+            PathResolver.ensureDirectory(achievementsDir)
             
-            const filePath = path.join(achievementsDir, 'users.json');
-            const configContent = JSON.stringify(achievements, null, 2);
-            fs.writeFileSync(filePath, configContent);
+            const filePath = path.join(achievementsDir, 'users.json')
+            const configContent = JSON.stringify(achievements, null, 2)
+            fs.writeFileSync(filePath, configContent)
             
             if (this.config?.global?.debugLog) {
-                this.debug('用户成就配置保存成功 (users.json)');
+                this.debug('用户成就配置保存成功 (users.json)')
             }
-            return true;
-        } catch (error) {
-            this.error('保存用户成就配置文件失败:', error);
-            return false;
+            return true
+        } catch (err) {
+            this.error('保存用户成就配置文件失败:', err)
+            return false
         }
     }
 
@@ -592,23 +592,23 @@ class ConfigManager {
      */
     setUserAchievementsConfig(achievements, fileName = 'custom.json') {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const achievementsDir = path.join(dataDir, 'achievements');
+            const dataDir = PathResolver.getDataDir()
+            const achievementsDir = path.join(dataDir, 'achievements')
             
             // 确保目录存在
-            PathResolver.ensureDirectory(achievementsDir);
+            PathResolver.ensureDirectory(achievementsDir)
             
-            const filePath = path.join(achievementsDir, fileName);
-            const configContent = JSON.stringify(achievements, null, 2);
-            fs.writeFileSync(filePath, configContent);
+            const filePath = path.join(achievementsDir, fileName)
+            const configContent = JSON.stringify(achievements, null, 2)
+            fs.writeFileSync(filePath, configContent)
             
             if (this.config?.global?.debugLog) {
-                this.debug('用户成就配置保存成功');
+                this.debug('用户成就配置保存成功')
             }
-            return true;
-        } catch (error) {
-            this.error('保存用户成就配置文件失败:', error);
-            return false;
+            return true
+        } catch (err) {
+            this.error('保存用户成就配置文件失败:', err)
+            return false
         }
     }
 
@@ -617,8 +617,8 @@ class ConfigManager {
      * @returns {Object} 合并后的成就配置对象
      */
     getAllAchievementsConfig() {
-        const defaultConfig = this.getDefaultAchievementsConfig();
-        const userAchievements = this.getUserAchievementsConfig();
+        const defaultConfig = this.getDefaultAchievementsConfig()
+        const userAchievements = this.getUserAchievementsConfig()
         
         // 合并默认和用户自定义成就
         return {
@@ -628,7 +628,7 @@ class ConfigManager {
             },
             categories: defaultConfig.categories || {},
             rarities: defaultConfig.rarities || {}
-        };
+        }
     }
 
     /**
@@ -638,28 +638,28 @@ class ConfigManager {
      */
     getGroupAchievementsConfig(groupId) {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId);
-            const achievements = {};
+            const dataDir = PathResolver.getDataDir()
+            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId)
+            const achievements = {}
 
             // 检查是否存在群专属目录
             if (fs.existsSync(groupAchievementsDir)) {
-                const files = fs.readdirSync(groupAchievementsDir).filter(file => file.endsWith('.json'));
+                const files = fs.readdirSync(groupAchievementsDir).filter(file => file.endsWith('.json'))
                 for (const file of files) {
-                    const filePath = path.join(groupAchievementsDir, file);
+                    const filePath = path.join(groupAchievementsDir, file)
                     try {
-                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                        Object.assign(achievements, fileData);
-                    } catch (fileError) {
-                        this.error(`加载群专属成就文件失败: ${file}`, fileError);
+                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+                        Object.assign(achievements, fileData)
+                    } catch (err) {
+                        this.error(`加载群专属成就文件失败: ${file}`, err)
                     }
                 }
             }
 
-            return achievements;
-        } catch (error) {
-            this.error(`读取群专属成就配置失败 (${groupId}):`, error);
-            return {};
+            return achievements
+        } catch (err) {
+            this.error(`读取群专属成就配置失败 (${groupId}):`, err)
+            return {}
         }
     }
 
@@ -672,29 +672,28 @@ class ConfigManager {
      */
     setGroupAchievementsConfig(groupId, achievements, fileName = 'group.json') {
         try {
-            const dataDir = PathResolver.getDataDir();
-            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId);
+            const dataDir = PathResolver.getDataDir()
+            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId)
             
             // 确保目录存在
-            PathResolver.ensureDirectory(groupAchievementsDir);
+            PathResolver.ensureDirectory(groupAchievementsDir)
             
-            const filePath = path.join(groupAchievementsDir, fileName);
-            const configContent = JSON.stringify(achievements, null, 2);
-            fs.writeFileSync(filePath, configContent);
+            const filePath = path.join(groupAchievementsDir, fileName)
+            const configContent = JSON.stringify(achievements, null, 2)
+            fs.writeFileSync(filePath, configContent)
             
             if (this.config?.global?.debugLog) {
-                this.debug(`群专属成就配置保存成功 (${groupId})`);
+                this.debug(`群专属成就配置保存成功 (${groupId})`)
             }
-            return true;
-        } catch (error) {
-            this.error(`保存群专属成就配置文件失败 (${groupId}):`, error);
-            return false;
+            return true
+        } catch (err) {
+            this.error(`保存群专属成就配置文件失败 (${groupId}):`, err)
+            return false
         }
     }
 }
 
-// 创建单例实例
-const globalConfig = new ConfigManager();
-export { globalConfig, ConfigManager };
-export default globalConfig;
+const globalConfig = new ConfigManager()
+export { globalConfig, ConfigManager }
+export default globalConfig
 

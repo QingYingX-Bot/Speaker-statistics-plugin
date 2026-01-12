@@ -1,7 +1,7 @@
-import { globalConfig } from '../ConfigManager.js';
-import { TimeUtils } from '../utils/TimeUtils.js';
-import { PostgreSQLAdapter } from './adapters/PostgreSQLAdapter.js';
-import { SQLiteAdapter } from './adapters/SQLiteAdapter.js';
+import { globalConfig } from '../ConfigManager.js'
+import { TimeUtils } from '../utils/TimeUtils.js'
+import { PostgreSQLAdapter } from './adapters/PostgreSQLAdapter.js'
+import { SQLiteAdapter } from './adapters/SQLiteAdapter.js'
 
 /**
  * 数据库服务类
@@ -9,13 +9,13 @@ import { SQLiteAdapter } from './adapters/SQLiteAdapter.js';
  */
 class DatabaseService {
     constructor() {
-        this.adapter = null;
-        this.initialized = false;
-        this.healthCheckInterval = null;
-        this.healthCheckIntervalMs = 60000; // 60秒健康检查间隔
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 1000; // 初始重连延迟1秒
+        this.adapter = null
+        this.initialized = false
+        this.healthCheckInterval = null
+        this.healthCheckIntervalMs = 60000
+        this.reconnectAttempts = 0
+        this.maxReconnectAttempts = 5
+        this.reconnectDelay = 1000
     }
 
     /**
@@ -26,64 +26,48 @@ class DatabaseService {
      */
     async initialize(maxRetries = 5, initialDelay = 1000) {
         if (this.initialized && this.adapter) {
-            // 如果已初始化，执行健康检查
             try {
-                await this.healthCheck();
-                return;
-            } catch (error) {
-                // 健康检查失败，重置状态并重试
-                globalConfig.warn('[数据库服务] 健康检查失败，尝试重新初始化:', error.message);
-                this.initialized = false;
-                this.adapter = null;
+                await this.healthCheck()
+                return
+            } catch (err) {
+                globalConfig.warn('[数据库服务] 健康检查失败，尝试重新初始化:', err.message)
+                this.initialized = false
+                this.adapter = null
             }
         }
 
-        // 指数退避重试策略
         for (let i = 0; i < maxRetries; i++) {
             try {
-                // 从配置获取数据库连接信息
-                const dbConfig = globalConfig.getConfig('database') || {};
-                const dbType = (dbConfig.type || 'sqlite').toLowerCase();
+                const dbConfig = globalConfig.getConfig('database') || {}
+                const dbType = (dbConfig.type || 'sqlite').toLowerCase()
                 
-                // 根据配置选择适配器
                 if (dbType === 'sqlite') {
-                    this.adapter = new SQLiteAdapter();
-                    globalConfig.debug('[数据库服务] 使用 SQLite 适配器');
+                    this.adapter = new SQLiteAdapter()
+                    globalConfig.debug('[数据库服务] 使用 SQLite 适配器')
                 } else {
-                    this.adapter = new PostgreSQLAdapter();
-                    globalConfig.debug('[数据库服务] 使用 PostgreSQL 适配器');
+                    this.adapter = new PostgreSQLAdapter()
+                    globalConfig.debug('[数据库服务] 使用 PostgreSQL 适配器')
                 }
 
-                // 初始化适配器
-                await this.adapter.initialize();
-                
-                // 执行健康检查
-                await this.healthCheck();
-                
-                this.initialized = true;
-                this.reconnectAttempts = 0;
-                
-                // 启动定期健康检查
-                this.startHealthCheck();
-                
-                return;
-            } catch (error) {
-                const isLastAttempt = i === maxRetries - 1;
+                await this.adapter.initialize()
+                await this.healthCheck()
+                this.initialized = true
+                this.reconnectAttempts = 0
+                this.startHealthCheck()
+                return
+            } catch (err) {
+                const isLastAttempt = i === maxRetries - 1
                 
                 if (isLastAttempt) {
-                    // 最后一次尝试失败，抛出错误
-                    if (error.message && error.message.includes('数据库')) {
-                        throw error;
+                    if (err.message?.includes('数据库')) {
+                        throw err
                     }
-                    throw new Error(`数据库初始化失败（已重试${maxRetries}次）: ${error.message}`);
+                    throw new Error(`数据库初始化失败（已重试${maxRetries}次）: ${err.message}`)
                 }
                 
-                // 计算延迟时间（指数退避）
-                const delay = initialDelay * Math.pow(2, i);
-                globalConfig.warn(`[数据库服务] 初始化失败，${delay}ms 后重试 (${i + 1}/${maxRetries}):`, error.message);
-                
-                // 等待后重试
-                await new Promise(resolve => setTimeout(resolve, delay));
+                const delay = initialDelay * Math.pow(2, i)
+                globalConfig.warn(`[数据库服务] 初始化失败，${delay}ms 后重试 (${i + 1}/${maxRetries}):`, err.message)
+                await new Promise(resolve => setTimeout(resolve, delay))
             }
         }
     }
@@ -94,17 +78,16 @@ class DatabaseService {
      */
     async healthCheck() {
         if (!this.adapter) {
-            this.initialized = false;
-            throw new Error('数据库适配器未初始化');
+            this.initialized = false
+            throw new Error('数据库适配器未初始化')
         }
 
         try {
-            // 执行简单的查询测试连接
-            await this.adapter.get('SELECT 1');
-            return true;
-        } catch (error) {
-            this.initialized = false;
-            throw new Error(`数据库健康检查失败: ${error.message}`);
+            await this.adapter.get('SELECT 1')
+            return true
+        } catch (err) {
+            this.initialized = false
+            throw new Error(`数据库健康检查失败: ${err.message}`)
         }
     }
 
@@ -112,21 +95,18 @@ class DatabaseService {
      * 启动定期健康检查
      */
     startHealthCheck() {
-        // 清除之前的健康检查定时器
         if (this.healthCheckInterval) {
-            clearInterval(this.healthCheckInterval);
+            clearInterval(this.healthCheckInterval)
         }
 
-        // 设置定期健康检查
         this.healthCheckInterval = setInterval(async () => {
             try {
-                await this.healthCheck();
-            } catch (error) {
-                globalConfig.warn('[数据库服务] 定期健康检查失败:', error.message);
-                // 健康检查失败，尝试重新连接
-                this.handleReconnect();
+                await this.healthCheck()
+            } catch (err) {
+                globalConfig.warn('[数据库服务] 定期健康检查失败:', err.message)
+                this.handleReconnect()
             }
-        }, this.healthCheckIntervalMs);
+        }, this.healthCheckIntervalMs)
     }
 
     /**
@@ -134,8 +114,8 @@ class DatabaseService {
      */
     stopHealthCheck() {
         if (this.healthCheckInterval) {
-            clearInterval(this.healthCheckInterval);
-            this.healthCheckInterval = null;
+            clearInterval(this.healthCheckInterval)
+            this.healthCheckInterval = null
         }
     }
 
@@ -144,26 +124,25 @@ class DatabaseService {
      */
     async handleReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            globalConfig.error(`[数据库服务] 重连失败，已达到最大重试次数 (${this.maxReconnectAttempts})`);
-            this.reconnectAttempts = 0;
-            return;
+            globalConfig.error(`[数据库服务] 重连失败，已达到最大重试次数 (${this.maxReconnectAttempts})`)
+            this.reconnectAttempts = 0
+            return
         }
 
-        this.reconnectAttempts++;
-        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        this.reconnectAttempts++
+        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1)
         
-        globalConfig.warn(`[数据库服务] 尝试重连数据库 (${this.reconnectAttempts}/${this.maxReconnectAttempts})，${delay}ms 后重试...`);
+        globalConfig.warn(`[数据库服务] 尝试重连数据库 (${this.reconnectAttempts}/${this.maxReconnectAttempts})，${delay}ms 后重试...`)
         
         setTimeout(async () => {
             try {
-                await this.initialize(1, 0); // 只重试1次，延迟为0（已经在setTimeout中延迟了）
-                globalConfig.mark('[数据库服务] 数据库重连成功');
-            } catch (error) {
-                globalConfig.error('[数据库服务] 重连失败:', error.message);
-                // 继续尝试重连
-                this.handleReconnect();
+                await this.initialize(1, 0)
+                globalConfig.mark('[数据库服务] 数据库重连成功')
+            } catch (err) {
+                globalConfig.error('[数据库服务] 重连失败:', err.message)
+                this.handleReconnect()
             }
-        }, delay);
+        }, delay)
     }
 
     /**
@@ -174,20 +153,17 @@ class DatabaseService {
      */
     async run(sql, ...params) {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
         
-        // 如果数据库连接失效，尝试重连
         try {
-            return await this.adapter.run(sql, ...params);
-        } catch (error) {
-            // 检查是否是连接错误
-            if (this.isConnectionError(error)) {
-                await this.handleReconnect();
-                // 重连后重试一次
-                return await this.adapter.run(sql, ...params);
+            return this.adapter.run(sql, ...params)
+        } catch (err) {
+            if (this.isConnectionError(err)) {
+                await this.handleReconnect()
+                return this.adapter.run(sql, ...params)
             }
-            throw error;
+            throw err
         }
     }
 
@@ -199,20 +175,17 @@ class DatabaseService {
      */
     async get(sql, ...params) {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
         
-        // 如果数据库连接失效，尝试重连
         try {
-            return await this.adapter.get(sql, ...params);
-        } catch (error) {
-            // 检查是否是连接错误
-            if (this.isConnectionError(error)) {
-                await this.handleReconnect();
-                // 重连后重试一次
-                return await this.adapter.get(sql, ...params);
+            return this.adapter.get(sql, ...params)
+        } catch (err) {
+            if (this.isConnectionError(err)) {
+                await this.handleReconnect()
+                return this.adapter.get(sql, ...params)
             }
-            throw error;
+            throw err
         }
     }
 
@@ -224,20 +197,17 @@ class DatabaseService {
      */
     async all(sql, ...params) {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
         
-        // 如果数据库连接失效，尝试重连
         try {
-            return await this.adapter.all(sql, ...params);
-        } catch (error) {
-            // 检查是否是连接错误
-            if (this.isConnectionError(error)) {
-                await this.handleReconnect();
-                // 重连后重试一次
-                return await this.adapter.all(sql, ...params);
+            return this.adapter.all(sql, ...params)
+        } catch (err) {
+            if (this.isConnectionError(err)) {
+                await this.handleReconnect()
+                return this.adapter.all(sql, ...params)
             }
-            throw error;
+            throw err
         }
     }
 
@@ -246,42 +216,38 @@ class DatabaseService {
      * @param {Error} error 错误对象
      * @returns {boolean}
      */
-    isConnectionError(error) {
-        if (!error) return false;
+    isConnectionError(err) {
+        if (!err) return false
         
-        const errorMessage = error.message || '';
-        const errorCode = error.code || '';
+        const errorMessage = err.message || ''
+        const errorCode = err.code || ''
         
-        // PostgreSQL 连接错误代码
         const postgresConnectionErrors = [
             'ECONNREFUSED',
             'ETIMEDOUT',
             'ENOTFOUND',
-            '57P01', // 管理员关闭
-            '57P02', // 崩溃
-            '57P03', // 无法连接
-            '08003', // 连接不存在
-            '08006', // 连接失败
-            '08001', // SQL客户端无法建立连接
-            '08004'  // SQL服务器拒绝连接
-        ];
+            '57P01',
+            '57P02',
+            '57P03',
+            '08003',
+            '08006',
+            '08001',
+            '08004'
+        ]
         
-        // SQLite 连接错误
         const sqliteConnectionErrors = [
             'SQLITE_BUSY',
             'SQLITE_LOCKED',
             'SQLITE_IOERR',
             'SQLITE_CORRUPT',
             'SQLITE_CANTOPEN'
-        ];
+        ]
         
-        // 检查错误代码
         if (postgresConnectionErrors.includes(errorCode) || 
             sqliteConnectionErrors.includes(errorCode)) {
-            return true;
+            return true
         }
         
-        // 检查错误消息
         const connectionErrorMessages = [
             'connection',
             '连接',
@@ -297,11 +263,11 @@ class DatabaseService {
             '丢失',
             'refused',
             '拒绝'
-        ];
+        ]
         
         return connectionErrorMessages.some(msg => 
             errorMessage.toLowerCase().includes(msg.toLowerCase())
-        );
+        )
     }
 
     /**
@@ -311,41 +277,33 @@ class DatabaseService {
      */
     async exec(sql) {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
-        return await this.adapter.exec(sql);
+        return this.adapter.exec(sql)
     }
 
     /**
      * 创建所有表
      */
     async createTables() {
-        return await this.adapter.createTables();
+        return this.adapter.createTables()
     }
 
-    /**
-     * 创建所有索引
-     */
     async createIndexes() {
-        return await this.adapter.createIndexes();
+        return this.adapter.createIndexes()
     }
 
-    /**
-     * 获取数据库类型
-     * @returns {string} 'postgresql' 或 'sqlite'
-     */
     getDatabaseType() {
         if (!this.adapter) {
-            return 'sqlite'; // 默认返回 sqlite
+            return 'sqlite'
         }
-        // 检查适配器类型
-        const adapterName = this.adapter.constructor.name;
+        const adapterName = this.adapter.constructor.name
         if (adapterName === 'PostgreSQLAdapter') {
-            return 'postgresql';
+            return 'postgresql'
         } else if (adapterName === 'SQLiteAdapter') {
-            return 'sqlite';
+            return 'sqlite'
         }
-        return 'sqlite'; // 默认返回 sqlite
+        return 'sqlite'
     }
 
     /**
@@ -353,8 +311,7 @@ class DatabaseService {
      * @returns {string} 时间字符串 (YYYY-MM-DD HH:MM:SS)
      */
     getCurrentTime() {
-        // 使用 UTC+8 时区
-        return TimeUtils.formatDateTime(TimeUtils.getUTC8Date());
+        return TimeUtils.formatDateTime(TimeUtils.getUTC8Date())
     }
 
     /**
@@ -364,16 +321,28 @@ class DatabaseService {
      */
     sanitizeString(str) {
         if (str === null || str === undefined) {
-            return null;
+            return null
         }
-        // 转换为字符串
-        let cleaned = String(str);
-        // 移除所有 null 字节（0x00）
-        cleaned = cleaned.replace(/\0/g, '');
-        // 移除其他可能导致问题的控制字符（保留换行符、制表符等常用字符）
-        // 只移除可能导致编码问题的字符
-        cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, '');
-        return cleaned;
+        let cleaned = String(str)
+        cleaned = cleaned.replace(/\0/g, '')
+        cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, '')
+        return cleaned
+    }
+
+    /**
+     * 格式化日期时间为字符串（内部方法）
+     * @param {Date|string|null} date 日期对象或字符串
+     * @returns {string|null} 格式化后的日期时间字符串
+     */
+    _formatDateTime(date) {
+        if (!date) return null
+        if (date instanceof Date) {
+            return date.toISOString().replace('T', ' ').substring(0, 19)
+        }
+        if (typeof date === 'string' && date.trim() !== '') {
+            return date
+        }
+        return null
     }
 
     // ========== 用户统计相关方法 ==========
@@ -385,7 +354,7 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 用户统计数据
      */
     async getUserStats(groupId, userId) {
-        return await this.get('SELECT * FROM user_stats WHERE group_id = $1 AND user_id = $2', groupId, userId);
+        return this.get('SELECT * FROM user_stats WHERE group_id = $1 AND user_id = $2', groupId, userId)
     }
 
     /**
@@ -396,25 +365,19 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveUserStats(groupId, userId, stats) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
+        const sanitizedGroupId = this.sanitizeString(groupId) || ''
+        const sanitizedUserId = this.sanitizeString(userId) || ''
+        const sanitizedNickname = this.sanitizeString(stats.nickname) || ''
         
-        // 清理所有字符串字段中的 null 字节（PostgreSQL 不允许 UTF-8 字符串中包含 null 字节）
-        const sanitizedGroupId = this.sanitizeString(groupId) || '';
-        const sanitizedUserId = this.sanitizeString(userId) || '';
-        const sanitizedNickname = this.sanitizeString(stats.nickname) || '';
-        
-        // 确保 last_speaking_time 是字符串或 null
-        let lastSpeakingTime = stats.last_speaking_time || null;
+        let lastSpeakingTime = stats.last_speaking_time || null
         if (lastSpeakingTime instanceof Date) {
-            lastSpeakingTime = lastSpeakingTime.toISOString();
+            lastSpeakingTime = lastSpeakingTime.toISOString()
         } else if (lastSpeakingTime && typeof lastSpeakingTime !== 'string') {
-            lastSpeakingTime = String(lastSpeakingTime);
+            lastSpeakingTime = String(lastSpeakingTime)
         }
-        // 清理 last_speaking_time 中的 null 字节
-        lastSpeakingTime = this.sanitizeString(lastSpeakingTime);
+        lastSpeakingTime = this.sanitizeString(lastSpeakingTime)
         
-        // 使用 PostgreSQL 的 INSERT ... ON CONFLICT ... DO UPDATE 语法（UPSERT）
-        // 这样可以避免并发时的主键冲突问题
         await this.run(`
             INSERT INTO user_stats (
                 group_id, user_id, nickname, total_count, total_words,
@@ -440,9 +403,9 @@ class DatabaseService {
             lastSpeakingTime,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -453,32 +416,31 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async updateUserStats(groupId, userId, updates) {
-        const now = this.getCurrentTime();
-        const setParts = [];
-        const values = [];
-        let paramIndex = 1;
+        const now = this.getCurrentTime()
+        const setParts = []
+        const values = []
+        let paramIndex = 1
 
         for (const [key, value] of Object.entries(updates)) {
-            setParts.push(`${key} = $${paramIndex++}`);
-            // 转换 Date 对象为字符串
-            let convertedValue = value;
+            setParts.push(`${key} = $${paramIndex++}`)
+            let convertedValue = value
             if (value instanceof Date) {
-                convertedValue = value.toISOString();
+                convertedValue = value.toISOString()
             } else if (value === null || value === undefined) {
-                convertedValue = null;
+                convertedValue = null
             }
-            values.push(convertedValue);
+            values.push(convertedValue)
         }
 
-        setParts.push(`updated_at = $${paramIndex++}`);
-        values.push(now);
-        const whereParam1 = paramIndex++;
-        const whereParam2 = paramIndex;
-        values.push(groupId, userId);
+        setParts.push(`updated_at = $${paramIndex++}`)
+        values.push(now)
+        const whereParam1 = paramIndex++
+        const whereParam2 = paramIndex
+        values.push(groupId, userId)
 
-        const sql = `UPDATE user_stats SET ${setParts.join(', ')} WHERE group_id = $${whereParam1} AND user_id = $${whereParam2}`;
-        await this.run(sql, ...values);
-        return true;
+        const sql = `UPDATE user_stats SET ${setParts.join(', ')} WHERE group_id = $${whereParam1} AND user_id = $${whereParam2}`
+        await this.run(sql, ...values)
+        return true
     }
 
     /**
@@ -487,16 +449,12 @@ class DatabaseService {
      * @returns {Promise<Array>} 用户统计数组
      */
     async getAllGroupUsers(groupId) {
-        return await this.all('SELECT * FROM user_stats WHERE group_id = $1 ORDER BY total_count DESC', groupId);
+        return this.all('SELECT * FROM user_stats WHERE group_id = $1 ORDER BY total_count DESC', groupId)
     }
 
-    /**
-     * 获取所有群组ID列表
-     * @returns {Promise<Array<string>>} 群ID数组
-     */
     async getAllGroupIds() {
-        const rows = await this.all('SELECT DISTINCT group_id FROM user_stats');
-        return rows.map(row => row.group_id);
+        const rows = await this.all('SELECT DISTINCT group_id FROM user_stats')
+        return rows.map(row => row.group_id)
     }
 
     /**
@@ -504,18 +462,18 @@ class DatabaseService {
      * @returns {Promise<Map<string, Array>>} 群ID到用户列表的映射
      */
     async getAllGroupsUsersBatch() {
-        const rows = await this.all('SELECT * FROM user_stats ORDER BY group_id, total_count DESC');
-        const groupsMap = new Map();
+        const rows = await this.all('SELECT * FROM user_stats ORDER BY group_id, total_count DESC')
+        const groupsMap = new Map()
         
         for (const row of rows) {
-            const groupId = row.group_id;
+            const groupId = row.group_id
             if (!groupsMap.has(groupId)) {
-                groupsMap.set(groupId, []);
+                groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row);
+            groupsMap.get(groupId).push(row)
         }
         
-        return groupsMap;
+        return groupsMap
     }
 
     /**
@@ -532,18 +490,18 @@ class DatabaseService {
              AND (ds.message_count > 0 OR ds.word_count > 0)
              ORDER BY ds.group_id, ds.message_count DESC`,
             dateKey
-        );
-        const groupsMap = new Map();
+        )
+        const groupsMap = new Map()
         
         for (const row of rows) {
-            const groupId = row.group_id;
+            const groupId = row.group_id
             if (!groupsMap.has(groupId)) {
-                groupsMap.set(groupId, []);
+                groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row);
+            groupsMap.get(groupId).push(row)
         }
         
-        return groupsMap;
+        return groupsMap
     }
 
     /**
@@ -560,18 +518,18 @@ class DatabaseService {
              AND (ms.message_count > 0 OR ms.word_count > 0)
              ORDER BY ms.group_id, ms.message_count DESC`,
             monthKey
-        );
-        const groupsMap = new Map();
+        )
+        const groupsMap = new Map()
         
         for (const row of rows) {
-            const groupId = row.group_id;
+            const groupId = row.group_id
             if (!groupsMap.has(groupId)) {
-                groupsMap.set(groupId, []);
+                groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row);
+            groupsMap.get(groupId).push(row)
         }
         
-        return groupsMap;
+        return groupsMap
     }
 
     /**
@@ -579,23 +537,18 @@ class DatabaseService {
      * @returns {Promise<Map<string, string>>} 群ID到群名称的映射
      */
     async getAllGroupsInfoBatch() {
-        const rows = await this.all('SELECT group_id, group_name FROM group_info');
-        const groupsMap = new Map();
+        const rows = await this.all('SELECT group_id, group_name FROM group_info')
+        const groupsMap = new Map()
         
         for (const row of rows) {
             if (row.group_name) {
-                groupsMap.set(row.group_id, row.group_name);
+                groupsMap.set(row.group_id, row.group_name)
             }
         }
         
-        return groupsMap;
+        return groupsMap
     }
 
-    /**
-     * 删除群组所有数据
-     * @param {string} groupId 群号
-     * @returns {Promise<boolean>} 是否成功
-     */
     /**
      * 归档群组数据（移到暂存表，不删除）
      * @param {string} groupId 群组ID
@@ -603,70 +556,26 @@ class DatabaseService {
      */
     async archiveGroupData(groupId) {
         try {
-            // 检查群组是否已在归档表中（唯一约束检查）
-            const existing = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId);
-            if (existing) {
-                // 如果已存在，只更新归档时间和活动时间，不重复归档
-                const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId);
-                const groupName = groupInfo?.group_name || '';
+            const existing = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId)
+            const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId)
+            const groupName = groupInfo?.group_name || ''
                 
                 const lastActivity = await this.get(
                     'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
                     groupId
-                );
-                // 确保 lastActivityAt 是 null 或有效的日期字符串，不能是对象
-                let lastActivityAt = null;
-                if (lastActivity && lastActivity.last_activity) {
-                    const activityValue = lastActivity.last_activity;
-                    // 如果是有效的日期字符串或Date对象，转换为字符串；否则设为null
-                    if (typeof activityValue === 'string' && activityValue.trim() !== '') {
-                        lastActivityAt = activityValue;
-                    } else if (activityValue instanceof Date) {
-                        lastActivityAt = activityValue.toISOString().replace('T', ' ').substring(0, 19);
-                    } else {
-                        // 如果是对象或其他无效值，设为null
-                        lastActivityAt = null;
-                    }
-                }
-                
-                const now = this.getCurrentTime();
+            )
+            const lastActivityAt = this._formatDateTime(lastActivity?.last_activity)
+            const now = this.getCurrentTime()
+            
+            if (existing) {
                 await this.run(`
                     UPDATE archived_groups 
                     SET archived_at = $1,
                         last_activity_at = COALESCE($2, archived_groups.last_activity_at),
                         group_name = COALESCE($3, archived_groups.group_name)
                     WHERE group_id = $4
-                `, now, lastActivityAt, groupName, groupId);
-                
-                return true;
-            }
-            
-            // 如果不存在，执行归档操作
-            const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId);
-            const groupName = groupInfo?.group_name || '';
-            
-            // 获取最后活动时间（从 user_stats 的 updated_at）
-            const lastActivity = await this.get(
-                'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
-                groupId
-            );
-            // 确保 lastActivityAt 是 null 或有效的日期字符串，不能是对象
-            let lastActivityAt = null;
-            if (lastActivity && lastActivity.last_activity) {
-                const activityValue = lastActivity.last_activity;
-                // 如果是有效的日期字符串或Date对象，转换为字符串；否则设为null
-                if (typeof activityValue === 'string' && activityValue.trim() !== '') {
-                    lastActivityAt = activityValue;
-                } else if (activityValue instanceof Date) {
-                    lastActivityAt = activityValue.toISOString().replace('T', ' ').substring(0, 19);
+                `, now, lastActivityAt, groupName, groupId)
                 } else {
-                    // 如果是对象或其他无效值，设为null
-                    lastActivityAt = null;
-                }
-            }
-            
-            // 插入到归档表（使用 ON CONFLICT 作为额外保护）
-            const now = this.getCurrentTime();
             await this.run(`
                 INSERT INTO archived_groups (group_id, group_name, archived_at, last_activity_at)
                 VALUES ($1, $2, $3, $4)
@@ -674,11 +583,12 @@ class DatabaseService {
                 DO UPDATE SET 
                     archived_at = EXCLUDED.archived_at,
                     last_activity_at = COALESCE(EXCLUDED.last_activity_at, archived_groups.last_activity_at)
-            `, groupId, groupName, now, lastActivityAt);
+                `, groupId, groupName, now, lastActivityAt)
+            }
             
-            return true;
-        } catch (error) {
-            throw new Error(`归档群组数据失败: ${error.message}`);
+            return true
+        } catch (err) {
+            throw new Error(`归档群组数据失败: ${err.message}`)
         }
     }
 
@@ -690,17 +600,15 @@ class DatabaseService {
     async restoreGroupData(groupId) {
         try {
             // 检查是否在归档表中
-            const archived = await this.get('SELECT * FROM archived_groups WHERE group_id = $1', groupId);
+            const archived = await this.get('SELECT * FROM archived_groups WHERE group_id = $1', groupId)
             if (!archived) {
-                return false; // 不在归档表中，无需恢复
+                return false
             }
             
-            // 从归档表中删除
-            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId);
-            
-            return true;
-        } catch (error) {
-            throw new Error(`恢复群组数据失败: ${error.message}`);
+            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId)
+            return true
+        } catch (err) {
+            throw new Error(`恢复群组数据失败: ${err.message}`)
         }
     }
 
@@ -711,10 +619,10 @@ class DatabaseService {
      */
     async isGroupArchived(groupId) {
         try {
-            const archived = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId);
-            return !!archived;
-        } catch (error) {
-            return false;
+            const archived = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId)
+            return !!archived
+        } catch {
+            return false
         }
     }
 
@@ -725,18 +633,18 @@ class DatabaseService {
      */
     async deleteGroupData(groupId) {
         try {
-            await this.run('DELETE FROM user_stats WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM daily_stats WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM weekly_stats WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM monthly_stats WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM yearly_stats WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM achievements WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM user_display_achievements WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM group_info WHERE group_id = $1', groupId);
-            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId);
-            return true;
-        } catch (error) {
-            throw new Error(`删除群组数据失败: ${error.message}`);
+            await this.run('DELETE FROM user_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM daily_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM weekly_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM monthly_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM yearly_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM achievements WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM user_display_achievements WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM group_info WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId)
+            return true
+        } catch (err) {
+            throw new Error(`删除群组数据失败: ${err.message}`)
         }
     }
 
@@ -748,44 +656,36 @@ class DatabaseService {
      */
     async cleanupArchivedGroups(retentionDays = 60) {
         try {
-            const dbType = this.getDatabaseType();
-            const now = new Date();
-            const cutoffDate = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+            const dbType = this.getDatabaseType()
+            const now = new Date()
+            const cutoffDate = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000)
             
-            let cutoffDateStr;
-            if (dbType === 'postgresql') {
-                cutoffDateStr = cutoffDate.toISOString();
-            } else {
-                // SQLite 使用 ISO 字符串格式
-                cutoffDateStr = cutoffDate.toISOString();
-            }
+            const cutoffDateStr = cutoffDate.toISOString()
             
-            // 获取需要清理的群组ID列表
-            // 条件：归档时间超过指定天数 且 (最后活动时间为空 或 最后活动时间也超过指定天数)
             const groupsToDelete = await this.all(
                 `SELECT group_id FROM archived_groups 
                  WHERE archived_at < $1 
                  AND (last_activity_at IS NULL OR last_activity_at < $1)`,
                 cutoffDateStr
-            );
+            )
             
-            let deletedCount = 0;
+            let deletedCount = 0
             for (const group of groupsToDelete) {
                 try {
-                    await this.deleteGroupData(group.group_id);
-                    deletedCount++;
+                    await this.deleteGroupData(group.group_id)
+                    deletedCount++
                     if (globalConfig.getConfig('global.debugLog')) {
-                        globalConfig.debug(`已永久删除归档群组: ${group.group_id}`);
+                        globalConfig.debug(`已永久删除归档群组: ${group.group_id}`)
                     }
-                } catch (error) {
-                    globalConfig.error(`清理归档群组失败: ${group.group_id}`, error);
+                } catch (err) {
+                    globalConfig.error(`清理归档群组失败: ${group.group_id}`, err)
                 }
             }
             
-            return deletedCount;
-        } catch (error) {
-            globalConfig.error('清理归档群组失败:', error);
-            return 0;
+            return deletedCount
+        } catch (err) {
+            globalConfig.error('清理归档群组失败:', err)
+            return 0
         }
     }
 
@@ -796,18 +696,17 @@ class DatabaseService {
      */
     async updateArchivedGroupActivity(groupId) {
         try {
-            const now = this.getCurrentTime();
+            const now = this.getCurrentTime()
             await this.run(
                 `UPDATE archived_groups 
                  SET last_activity_at = $1 
                  WHERE group_id = $2`,
                 now,
                 groupId
-            );
-            return true;
-        } catch (error) {
-            // 如果更新失败，不影响主流程
-            return false;
+            )
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -826,10 +725,10 @@ class DatabaseService {
                  LIMIT $1 OFFSET $2`,
                 limit,
                 offset
-            );
-            return groups || [];
-        } catch (error) {
-            throw new Error(`获取归档群组列表失败: ${error.message}`);
+            )
+            return groups || []
+        } catch (err) {
+            throw new Error(`获取归档群组列表失败: ${err.message}`)
         }
     }
 
@@ -839,10 +738,10 @@ class DatabaseService {
      */
     async getArchivedGroupsCount() {
         try {
-            const result = await this.get('SELECT COUNT(*) as count FROM archived_groups');
-            return parseInt(result?.count || 0, 10);
-        } catch (error) {
-            throw new Error(`获取归档群组总数失败: ${error.message}`);
+            const result = await this.get('SELECT COUNT(*) as count FROM archived_groups')
+            return parseInt(result?.count || 0, 10)
+        } catch (err) {
+            throw new Error(`获取归档群组总数失败: ${err.message}`)
         }
     }
 
@@ -854,16 +753,15 @@ class DatabaseService {
      * @returns {Promise<Array>} 排行榜数据
      */
     async getTopUsers(groupId, limit, orderBy = 'total_count') {
-        // 防止 SQL 注入，只允许特定字段
-        const allowedColumns = ['total_count', 'total_words', 'active_days', 'continuous_days'];
+        const allowedColumns = ['total_count', 'total_words', 'active_days', 'continuous_days']
         if (!allowedColumns.includes(orderBy)) {
-            orderBy = 'total_count';
+            orderBy = 'total_count'
         }
-        return await this.all(
+        return this.all(
             `SELECT * FROM user_stats WHERE group_id = $1 ORDER BY ${orderBy} DESC LIMIT $2`,
             groupId,
             limit
-        );
+        )
     }
 
     /**
@@ -873,16 +771,11 @@ class DatabaseService {
      * @returns {Promise<Array>} 排行榜数据（按用户ID聚合所有群聊的数据）
      */
     async getTopUsersAllGroups(limit, orderBy = 'total_count') {
-        // 防止 SQL 注入，只允许特定字段
-        const allowedColumns = ['total_count', 'total_words', 'active_days', 'continuous_days'];
+        const allowedColumns = ['total_count', 'total_words', 'active_days', 'continuous_days']
         if (!allowedColumns.includes(orderBy)) {
-            orderBy = 'total_count';
+            orderBy = 'total_count'
         }
-        // 按用户ID聚合所有群聊的数据，取总和
-        // 优化：使用子查询预计算 active_days，减少 JOIN 开销
-        // 注意：active_days 需要从 daily_stats 统计不重复日期，不能简单求和
-        // 排除已归档的群组
-        return await this.all(
+        return this.all(
             `WITH user_aggregated AS (
                 SELECT 
                     user_id,
@@ -917,7 +810,7 @@ class DatabaseService {
             ORDER BY ua.${orderBy} DESC 
             LIMIT $1`,
             limit
-        );
+        )
     }
 
     // ========== 日统计相关方法 ==========
@@ -930,12 +823,12 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 日统计数据
      */
     async getDailyStats(groupId, userId, dateKey) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM daily_stats WHERE group_id = $1 AND user_id = $2 AND date_key = $3',
             groupId,
             userId,
             dateKey
-        );
+        )
     }
 
     /**
@@ -948,11 +841,10 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveDailyStats(groupId, userId, dateKey, stats) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
         
-        // 确保 stats 中的值是数字类型
-        const messageCount = parseInt(stats.message_count || 0, 10);
-        const wordCount = parseInt(stats.word_count || 0, 10);
+        const messageCount = parseInt(stats.message_count || 0, 10)
+        const wordCount = parseInt(stats.word_count || 0, 10)
         
         await this.run(`
             INSERT INTO daily_stats (
@@ -971,9 +863,9 @@ class DatabaseService {
             wordCount,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -985,13 +877,13 @@ class DatabaseService {
      * @returns {Promise<Array>} 日统计数据数组
      */
     async getDailyStatsByDateRange(groupId, userId, startDate, endDate) {
-        return await this.all(
+        return this.all(
             'SELECT * FROM daily_stats WHERE group_id = $1 AND user_id = $2 AND date_key >= $3 AND date_key <= $4 ORDER BY date_key',
             groupId,
             userId,
             startDate,
             endDate
-        );
+        )
     }
 
     /**
@@ -1001,7 +893,7 @@ class DatabaseService {
      * @returns {Promise<Array>} 日统计数据列表（已排序）
      */
     async getDailyStatsByGroupAndDate(groupId, dateKey) {
-        return await this.all(
+        return this.all(
             `SELECT ds.*, us.nickname, us.last_speaking_time 
              FROM daily_stats ds
              LEFT JOIN user_stats us ON ds.group_id = us.group_id AND ds.user_id = us.user_id
@@ -1010,7 +902,7 @@ class DatabaseService {
              ORDER BY ds.message_count DESC`,
             groupId,
             dateKey
-        );
+        )
     }
 
     // ========== 周统计相关方法 ==========
@@ -1023,12 +915,12 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 周统计数据
      */
     async getWeeklyStats(groupId, userId, weekKey) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM weekly_stats WHERE group_id = $1 AND user_id = $2 AND week_key = $3',
             groupId,
             userId,
             weekKey
-        );
+        )
     }
 
     /**
@@ -1041,11 +933,10 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveWeeklyStats(groupId, userId, weekKey, stats) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
         
-        // 确保 stats 中的值是数字类型
-        const messageCount = parseInt(stats.message_count || 0, 10);
-        const wordCount = parseInt(stats.word_count || 0, 10);
+        const messageCount = parseInt(stats.message_count || 0, 10)
+        const wordCount = parseInt(stats.word_count || 0, 10)
         
         await this.run(`
             INSERT INTO weekly_stats (
@@ -1064,9 +955,9 @@ class DatabaseService {
             wordCount,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -1076,7 +967,7 @@ class DatabaseService {
      * @returns {Promise<Array>} 周统计数据列表（已排序）
      */
     async getWeeklyStatsByGroupAndWeek(groupId, weekKey) {
-        return await this.all(
+        return this.all(
             `SELECT ws.*, us.nickname, us.last_speaking_time 
              FROM weekly_stats ws
              LEFT JOIN user_stats us ON ws.group_id = us.group_id AND ws.user_id = us.user_id
@@ -1085,7 +976,7 @@ class DatabaseService {
              ORDER BY ws.message_count DESC`,
             groupId,
             weekKey
-        );
+        )
     }
 
     // ========== 月统计相关方法 ==========
@@ -1098,12 +989,12 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 月统计数据
      */
     async getMonthlyStats(groupId, userId, monthKey) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM monthly_stats WHERE group_id = $1 AND user_id = $2 AND month_key = $3',
             groupId,
             userId,
             monthKey
-        );
+        )
     }
 
     /**
@@ -1116,15 +1007,13 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveMonthlyStats(groupId, userId, monthKey, stats) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
         
-        // 确保 stats 中的值是数字类型
-        const messageCount = parseInt(stats.message_count || 0, 10);
-        const wordCount = parseInt(stats.word_count || 0, 10);
+        const messageCount = parseInt(stats.message_count || 0, 10)
+        const wordCount = parseInt(stats.word_count || 0, 10)
         
-        // 添加验证：确保值合理（如果出现异常大值，记录警告）
         if (messageCount > 1000000) {
-            globalConfig.error(`[数据库服务] 检测到异常大的消息数: ${messageCount} (group_id=${groupId}, user_id=${userId}, month_key=${monthKey})`);
+            globalConfig.error(`[数据库服务] 检测到异常大的消息数: ${messageCount} (group_id=${groupId}, user_id=${userId}, month_key=${monthKey})`)
         }
         
         await this.run(`
@@ -1144,9 +1033,9 @@ class DatabaseService {
             wordCount,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -1156,7 +1045,7 @@ class DatabaseService {
      * @returns {Promise<Array>} 月统计数据列表（已排序）
      */
     async getMonthlyStatsByGroupAndMonth(groupId, monthKey) {
-        return await this.all(
+        return this.all(
             `SELECT ms.*, us.nickname, us.last_speaking_time 
              FROM monthly_stats ms
              LEFT JOIN user_stats us ON ms.group_id = us.group_id AND ms.user_id = us.user_id
@@ -1165,7 +1054,7 @@ class DatabaseService {
              ORDER BY ms.message_count DESC`,
             groupId,
             monthKey
-        );
+        )
     }
 
     // ========== 年统计相关方法 ==========
@@ -1178,12 +1067,12 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 年统计数据
      */
     async getYearlyStats(groupId, userId, yearKey) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM yearly_stats WHERE group_id = $1 AND user_id = $2 AND year_key = $3',
             groupId,
             userId,
             yearKey
-        );
+        )
     }
 
     /**
@@ -1196,11 +1085,10 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveYearlyStats(groupId, userId, yearKey, stats) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
         
-        // 确保 stats 中的值是数字类型
-        const messageCount = parseInt(stats.message_count || 0, 10);
-        const wordCount = parseInt(stats.word_count || 0, 10);
+        const messageCount = parseInt(stats.message_count || 0, 10)
+        const wordCount = parseInt(stats.word_count || 0, 10)
         
         await this.run(`
             INSERT INTO yearly_stats (
@@ -1219,9 +1107,9 @@ class DatabaseService {
             wordCount,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -1231,7 +1119,7 @@ class DatabaseService {
      * @returns {Promise<Array>} 年统计数据列表（已排序）
      */
     async getYearlyStatsByGroupAndYear(groupId, yearKey) {
-        return await this.all(
+        return this.all(
             `SELECT ys.*, us.nickname, us.last_speaking_time 
              FROM yearly_stats ys
              LEFT JOIN user_stats us ON ys.group_id = us.group_id AND ys.user_id = us.user_id
@@ -1240,10 +1128,37 @@ class DatabaseService {
              ORDER BY ys.message_count DESC`,
             groupId,
             yearKey
-        );
+        )
     }
 
     // ========== 成就相关方法 ==========
+
+    /**
+     * 转换成就数据为数据库格式（内部方法）
+     * @param {Object} achievementData 成就数据
+     * @returns {Object} 转换后的数据 { unlocked, unlockedAt, progress }
+     */
+    _normalizeAchievementData(achievementData) {
+        const unlocked = achievementData.unlocked ? 1 : 0
+        let unlockedAt = achievementData.unlocked_at || null
+        if (unlockedAt instanceof Date) {
+            unlockedAt = unlockedAt.toISOString()
+        } else if (unlockedAt && typeof unlockedAt !== 'string') {
+            unlockedAt = String(unlockedAt)
+        }
+        
+        let progress = achievementData.progress
+        if (progress === null || progress === undefined) {
+            progress = 0
+        } else if (typeof progress === 'object') {
+            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress)
+            progress = 0
+        } else {
+            progress = parseInt(progress, 10) || 0
+        }
+        
+        return { unlocked, unlockedAt, progress }
+    }
 
     /**
      * 获取用户成就
@@ -1253,12 +1168,12 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 成就数据
      */
     async getUserAchievement(groupId, userId, achievementId) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2 AND achievement_id = $3',
             groupId,
             userId,
             achievementId
-        );
+        )
     }
 
     /**
@@ -1270,29 +1185,8 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveUserAchievement(groupId, userId, achievementId, achievementData) {
-        const now = this.getCurrentTime();
-        
-        // 确保所有参数都是正确的类型
-        const unlocked = achievementData.unlocked ? 1 : 0; // SQLite 使用 INTEGER 存储布尔值
-        let unlockedAt = achievementData.unlocked_at || null;
-        // 如果是 Date 对象，转换为字符串
-        if (unlockedAt instanceof Date) {
-            unlockedAt = unlockedAt.toISOString();
-        } else if (unlockedAt && typeof unlockedAt !== 'string') {
-            unlockedAt = String(unlockedAt);
-        }
-        
-        // 确保 progress 是数字
-        let progress = achievementData.progress;
-        if (progress === null || progress === undefined) {
-            progress = 0;
-        } else if (typeof progress === 'object') {
-            // 如果是对象或数组，记录警告并使用 0
-            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress);
-            progress = 0;
-        } else {
-            progress = parseInt(progress, 10) || 0;
-        }
+        const now = this.getCurrentTime()
+        const { unlocked, unlockedAt, progress } = this._normalizeAchievementData(achievementData)
         
         await this.run(`
             INSERT INTO achievements (
@@ -1313,23 +1207,17 @@ class DatabaseService {
             progress,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
-    /**
-     * 获取用户所有成就
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @returns {Promise<Array>} 成就数组
-     */
     async getAllUserAchievements(groupId, userId) {
-        return await this.all(
+        return this.all(
             'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2',
             groupId,
             userId
-        );
+        )
     }
 
     /**
@@ -1340,19 +1228,18 @@ class DatabaseService {
      */
     async getAllUserAchievementsBatch(groupId, userIds) {
         if (!userIds || userIds.length === 0) {
-            return [];
+            return []
         }
 
-        // 构建 IN 子句的占位符
-        const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',');
-        const params = [groupId, ...userIds];
+        const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',')
+        const params = [groupId, ...userIds]
         
         const sql = `
             SELECT * FROM achievements 
             WHERE group_id = $1 AND user_id IN (${placeholders})
-        `;
+        `
         
-        return await this.all(sql, ...params);
+        return this.all(sql, ...params)
     }
 
     /**
@@ -1362,16 +1249,16 @@ class DatabaseService {
      */
     async saveUserAchievementsBatch(achievements) {
         if (!achievements || achievements.length === 0) {
-            return true;
+            return true
         }
 
-        return await this.transaction(async () => {
+        return this.transaction(async () => {
             for (const achievement of achievements) {
-                const { groupId, userId, achievementId, achievementData } = achievement;
-                await this.saveUserAchievement(groupId, userId, achievementId, achievementData);
+                const { groupId, userId, achievementId, achievementData } = achievement
+                await this.saveUserAchievement(groupId, userId, achievementId, achievementData)
             }
-            return true;
-        });
+            return true
+        })
     }
 
     /**
@@ -1381,11 +1268,11 @@ class DatabaseService {
      * @returns {Promise<Array>} 已解锁成就数组
      */
     async getUnlockedAchievements(groupId, userId) {
-        return await this.all(
+        return this.all(
             'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2 AND unlocked = true',
             groupId,
             userId
-        );
+        )
     }
 
     /**
@@ -1399,8 +1286,8 @@ class DatabaseService {
             'SELECT 1 FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true LIMIT 1',
             userId,
             achievementId
-        );
-        return result !== null;
+        )
+        return result !== null
     }
 
     /**
@@ -1410,11 +1297,11 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 成就信息（包含 unlocked_at 和 progress）
      */
     async getAchievementFromAnyGroup(userId, achievementId) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true ORDER BY unlocked_at ASC LIMIT 1',
             userId,
             achievementId
-        );
+        )
     }
 
     /**
@@ -1423,11 +1310,8 @@ class DatabaseService {
      * @returns {Promise<Array<string>>} 群ID数组
      */
     async getUserGroups(userId) {
-        const rows = await this.all(
-            'SELECT DISTINCT group_id FROM user_stats WHERE user_id = $1',
-            userId
-        );
-        return rows.map(row => row.group_id);
+        const rows = await this.all('SELECT DISTINCT group_id FROM user_stats WHERE user_id = $1', userId)
+        return rows.map(row => row.group_id)
     }
 
     /**
@@ -1439,21 +1323,19 @@ class DatabaseService {
      */
     async getAchievementUnlockCount(achievementId, groupId = null, isGlobal = false) {
         if (isGlobal) {
-            // 全局成就：统计所有群中不同的用户数量
             const result = await this.get(
                 'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE achievement_id = $1 AND unlocked = true',
                 achievementId
-            );
-            return result ? parseInt(result.count) : 0;
+            )
+            return result ? parseInt(result.count, 10) : 0
         } else {
-            // 群专属成就：只统计当前群
-            if (!groupId) return 0;
+            if (!groupId) return 0
             const result = await this.get(
                 'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE group_id = $1 AND achievement_id = $2 AND unlocked = true',
                 groupId,
                 achievementId
-            );
-            return result ? parseInt(result.count) : 0;
+            )
+            return result ? parseInt(result.count, 10) : 0
         }
     }
 
@@ -1465,38 +1347,15 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveFestivalAchievementToAllGroups(userId, achievementId, achievementData) {
-        const now = this.getCurrentTime();
-        
-        // 获取用户所在的所有群
-        const groups = await this.getUserGroups(userId);
+        const now = this.getCurrentTime()
+        const groups = await this.getUserGroups(userId)
         
         if (groups.length === 0) {
-            return false;
+            return false
         }
 
-        // 确保所有参数都是正确的类型
-        const unlocked = achievementData.unlocked ? 1 : 0; // SQLite 使用 INTEGER 存储布尔值
-        let unlockedAt = achievementData.unlocked_at || null;
-        // 如果是 Date 对象，转换为字符串
-        if (unlockedAt instanceof Date) {
-            unlockedAt = unlockedAt.toISOString();
-        } else if (unlockedAt && typeof unlockedAt !== 'string') {
-            unlockedAt = String(unlockedAt);
-        }
-        
-        // 确保 progress 是数字
-        let progress = achievementData.progress;
-        if (progress === null || progress === undefined) {
-            progress = 0;
-        } else if (typeof progress === 'object') {
-            // 如果是对象或数组，记录警告并使用 0
-            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress);
-            progress = 0;
-        } else {
-            progress = parseInt(progress, 10) || 0;
-        }
+        const { unlocked, unlockedAt, progress } = this._normalizeAchievementData(achievementData)
 
-        // 使用事务或批量插入
         for (const groupId of groups) {
             await this.run(`
                 INSERT INTO achievements (
@@ -1517,10 +1376,10 @@ class DatabaseService {
                 progress,
                 now,
                 now
-            );
+            )
         }
 
-        return true;
+        return true
     }
 
     /**
@@ -1531,28 +1390,19 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async setDisplayAchievement(groupId, userId, achievementData) {
-        const now = this.getCurrentTime();
-        const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false;
-        // SQLite 使用 INTEGER 存储布尔值
-        const isManualInt = isManual ? 1 : 0;
+        const now = this.getCurrentTime()
+        const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false
+        const isManualInt = isManual ? 1 : 0
         
-        // 获取自动佩戴时间
-        // 如果提供了 autoDisplayAt，使用提供的值（通常是解锁时间）
-        // 如果未提供且是自动设置，使用当前时间
-        let autoDisplayAt = achievementData.autoDisplayAt;
+        let autoDisplayAt = achievementData.autoDisplayAt
         if (isManual) {
-            // 手动设置，清除自动显示时间
-            autoDisplayAt = null;
+            autoDisplayAt = null
         } else if (!autoDisplayAt) {
-            // 自动设置但未提供时间，使用当前时间
-                autoDisplayAt = now;
-            }
-        
-        // 确保 autoDisplayAt 是字符串或 null
-        if (autoDisplayAt instanceof Date) {
-            autoDisplayAt = autoDisplayAt.toISOString();
+            autoDisplayAt = now
+        } else if (autoDisplayAt instanceof Date) {
+            autoDisplayAt = autoDisplayAt.toISOString()
         } else if (autoDisplayAt && typeof autoDisplayAt !== 'string') {
-            autoDisplayAt = String(autoDisplayAt);
+            autoDisplayAt = String(autoDisplayAt)
         }
         
         await this.run(`
@@ -1577,9 +1427,9 @@ class DatabaseService {
             autoDisplayAt,
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -1589,11 +1439,11 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 显示成就数据
      */
     async getDisplayAchievement(groupId, userId) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
             groupId,
             userId
-        );
+        )
     }
 
     // ========== 群组信息相关方法 ==========
@@ -1604,10 +1454,10 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 群组信息
      */
     async getGroupInfo(groupId) {
-        return await this.get(
+        return this.get(
             'SELECT * FROM group_info WHERE group_id = $1',
             groupId
-        );
+        )
     }
 
     /**
@@ -1617,10 +1467,10 @@ class DatabaseService {
      */
     async getFormattedGroupName(groupId) {
         try {
-            const groupInfo = await this.getGroupInfo(groupId);
-            return groupInfo?.group_name || `群${groupId}`;
-        } catch (error) {
-            return `群${groupId}`;
+            const groupInfo = await this.getGroupInfo(groupId)
+            return groupInfo?.group_name || `群${groupId}`
+        } catch {
+            return `群${groupId}`
         }
     }
 
@@ -1631,7 +1481,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveGroupInfo(groupId, groupName) {
-        const now = this.getCurrentTime();
+        const now = this.getCurrentTime()
         
         await this.run(`
             INSERT INTO group_info (
@@ -1646,9 +1496,9 @@ class DatabaseService {
             groupName || '',
             now,
             now
-        );
+        )
 
-        return true;
+        return true
     }
 
     /**
@@ -1657,11 +1507,8 @@ class DatabaseService {
      * @returns {Promise<string|null>} 最早创建时间
      */
     async getGroupEarliestTime(groupId) {
-        const result = await this.get(
-            'SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id = $1',
-            groupId
-        );
-        return result?.earliest_time || null;
+        const result = await this.get('SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id = $1', groupId)
+        return result?.earliest_time || null
     }
 
     /**
@@ -1670,7 +1517,6 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 用户统计数据总和
      */
     async getUserStatsAllGroups(userId) {
-        // 获取基础统计数据（总和）
         const baseStats = await this.get(`
             SELECT
                 user_id,
@@ -1682,23 +1528,18 @@ class DatabaseService {
             FROM user_stats
             WHERE user_id = $1
             GROUP BY user_id
-        `, userId);
+        `, userId)
         
-        // 计算真实的活跃天数：统计所有群聊中不重复的日期数量
         const activeDaysResult = await this.get(`
             SELECT COUNT(DISTINCT date_key) as active_days
             FROM daily_stats
             WHERE user_id = $1
-        `, userId);
+        `, userId)
         
-        const activeDays = activeDaysResult?.active_days || 0;
+        const activeDays = activeDaysResult?.active_days || 0
         
-        // 如果 baseStats 为空，但从 daily_stats 中有数据，说明用户确实有统计记录
-        // 需要从 daily_stats 表计算总数据
         if (!baseStats) {
-            // 检查是否有 daily_stats 数据
             if (activeDays > 0) {
-                // 从 daily_stats 表计算总消息数和总字数
                 const dailyStatsSum = await this.get(`
                     SELECT 
                         SUM(message_count) as total_count,
@@ -1706,34 +1547,29 @@ class DatabaseService {
                         MAX(updated_at) as last_speaking_time
                     FROM daily_stats
                     WHERE user_id = $1
-                `, userId);
+                `, userId)
                 
                 if (dailyStatsSum && (dailyStatsSum.total_count > 0 || dailyStatsSum.total_words > 0)) {
-                    // 返回从 daily_stats 计算的统计数据
                     return {
                         user_id: userId,
                         nickname: null,
                         total_count: parseInt(dailyStatsSum.total_count || 0, 10),
                         total_words: parseInt(dailyStatsSum.total_words || 0, 10),
                         active_days: activeDays,
-                        continuous_days: 0, // 无法从 daily_stats 计算连续天数
+                        continuous_days: 0,
                         last_speaking_time: dailyStatsSum.last_speaking_time || null
-                    };
+                    }
                 }
             }
-            // 如果没有数据，返回 null
-            return null;
+            return null
         }
         
-        // 如果有 baseStats，使用它并设置活跃天数
-        baseStats.active_days = activeDays;
+        baseStats.active_days = activeDays
+        baseStats.total_count = parseInt(baseStats.total_count || 0, 10)
+        baseStats.total_words = parseInt(baseStats.total_words || 0, 10)
+        baseStats.continuous_days = parseInt(baseStats.continuous_days || 0, 10)
         
-        // 确保数值字段不为 null（处理 SUM 可能返回 null 的情况）
-        baseStats.total_count = parseInt(baseStats.total_count || 0, 10);
-        baseStats.total_words = parseInt(baseStats.total_words || 0, 10);
-        baseStats.continuous_days = parseInt(baseStats.continuous_days || 0, 10);
-        
-        return baseStats;
+        return baseStats
     }
 
     /**
@@ -1743,7 +1579,7 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 日统计数据总和
      */
     async getUserDailyStatsAllGroups(userId, dateKey) {
-        const result = await this.get(`
+        return this.get(`
             SELECT
                 user_id,
                 SUM(message_count) as message_count,
@@ -1751,8 +1587,7 @@ class DatabaseService {
             FROM daily_stats
             WHERE user_id = $1 AND date_key = $2
             GROUP BY user_id
-        `, userId, dateKey);
-        return result;
+        `, userId, dateKey)
     }
 
     /**
@@ -1762,7 +1597,7 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 月统计数据总和
      */
     async getUserMonthlyStatsAllGroups(userId, monthKey) {
-        const result = await this.get(`
+        return this.get(`
             SELECT
                 user_id,
                 SUM(message_count) as message_count,
@@ -1770,8 +1605,7 @@ class DatabaseService {
             FROM monthly_stats
             WHERE user_id = $1 AND month_key = $2
             GROUP BY user_id
-        `, userId, monthKey);
-        return result;
+        `, userId, monthKey)
     }
 
     // ========== 事务支持 ==========
@@ -1783,9 +1617,9 @@ class DatabaseService {
      */
     async transaction(callback) {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
-        return await this.adapter.transaction(callback);
+        return this.adapter.transaction(callback)
     }
 
     // ========== 备份和恢复 ==========
@@ -1796,21 +1630,13 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async backup(backupPath) {
-        // PostgreSQL 备份需要使用 pg_dump 命令
-        // 这里提供一个简单的实现，实际使用时可能需要调整
-        globalConfig.error('[数据库服务] PostgreSQL 备份需要使用 pg_dump 命令，请在外部执行备份');
-        throw new Error('PostgreSQL 备份功能需要外部工具支持');
+        globalConfig.error('[数据库服务] PostgreSQL 备份需要使用 pg_dump 命令，请在外部执行备份')
+        throw new Error('PostgreSQL 备份功能需要外部工具支持')
     }
 
-    /**
-     * 恢复数据库（使用 pg_restore）
-     * @param {string} backupPath 备份路径
-     * @returns {Promise<boolean>} 是否成功
-     */
     async restore(backupPath) {
-        // PostgreSQL 恢复需要使用 pg_restore 命令
-        globalConfig.error('[数据库服务] PostgreSQL 恢复需要使用 pg_restore 命令，请在外部执行恢复');
-        throw new Error('PostgreSQL 恢复功能需要外部工具支持');
+        globalConfig.error('[数据库服务] PostgreSQL 恢复需要使用 pg_restore 命令，请在外部执行恢复')
+        throw new Error('PostgreSQL 恢复功能需要外部工具支持')
     }
 
     /**
@@ -1818,59 +1644,39 @@ class DatabaseService {
      * @returns {Promise<void>}
      */
     async close() {
-        // 停止健康检查
-        this.stopHealthCheck();
+        this.stopHealthCheck()
         
         if (this.adapter) {
-            await this.adapter.close();
-            this.adapter = null;
-            this.initialized = false;
+            await this.adapter.close()
+            this.adapter = null
+            this.initialized = false
         }
     }
 
-    // ========== 维护操作 ==========
-
-    /**
-     * 执行 VACUUM（压缩数据库）
-     * @returns {Promise<void>}
-     */
     async vacuum() {
-        await this.run('VACUUM');
+        await this.run('VACUUM')
     }
 
-    /**
-     * 执行 ANALYZE（更新统计信息）
-     * @returns {Promise<void>}
-     */
     async analyze() {
-        await this.run('ANALYZE');
+        await this.run('ANALYZE')
     }
 
-    /**
-     * 获取数据库大小
-     * @returns {Promise<number>} 数据库大小（字节）
-     */
     async getDatabaseSize() {
         if (!this.adapter) {
-            throw new Error('数据库未初始化');
+            throw new Error('数据库未初始化')
         }
-        return await this.adapter.getDatabaseSize();
+        return this.adapter.getDatabaseSize()
     }
 }
 
-// 单例模式
-let databaseServiceInstance = null;
+let databaseServiceInstance = null
 
-/**
- * 获取数据库服务实例（单例）
- * @returns {DatabaseService} 数据库服务实例
- */
 export function getDatabaseService() {
     if (!databaseServiceInstance) {
-        databaseServiceInstance = new DatabaseService();
+        databaseServiceInstance = new DatabaseService()
     }
-    return databaseServiceInstance;
+    return databaseServiceInstance
 }
 
-export { DatabaseService };
-export default DatabaseService;
+export { DatabaseService }
+export default DatabaseService

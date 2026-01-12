@@ -1,10 +1,10 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 // 获取插件根目录
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const pluginRootDir = path.resolve(__dirname, '../..');
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const pluginRootDir = path.resolve(__dirname, '../..')
 
 /**
  * 插件信息配置
@@ -36,6 +36,6 @@ export function getPluginInfo() {
     iconColor: '#42a5f5',
     // 如果想要显示成图片，也可以填写图标路径（绝对路径）
     // iconPath: path.join(pluginRootDir, 'resources/images/icon.png')
-  };
+  }
 }
 

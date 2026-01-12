@@ -4,6 +4,84 @@
 
 ---
 
+## [4.0.0] - 2026-01-12
+
+### 🎉 重大版本更新
+
+本次更新为重大版本升级，主要进行了全面的代码优化和规范化工作。
+
+### 🚀 代码优化
+
+#### 代码风格统一
+- ✅ **统一代码风格**：
+  - 移除所有分号，统一代码风格
+  - 统一错误变量命名为 `err`
+  - 统一日志系统为 `globalConfig`
+  - 确保所有 `parseInt` 调用包含 radix 参数
+
+#### 服务层代码优化
+- ✅ **BackgroundApi.js 优化**：
+  - 统一日志系统：`logger`/`console` → `globalConfig`
+  - 移除所有分号
+  - 统一错误变量命名为 `err`
+- ✅ **AdminApi.js 优化**：
+  - 修复 `logger.warn` → `globalConfig.warn`
+  - 移除所有分号
+  - 统一错误变量命名
+- ✅ **ApiResponse.js 优化**：
+  - 统一参数名为 `err`（保持方法名 `error` 和 JSON 响应字段 `error` 不变）
+- ✅ **AuthMiddleware.js 优化**：
+  - 统一错误变量命名为 `err`
+  - 修复 JSON 响应中的字段名（保持 `error` 而不是 `err`）
+- ✅ **其他 API 文件优化**：
+  - 移除所有分号
+  - 统一错误变量命名为 `err`
+  - 统一代码风格
+
+#### 核心层代码优化
+- ✅ **Plugin.js 优化**：
+  - 统一日志系统：`logger` → `globalConfig`
+  - 保留 `logger.mark` 和 `logger.info` 的特殊处理（使用可选链和回退）
+  - 移除所有分号
+  - 统一错误变量命名
+- ✅ **ConfigManager.js 优化**：
+  - 统一错误变量命名：`fileError` → `err`
+  - 修复日志系统引用
+  - 移除所有分号
+- ✅ **RankCommands.js 优化**：
+  - 统一错误变量命名：`error` → `err`
+  - 移除所有分号
+
+#### 工具类代码优化
+- ✅ **CommonUtils.js 优化**：
+  - 移除废弃方法 `validateAdminPermission`（已迁移到 `PermissionManager`）
+  - 所有使用该方法的地方已更新为使用 `getPermissionManager().validateAdminPermission()`
+
+#### Guoba 配置层代码优化
+- ✅ **getConfigData.js 优化**：
+  - 移除所有分号
+  - 统一错误变量命名为 `err`
+  - 提取 `addConditionFields` 方法，合并重复的条件字段处理逻辑
+- ✅ **setConfigData.js 优化**：
+  - 移除所有分号
+  - 统一错误变量命名为 `err`
+  - 提取 `buildAchievementCondition` 方法，合并重复的条件构建逻辑
+- ✅ **configSchemas.js 优化**：
+  - 移除所有分号
+  - 统一代码风格
+- ✅ **pluginInfo.js 优化**：
+  - 移除所有分号
+  - 统一代码风格
+
+### 🐛 Bug 修复
+
+- ✅ **修复归档群组重复显示问题**：
+  - 修复 `#水群归档僵尸群` 命令中已归档的群组仍会出现在列表中的问题
+  - 在查询僵尸群时，自动排除已归档的群组
+  - 使用 `isGroupArchived` 方法检查群组归档状态
+
+---
+
 ## [3.2.16] - 2026-01-03
 
 ### ✨ 新功能

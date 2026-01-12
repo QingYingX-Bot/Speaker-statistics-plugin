@@ -1,9 +1,9 @@
-import puppeteer from 'puppeteer';
-import fs from 'fs';
-import path from 'path';
-import { PathResolver } from '../core/utils/PathResolver.js';
-import { TemplateManager } from './TemplateManager.js';
-import { globalConfig } from '../core/ConfigManager.js';
+import puppeteer from 'puppeteer'
+import fs from 'fs'
+import path from 'path'
+import { PathResolver } from '../core/utils/PathResolver.js'
+import { TemplateManager } from './TemplateManager.js'
+import { globalConfig } from '../core/ConfigManager.js'
 
 /**
  * 图片生成器
@@ -11,21 +11,21 @@ import { globalConfig } from '../core/ConfigManager.js';
  */
 class ImageGenerator {
     constructor(dataService = null) {
-        this.browser = null;
-        this.baseDir = PathResolver.getDataDir();
-        this.templateManager = new TemplateManager(dataService);
-        this.browserInitPromise = null;
-        this.maxConcurrentPages = 5;
-        this.activePages = 0;
-        this.pageQueue = [];
-        this.pagePool = [];
-        this.maxPoolSize = 10;
-        this.browserKeepAlive = true;
-        this.lastUsedTime = Date.now();
-        this.cleanupTimer = null;
+        this.browser = null
+        this.baseDir = PathResolver.getDataDir()
+        this.templateManager = new TemplateManager(dataService)
+        this.browserInitPromise = null
+        this.maxConcurrentPages = 5
+        this.activePages = 0
+        this.pageQueue = []
+        this.pagePool = []
+        this.maxPoolSize = 10
+        this.browserKeepAlive = true
+        this.lastUsedTime = Date.now()
+        this.cleanupTimer = null
 
         // 启动定期清理任务
-        this.startCleanupTimer();
+        this.startCleanupTimer()
     }
 
     /**
@@ -34,8 +34,8 @@ class ImageGenerator {
     startCleanupTimer() {
         // 每小时清理一次临时文件
         this.cleanupTimer = setInterval(() => {
-            this.cleanupTempFiles();
-        }, 60 * 60 * 1000);
+            this.cleanupTempFiles()
+        }, 60 * 60 * 1000)
     }
 
     /**
@@ -43,32 +43,32 @@ class ImageGenerator {
      */
     cleanupTempFiles() {
         try {
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) return;
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) return
 
-            const files = fs.readdirSync(tempDir);
-            const now = Date.now();
-            let cleanedCount = 0;
+            const files = fs.readdirSync(tempDir)
+            const now = Date.now()
+            let cleanedCount = 0
 
             for (const file of files) {
-                const filePath = path.join(tempDir, file);
+                const filePath = path.join(tempDir, file)
                 try {
-                    const stats = fs.statSync(filePath);
+                    const stats = fs.statSync(filePath)
                     // 删除超过1小时的文件
                     if (now - stats.mtime.getTime() > 60 * 60 * 1000) {
-                        fs.unlinkSync(filePath);
-                        cleanedCount++;
+                        fs.unlinkSync(filePath)
+                        cleanedCount++
                     }
-                } catch (error) {
+                } catch (err) {
                     // 忽略错误，继续清理
                 }
             }
 
             if (cleanedCount > 0) {
-                globalConfig.debug(`清理临时文件: ${cleanedCount} 个`);
+                globalConfig.debug(`清理临时文件: ${cleanedCount} 个`)
             }
-        } catch (error) {
-            globalConfig.error('清理临时文件失败:', error);
+        } catch (err) {
+            globalConfig.error('清理临时文件失败:', err)
         }
     }
 
@@ -78,7 +78,7 @@ class ImageGenerator {
      */
     async initBrowser() {
         if (this.browserInitPromise) {
-            return this.browserInitPromise;
+            return this.browserInitPromise
         }
 
         this.browserInitPromise = puppeteer.launch({
@@ -97,18 +97,18 @@ class ImageGenerator {
                 width: 1800,
                 height: 900
             }
-        });
+        })
 
         try {
-            this.browser = await this.browserInitPromise;
-            globalConfig.debug('[发言统计] 图片生成器浏览器初始化成功');
-        } catch (error) {
-            this.browserInitPromise = null;
-            globalConfig.error('[发言统计] 图片生成器浏览器初始化失败:', error);
-            throw error;
+            this.browser = await this.browserInitPromise
+            globalConfig.debug('[发言统计] 图片生成器浏览器初始化成功')
+        } catch (err) {
+            this.browserInitPromise = null
+            globalConfig.error('[发言统计] 图片生成器浏览器初始化失败:', err)
+            throw err
         }
 
-        return this.browser;
+        return this.browser
     }
 
     /**
@@ -117,12 +117,12 @@ class ImageGenerator {
     async closeBrowser() {
         if (this.browser) {
             try {
-                await this.browser.close();
-                this.browser = null;
-                this.browserInitPromise = null;
-                globalConfig.debug('[发言统计] 图片生成器浏览器已关闭');
-            } catch (error) {
-                globalConfig.error('[发言统计] 关闭浏览器失败:', error);
+                await this.browser.close()
+                this.browser = null
+                this.browserInitPromise = null
+                globalConfig.debug('[发言统计] 图片生成器浏览器已关闭')
+            } catch (err) {
+                globalConfig.error('[发言统计] 关闭浏览器失败:', err)
             }
         }
     }
@@ -131,29 +131,29 @@ class ImageGenerator {
      * 获取可用页面
      */
     async getAvailablePage() {
-        this.lastUsedTime = Date.now();
+        this.lastUsedTime = Date.now()
 
         // 优先从页面池获取
         if (this.pagePool.length > 0) {
-            const page = this.pagePool.pop();
-            this.activePages++;
-            return page;
+            const page = this.pagePool.pop()
+            this.activePages++
+            return page
         }
 
         // 如果页面池为空且未达到并发限制，创建新页面
         if (this.activePages < this.maxConcurrentPages) {
-            this.activePages++;
-            const browser = await this.initBrowser();
-            const page = await browser.newPage();
-            await page.setCacheEnabled(true);
-            await page.setJavaScriptEnabled(true);
-            return page;
+            this.activePages++
+            const browser = await this.initBrowser()
+            const page = await browser.newPage()
+            await page.setCacheEnabled(true)
+            await page.setJavaScriptEnabled(true)
+            return page
         }
 
         // 等待可用页面
         return new Promise((resolve) => {
-            this.pageQueue.push(resolve);
-        });
+            this.pageQueue.push(resolve)
+        })
     }
 
     /**
@@ -161,30 +161,30 @@ class ImageGenerator {
      */
     async releasePage(page) {
         try {
-            await page.goto('about:blank');
+            await page.goto('about:blank')
             await page.evaluate(() => {
-                document.body.innerHTML = '';
-            });
+                document.body.innerHTML = ''
+            })
 
             if (this.pagePool.length < this.maxPoolSize) {
-                this.pagePool.push(page);
+                this.pagePool.push(page)
             } else {
-                await page.close();
+                await page.close()
             }
-        } catch (error) {
-            globalConfig.error('[发言统计] 释放页面失败:', error);
+        } catch (err) {
+            globalConfig.error('[发言统计] 释放页面失败:', err)
             try {
-                await page.close();
-            } catch (closeError) {
+                await page.close()
+            } catch (closeErr) {
                 // 忽略关闭错误
             }
         } finally {
-            this.activePages--;
+            this.activePages--
 
             // 处理等待中的请求
             if (this.pageQueue.length > 0) {
-                const resolve = this.pageQueue.shift();
-                this.getAvailablePage().then(page => resolve(page));
+                const resolve = this.pageQueue.shift()
+                this.getAvailablePage().then(page => resolve(page))
             }
         }
     }
@@ -201,13 +201,13 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateRankingImage(data, groupId, groupName, title, type = 'total', userInfo = null, options = {}) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 1520,
                 height: 1
-            });
+            })
 
             // 生成HTML
             const html = await this.templateManager.renderImageRankingTemplate(
@@ -217,50 +217,50 @@ class ImageGenerator {
                 title,
                 userInfo,
                 options
-            );
+            )
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 等待头像加载
             try {
                 await page.waitForFunction(() => {
-                    const avatars = Array.from(document.querySelectorAll('img.avatar'));
-                    return avatars.every(img => img.complete && img.naturalWidth > 0);
+                    const avatars = Array.from(document.querySelectorAll('img.avatar'))
+                    return avatars.every(img => img.complete && img.naturalWidth > 0)
                 }, {
                     timeout: 5000,
                     polling: 200
-                });
+                })
             } catch (err) {
-                globalConfig.debug('[发言统计] 头像加载超时或出错:', err);
+                globalConfig.debug('[发言统计] 头像加载超时或出错:', err)
             }
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 1520,
                 height: bodyHeight
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const fileKey = groupId ? `${groupId}_${type}` : `all_${type}`;
-            const imagePath = path.join(tempDir, `${fileKey}_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const fileKey = groupId ? `${groupId}_${type}` : `all_${type}`
+            const imagePath = path.join(tempDir, `${fileKey}_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 optimizeForSpeed: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成排行榜图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成排行榜图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -274,14 +274,14 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateUserStatsImage(userData, groupId, groupName, userId, nickname) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 760,
                 height: 1,
                 deviceScaleFactor: 2
-            });
+            })
 
             // 生成HTML
             const html = await this.templateManager.renderUserStatsTemplate(
@@ -290,51 +290,51 @@ class ImageGenerator {
                 groupName,
                 userId,
                 nickname
-            );
+            )
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 等待头像加载
             try {
                 await page.waitForFunction(() => {
-                    const avatars = Array.from(document.querySelectorAll('img.avatar'));
-                    return avatars.every(img => img.complete && img.naturalWidth > 0);
+                    const avatars = Array.from(document.querySelectorAll('img.avatar'))
+                    return avatars.every(img => img.complete && img.naturalWidth > 0)
                 }, {
                     timeout: 5000,
                     polling: 200
-                });
+                })
             } catch (err) {
-                globalConfig.debug('[发言统计] 头像加载超时或出错:', err);
+                globalConfig.debug('[发言统计] 头像加载超时或出错:', err)
             }
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 760,
                 height: bodyHeight,
                 deviceScaleFactor: 2
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `${userId}_stats_${Date.now()}.jpg`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `${userId}_stats_${Date.now()}.jpg`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 quality: 95,
                 type: 'jpeg'
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成用户统计图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成用户统计图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -347,13 +347,13 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateGroupStatsImage(groupStats, groupId, groupName, topUsers) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 1200,
                 height: 1
-            });
+            })
 
             // 使用模板管理器生成HTML
             const html = await this.templateManager.renderGroupStatsTemplate(
@@ -361,50 +361,50 @@ class ImageGenerator {
                 groupId,
                 groupName,
                 topUsers
-            );
+            )
 
             if (!html) {
-                throw new Error('群统计模板渲染失败');
+                throw new Error('群统计模板渲染失败')
             }
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 等待头像加载
             try {
                 await page.waitForFunction(() => {
-                    const avatars = Array.from(document.querySelectorAll('img.user-avatar'));
-                    return avatars.every(img => img.complete && img.naturalWidth > 0);
+                    const avatars = Array.from(document.querySelectorAll('img.user-avatar'))
+                    return avatars.every(img => img.complete && img.naturalWidth > 0)
                 }, {
                     timeout: 5000,
                     polling: 200
-                });
+                })
             } catch (err) {
-                globalConfig.debug('[发言统计] 头像加载超时或出错:', err);
+                globalConfig.debug('[发言统计] 头像加载超时或出错:', err)
             }
 
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 1200,
                 height: bodyHeight
-            });
+            })
 
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `${groupId}_group_stats_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `${groupId}_group_stats_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成群统计图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成群统计图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -414,49 +414,49 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateHelpPanelImage(isMaster = false) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 1520,
                 height: 1
-            });
+            })
 
             // 生成HTML
-            const html = this.templateManager.renderHelpPanelTemplate(isMaster);
+            const html = this.templateManager.renderHelpPanelTemplate(isMaster)
 
             if (!html) {
-                throw new Error('渲染帮助面板模板失败');
+                throw new Error('渲染帮助面板模板失败')
             }
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 1520,
                 height: bodyHeight
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `help_panel_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `help_panel_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 optimizeForSpeed: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成帮助面板图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成帮助面板图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -466,49 +466,49 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateGlobalStatsImage(globalStats) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 2200,
                 height: 1
-            });
+            })
 
             // 生成HTML
-            const html = this.templateManager.renderGlobalStatsTemplate(globalStats);
+            const html = this.templateManager.renderGlobalStatsTemplate(globalStats)
 
             if (!html) {
-                throw new Error('渲染全局统计模板失败');
+                throw new Error('渲染全局统计模板失败')
             }
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 2200,
                 height: bodyHeight
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `global_stats_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `global_stats_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 optimizeForSpeed: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成全局统计图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成全局统计图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -521,34 +521,34 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateAchievementListImage(allDefinitions, userAchievements, groupId, userId, displayAchievement = null) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 1520,
                 height: 1
-            });
+            })
 
             // 获取群名称
-            let groupName = `群${groupId}`;
+            let groupName = `群${groupId}`
             try {
                 if (this.templateManager.dataService) {
-                    const dbService = this.templateManager.dataService.dbService;
+                    const dbService = this.templateManager.dataService.dbService
                     if (dbService && dbService.getGroupInfo) {
-                        const groupInfo = await dbService.getGroupInfo(groupId);
+                        const groupInfo = await dbService.getGroupInfo(groupId)
                         if (groupInfo && groupInfo.group_name) {
-                            groupName = groupInfo.group_name;
+                            groupName = groupInfo.group_name
                         }
                     }
                 }
                 if (groupName === `群${groupId}` && typeof Bot !== 'undefined' && Bot.gl) {
-                    const glGroup = Bot.gl.get(groupId);
+                    const glGroup = Bot.gl.get(groupId)
                     if (glGroup && glGroup.name) {
-                        groupName = glGroup.name;
+                        groupName = glGroup.name
                     }
                 }
-            } catch (error) {
-                globalConfig.debug('获取群名称失败，使用默认值:', error);
+            } catch (err) {
+                globalConfig.debug('获取群名称失败，使用默认值:', err)
             }
 
             // 使用模板管理器生成HTML
@@ -558,40 +558,40 @@ class ImageGenerator {
                 groupId,
                 groupName,
                 displayAchievement
-            );
+            )
 
             if (!html) {
-                throw new Error('成就列表模板渲染失败');
+                throw new Error('成就列表模板渲染失败')
             }
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 1520,
                 height: bodyHeight
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `achievement_list_${groupId}_${userId}_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `achievement_list_${groupId}_${userId}_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 optimizeForSpeed: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成成就列表图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成成就列表图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 
@@ -603,34 +603,34 @@ class ImageGenerator {
      * @returns {Promise<string>} 图片路径
      */
     async generateAchievementStatisticsImage(globalStats, groupStats, groupId) {
-        const page = await this.getAvailablePage();
+        const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
                 width: 1520,
                 height: 1
-            });
+            })
 
             // 获取群名称
-            let groupName = `群${groupId}`;
+            let groupName = `群${groupId}`
             try {
                 if (this.templateManager.dataService) {
-                    const dbService = this.templateManager.dataService.dbService;
+                    const dbService = this.templateManager.dataService.dbService
                     if (dbService && dbService.getGroupInfo) {
-                        const groupInfo = await dbService.getGroupInfo(groupId);
+                        const groupInfo = await dbService.getGroupInfo(groupId)
                         if (groupInfo && groupInfo.group_name) {
-                            groupName = groupInfo.group_name;
+                            groupName = groupInfo.group_name
                         }
                     }
                 }
                 if (groupName === `群${groupId}` && typeof Bot !== 'undefined' && Bot.gl) {
-                    const glGroup = Bot.gl.get(groupId);
+                    const glGroup = Bot.gl.get(groupId)
                     if (glGroup && glGroup.name) {
-                        groupName = glGroup.name;
+                        groupName = glGroup.name
                     }
                 }
-            } catch (error) {
-                globalConfig.debug('获取群名称失败，使用默认值:', error);
+            } catch (err) {
+                globalConfig.debug('获取群名称失败，使用默认值:', err)
             }
 
             // 使用模板管理器生成HTML
@@ -639,44 +639,44 @@ class ImageGenerator {
                 groupStats,
                 groupId,
                 groupName
-            );
+            )
 
             if (!html) {
-                throw new Error('成就统计模板渲染失败');
+                throw new Error('成就统计模板渲染失败')
             }
 
             await page.setContent(html, {
                 waitUntil: 'networkidle0'
-            });
+            })
 
             // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
+            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
                 width: 1520,
                 height: bodyHeight
-            });
+            })
 
             // 保存图片
-            const tempDir = PathResolver.getTempDir();
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-            const imagePath = path.join(tempDir, `achievement_statistics_${groupId}_${Date.now()}.png`);
+            const tempDir = PathResolver.getTempDir()
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+            const imagePath = path.join(tempDir, `achievement_statistics_${groupId}_${Date.now()}.png`)
 
             await page.screenshot({
                 path: imagePath,
                 fullPage: true,
                 optimizeForSpeed: true
-            });
+            })
 
-            return imagePath;
-        } catch (error) {
-            globalConfig.error('生成成就统计图片失败:', error);
-            throw error;
+            return imagePath
+        } catch (err) {
+            globalConfig.error('生成成就统计图片失败:', err)
+            throw err
         } finally {
-            await this.releasePage(page);
+            await this.releasePage(page)
         }
     }
 }
 
-export { ImageGenerator };
-export default ImageGenerator;
+export { ImageGenerator }
+export default ImageGenerator
 

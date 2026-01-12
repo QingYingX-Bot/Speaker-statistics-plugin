@@ -13,10 +13,10 @@ class AchievementUtils {
         'rare': 3,
         'epic': 4,
         'legendary': 5,
-        'festival': 5,  // festival 和 legendary 同级
+        'festival': 5,
         'mythic': 6,
-        'special': 7   // 特殊等级，最高稀有度
-    };
+        'special': 7
+    }
 
     /**
      * 判断是否为节日成就
@@ -24,7 +24,7 @@ class AchievementUtils {
      * @returns {boolean} 是否为节日成就
      */
     static isFestivalAchievement(rarity) {
-        return (rarity || '').toLowerCase() === 'festival';
+        return (rarity || '').toLowerCase() === 'festival'
     }
 
     /**
@@ -33,7 +33,7 @@ class AchievementUtils {
      * @returns {boolean} 是否为特殊成就
      */
     static isSpecialAchievement(rarity) {
-        return (rarity || '').toLowerCase() === 'special';
+        return (rarity || '').toLowerCase() === 'special'
     }
 
     /**
@@ -43,8 +43,8 @@ class AchievementUtils {
      * @returns {boolean} 是否为全局成就
      */
     static isGlobalAchievement(rarity) {
-        const lowerRarity = (rarity || '').toLowerCase();
-        return lowerRarity === 'festival' || lowerRarity === 'special';
+        const lowerRarity = (rarity || '').toLowerCase()
+        return lowerRarity === 'festival' || lowerRarity === 'special'
     }
 
     /**
@@ -53,7 +53,7 @@ class AchievementUtils {
      * @returns {number} 排序值
      */
     static getRarityOrder(rarity) {
-        return this.RARITY_ORDER[rarity?.toLowerCase()] || 0;
+        return this.RARITY_ORDER[rarity?.toLowerCase()] || 0
     }
 
     /**
@@ -63,9 +63,9 @@ class AchievementUtils {
      * @returns {number} 比较结果（负数表示A小于B，正数表示A大于B，0表示相等）
      */
     static compareRarity(rarityA, rarityB) {
-        const orderA = this.getRarityOrder(rarityA);
-        const orderB = this.getRarityOrder(rarityB);
-        return orderB - orderA; // 降序排列（稀有度高的在前）
+        const orderA = this.getRarityOrder(rarityA)
+        const orderB = this.getRarityOrder(rarityB)
+        return orderB - orderA
     }
 
     /**
@@ -77,21 +77,20 @@ class AchievementUtils {
      */
     static sortByRarity(achievements, getRarity, getSecondarySort = null) {
         return achievements.sort((a, b) => {
-            const rarityA = getRarity(a);
-            const rarityB = getRarity(b);
-            const rarityCompare = this.compareRarity(rarityA, rarityB);
+            const rarityA = getRarity(a)
+            const rarityB = getRarity(b)
+            const rarityCompare = this.compareRarity(rarityA, rarityB)
             
             if (rarityCompare !== 0) {
-                return rarityCompare;
+                return rarityCompare
             }
             
-            // 稀有度相同时，使用次要排序
             if (getSecondarySort) {
-                return getSecondarySort(a, b);
+                return getSecondarySort(a, b)
             }
             
-            return 0;
-        });
+            return 0
+        })
     }
 
     /**
@@ -103,11 +102,10 @@ class AchievementUtils {
      */
     static sortUnlockedAchievements(achievements, getRarity, getUnlockTime) {
         return this.sortByRarity(achievements, getRarity, (a, b) => {
-            const timeA = getUnlockTime(a);
-            const timeB = getUnlockTime(b);
-            // 解锁时间倒序（最新的在前）
-            return timeB - timeA;
-        });
+            const timeA = getUnlockTime(a)
+            const timeB = getUnlockTime(b)
+            return timeB - timeA
+        })
     }
 
     /**
@@ -119,10 +117,10 @@ class AchievementUtils {
      */
     static sortLockedAchievements(achievements, getRarity, getName) {
         return this.sortByRarity(achievements, getRarity, (a, b) => {
-            const nameA = getName(a);
-            const nameB = getName(b);
-            return nameA.localeCompare(nameB, 'zh-CN');
-        });
+            const nameA = getName(a)
+            const nameB = getName(b)
+            return nameA.localeCompare(nameB, 'zh-CN')
+        })
     }
 
     /**
@@ -132,10 +130,10 @@ class AchievementUtils {
      * @returns {boolean} 是否达到
      */
     static isRarityOrHigher(rarity, minRarity) {
-        return this.getRarityOrder(rarity) >= this.getRarityOrder(minRarity);
+        return this.getRarityOrder(rarity) >= this.getRarityOrder(minRarity)
     }
 }
 
-export { AchievementUtils };
-export default AchievementUtils;
+export { AchievementUtils }
+export default AchievementUtils
 

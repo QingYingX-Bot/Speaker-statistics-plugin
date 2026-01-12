@@ -9,12 +9,10 @@ class TimeUtils {
      * @returns {Date} UTC+8 时区的日期对象
      */
     static getUTC8Date() {
-        const now = new Date();
-        // UTC+8 偏移量（毫秒）
-        const utc8Offset = 8 * 60 * 60 * 1000;
-        // 获取 UTC 时间戳，然后加上 UTC+8 偏移量
-        const utc8Timestamp = now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset;
-        return new Date(utc8Timestamp);
+        const now = new Date()
+        const utc8Offset = 8 * 60 * 60 * 1000
+        const utc8Timestamp = now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + utc8Offset
+        return new Date(utc8Timestamp)
     }
 
     /**
@@ -22,7 +20,7 @@ class TimeUtils {
      * @returns {Object} 包含年、月、日、周等信息的对象
      */
     static getCurrentTime() {
-        const now = this.getUTC8Date();
+        const now = this.getUTC8Date()
         return {
             timestamp: now.getTime(),
             date: this.formatDate(now),
@@ -32,7 +30,7 @@ class TimeUtils {
             week: this.getWeekNumber(now),
             weekYear: this.getWeekYear(now),
             time: this.formatTime(now)
-        };
+        }
     }
 
     /**
@@ -40,7 +38,7 @@ class TimeUtils {
      * @returns {Object} 包含格式化日期时间和各种时间标识的对象
      */
     static getCurrentDateTime() {
-        const now = this.getUTC8Date();
+        const now = this.getUTC8Date()
         return {
             timestamp: now.getTime(),
             formattedDate: this.formatDate(now),
@@ -52,7 +50,7 @@ class TimeUtils {
             year: now.getFullYear(),
             month: this.padZero(now.getMonth() + 1),
             day: this.padZero(now.getDate())
-        };
+        }
     }
 
     /**
@@ -61,7 +59,7 @@ class TimeUtils {
      * @returns {string} 格式化后的日期
      */
     static formatDate(date) {
-        return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}-${this.padZero(date.getDate())}`;
+        return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}-${this.padZero(date.getDate())}`
     }
 
     /**
@@ -70,7 +68,7 @@ class TimeUtils {
      * @returns {string} 格式化后的时间
      */
     static formatTime(date) {
-        return `${this.padZero(date.getHours())}:${this.padZero(date.getMinutes())}:${this.padZero(date.getSeconds())}`;
+        return `${this.padZero(date.getHours())}:${this.padZero(date.getMinutes())}:${this.padZero(date.getSeconds())}`
     }
 
     /**
@@ -79,7 +77,7 @@ class TimeUtils {
      * @returns {string} 格式化后的日期时间
      */
     static formatDateTime(date) {
-        return `${this.formatDate(date)} ${this.formatTime(date)}`;
+        return `${this.formatDate(date)} ${this.formatTime(date)}`
     }
 
 
@@ -89,12 +87,12 @@ class TimeUtils {
      * @returns {string} 周数，格式为 YYYY-Wxx
      */
     static getWeekNumber(date) {
-        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-        return `${this.getWeekYear(date)}-W${this.padZero(weekNo)}`;
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+        const dayNum = d.getUTCDay() || 7
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
+        return `${this.getWeekYear(date)}-W${this.padZero(weekNo)}`
     }
 
     /**
@@ -103,10 +101,10 @@ class TimeUtils {
      * @returns {number} 年份
      */
     static getWeekYear(date) {
-        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        return d.getUTCFullYear();
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+        const dayNum = d.getUTCDay() || 7
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+        return d.getUTCFullYear()
     }
 
     /**
@@ -115,7 +113,7 @@ class TimeUtils {
      * @returns {string} 格式为 YYYY-MM
      */
     static getMonthString(date) {
-        return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}`;
+        return `${date.getFullYear()}-${this.padZero(date.getMonth() + 1)}`
     }
 
     /**
@@ -124,7 +122,7 @@ class TimeUtils {
      * @returns {string} 补零后的字符串
      */
     static padZero(num) {
-        return num.toString().padStart(2, '0');
+        return num.toString().padStart(2, '0')
     }
 
     /**
@@ -135,38 +133,35 @@ class TimeUtils {
      */
     static calculateContinuousDays(dailyStats, maxStreak = true) {
         if (!dailyStats || Object.keys(dailyStats).length === 0) {
-            return 0;
+            return 0
         }
 
-        const now = this.getUTC8Date();
-        let continuousDays = 0;
-        let currentStreak = 0;
+        const now = this.getUTC8Date()
+        let continuousDays = 0
+        let currentStreak = 0
 
-        // 从今天开始往前检查
         for (let i = 0; i < 365; i++) {
-            const checkDate = new Date(now);
-            checkDate.setDate(checkDate.getDate() - i);
-            const dateStr = this.formatDate(checkDate);
+            const checkDate = new Date(now)
+            checkDate.setDate(checkDate.getDate() - i)
+            const dateStr = this.formatDate(checkDate)
 
             if (dailyStats[dateStr]) {
-                currentStreak++;
+                currentStreak++
                 if (maxStreak) {
-                    continuousDays = Math.max(continuousDays, currentStreak);
+                    continuousDays = Math.max(continuousDays, currentStreak)
                 } else {
-                    // 如果不计算最大值，遇到第一个中断就停止
-                    continuousDays = currentStreak;
+                    continuousDays = currentStreak
                 }
             } else {
                 if (!maxStreak) {
-                    // 如果不计算最大值，遇到中断就停止
-                    break;
+                    break
                 }
-                currentStreak = 0;
+                currentStreak = 0
             }
         }
 
-        return continuousDays;
+        return continuousDays
     }
 }
 
-export { TimeUtils };
+export { TimeUtils }
