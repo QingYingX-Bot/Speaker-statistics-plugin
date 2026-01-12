@@ -1,6 +1,4 @@
 import puppeteer from 'puppeteer'
-import fs from 'fs'
-import path from 'path'
 import { PathResolver } from '../core/utils/PathResolver.js'
 import { TemplateManager } from './TemplateManager.js'
 import { globalConfig } from '../core/ConfigManager.js'
@@ -22,55 +20,8 @@ class ImageGenerator {
         this.maxPoolSize = 10
         this.browserKeepAlive = true
         this.lastUsedTime = Date.now()
-        this.cleanupTimer = null
-
-        // 启动定期清理任务
-        this.startCleanupTimer()
     }
 
-    /**
-     * 启动定期清理任务
-     */
-    startCleanupTimer() {
-        // 每小时清理一次临时文件
-        this.cleanupTimer = setInterval(() => {
-            this.cleanupTempFiles()
-        }, 60 * 60 * 1000)
-    }
-
-    /**
-     * 清理临时文件
-     */
-    cleanupTempFiles() {
-        try {
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) return
-
-            const files = fs.readdirSync(tempDir)
-            const now = Date.now()
-            let cleanedCount = 0
-
-            for (const file of files) {
-                const filePath = path.join(tempDir, file)
-                try {
-                    const stats = fs.statSync(filePath)
-                    // 删除超过1小时的文件
-                    if (now - stats.mtime.getTime() > 60 * 60 * 1000) {
-                        fs.unlinkSync(filePath)
-                        cleanedCount++
-                    }
-                } catch (err) {
-                    // 忽略错误，继续清理
-                }
-            }
-
-            if (cleanedCount > 0) {
-                globalConfig.debug(`清理临时文件: ${cleanedCount} 个`)
-            }
-        } catch (err) {
-            globalConfig.error('清理临时文件失败:', err)
-        }
-    }
 
 
     /**
@@ -198,14 +149,14 @@ class ImageGenerator {
      * @param {string} type 排行榜类型
      * @param {Object} userInfo 用户排名信息
      * @param {Object} options 其他选项
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateRankingImage(data, groupId, groupName, title, type = 'total', userInfo = null, options = {}) {
         const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
-                width: 1520,
+                width: 1800,
                 height: 1
             })
 
@@ -243,19 +194,14 @@ class ImageGenerator {
                 height: bodyHeight
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const fileKey = groupId ? `${groupId}_${type}` : `all_${type}`
-            const imagePath = path.join(tempDir, `${fileKey}_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true,
                 optimizeForSpeed: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成排行榜图片失败:', err)
             throw err
@@ -271,7 +217,7 @@ class ImageGenerator {
      * @param {string} groupName 群名称
      * @param {string} userId 用户ID
      * @param {string} nickname 用户昵称
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateUserStatsImage(userData, groupId, groupName, userId, nickname) {
         const page = await this.getAvailablePage()
@@ -317,19 +263,13 @@ class ImageGenerator {
                 deviceScaleFactor: 2
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `${userId}_stats_${Date.now()}.jpg`)
-
-            await page.screenshot({
-                path: imagePath,
-                fullPage: true,
-                quality: 95,
-                type: 'jpeg'
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
+                fullPage: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成用户统计图片失败:', err)
             throw err
@@ -344,7 +284,7 @@ class ImageGenerator {
      * @param {string} groupId 群号
      * @param {string} groupName 群名称
      * @param {Array} topUsers 前三用户数据
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateGroupStatsImage(groupStats, groupId, groupName, topUsers) {
         const page = await this.getAvailablePage()
@@ -390,16 +330,13 @@ class ImageGenerator {
                 height: bodyHeight
             })
 
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `${groupId}_group_stats_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成群统计图片失败:', err)
             throw err
@@ -411,14 +348,14 @@ class ImageGenerator {
     /**
      * 生成帮助面板图片
      * @param {boolean} isMaster 是否为主人
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateHelpPanelImage(isMaster = false) {
         const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
-                width: 1520,
+                width: 1800,
                 height: 1
             })
 
@@ -440,18 +377,14 @@ class ImageGenerator {
                 height: bodyHeight
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `help_panel_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true,
                 optimizeForSpeed: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成帮助面板图片失败:', err)
             throw err
@@ -463,7 +396,7 @@ class ImageGenerator {
     /**
      * 生成全局统计图片
      * @param {Object} globalStats 全局统计数据
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateGlobalStatsImage(globalStats) {
         const page = await this.getAvailablePage()
@@ -492,18 +425,14 @@ class ImageGenerator {
                 height: bodyHeight
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `global_stats_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true,
                 optimizeForSpeed: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成全局统计图片失败:', err)
             throw err
@@ -518,14 +447,14 @@ class ImageGenerator {
      * @param {Object} userAchievements 用户的成就解锁状态
      * @param {string} groupId 群ID
      * @param {string} userId 用户ID
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateAchievementListImage(allDefinitions, userAchievements, groupId, userId, displayAchievement = null) {
         const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
-                width: 1520,
+                width: 2400,
                 height: 1
             })
 
@@ -571,22 +500,18 @@ class ImageGenerator {
             // 获取实际高度并调整视口
             const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
-                width: 1520,
+                width: 2400,
                 height: bodyHeight
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `achievement_list_${groupId}_${userId}_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true,
                 optimizeForSpeed: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成成就列表图片失败:', err)
             throw err
@@ -600,14 +525,14 @@ class ImageGenerator {
      * @param {Array} globalStats 全局成就统计数组
      * @param {Array} groupStats 群专属成就统计数组
      * @param {string} groupId 群ID
-     * @returns {Promise<string>} 图片路径
+     * @returns {Promise<string>} base64 图片数据
      */
     async generateAchievementStatisticsImage(globalStats, groupStats, groupId) {
         const page = await this.getAvailablePage()
 
         try {
             await page.setViewport({
-                width: 1520,
+                width: 2400,
                 height: 1
             })
 
@@ -652,22 +577,18 @@ class ImageGenerator {
             // 获取实际高度并调整视口
             const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
             await page.setViewport({
-                width: 1520,
+                width: 2400,
                 height: bodyHeight
             })
 
-            // 保存图片
-            const tempDir = PathResolver.getTempDir()
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
-            const imagePath = path.join(tempDir, `achievement_statistics_${groupId}_${Date.now()}.png`)
-
-            await page.screenshot({
-                path: imagePath,
+            // 生成 base64 图片
+            const base64 = await page.screenshot({
+                encoding: 'base64',
                 fullPage: true,
                 optimizeForSpeed: true
             })
 
-            return imagePath
+            return base64
         } catch (err) {
             globalConfig.error('生成成就统计图片失败:', err)
             throw err

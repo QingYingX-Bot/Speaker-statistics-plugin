@@ -440,13 +440,42 @@ class TemplateManager {
 
         const statCards = []
         
+        // 今日数据（跨两列）
         statCards.push(`
 					<div class="stat-card span-2">
 						<div class="stat-label">今日发言</div>
 						<div class="stat-value">${CommonUtils.formatNumber(todayCount)}</div>
+						${todayWords > 0 ? `<div class="stat-subvalue">${CommonUtils.formatNumber(todayWords)} 字</div>` : ''}
 					</div>
         `)
         
+        // 本月数据（跨两列）
+        if (monthCount !== totalCount && monthCount > 0) {
+            statCards.push(`
+                    <div class="stat-card span-2">
+						<div class="stat-label">本月发言</div>
+						<div class="stat-value">${CommonUtils.formatNumber(monthCount)}</div>
+						${monthWords > 0 ? `<div class="stat-subvalue">${CommonUtils.formatNumber(monthWords)} 字</div>` : ''}
+                    </div>
+            `)
+        }
+        
+        // 总数据
+        statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">总发言数</div>
+						<div class="stat-value">${CommonUtils.formatNumber(totalCount)}</div>
+					</div>
+        `)
+        
+        statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">总字数</div>
+						<div class="stat-value">${CommonUtils.formatNumber(totalWords)}</div>
+					</div>
+        `)
+        
+        // 天数相关
         statCards.push(`
 					<div class="stat-card">
 						<div class="stat-label">连续发言天数</div>
@@ -461,6 +490,7 @@ class TemplateManager {
 					</div>
         `)
         
+        // 平均和占比
         if (messagePercentage !== '0.00' && messagePercentage !== '0' && parseFloat(messagePercentage) > 0) {
             statCards.push(`
 					<div class="stat-card">
@@ -468,30 +498,14 @@ class TemplateManager {
 						<div class="stat-value">${messagePercentage}%</div>
 					</div>
             `)
-            
-            statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">平均每日发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
-					</div>
-            `)
-        } else {
-            statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">平均每日发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
-					</div>
-            `)
         }
         
-        if (monthCount !== totalCount && monthCount > 0) {
-            statCards.push(`
-                    <div class="stat-card">
-						<div class="stat-label">本月发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(monthCount)}</div>
-                    </div>
-            `)
-        }
+        statCards.push(`
+					<div class="stat-card">
+						<div class="stat-label">平均每日发言</div>
+						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
+					</div>
+        `)
         const statsGridHtml = statCards.join('\n\t\t\t\t\t')
 
         const timeInfo = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/')
@@ -571,13 +585,33 @@ class TemplateManager {
             const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : 'rank-3'
             const displayName = this.getUserDisplayName(user.user_id, groupId, user.nickname || '未知用户')
             const count = user.total_count || user.count || 0
+            const words = user.total_words || 0
+            const activeDays = user.active_days || 0
+            const continuousDays = user.continuous_days || 0
 
             const userHtml = `
                 <div class="user-card">
                     <div class="rank-badge ${rankClass}">${rank}</div>
                     <img class="user-avatar" src="https://q1.qlogo.cn/g?b=qq&s=100&nk=${user.user_id}" alt="avatar" onerror="this.style.display='none'">
                     <div class="user-name">${displayName}</div>
-                    <div class="user-count">${CommonUtils.formatNumber(count)} 条</div>
+                    <div class="user-stats">
+                        <div class="user-stat-item">
+                            <div class="user-stat-label">消息数</div>
+                            <div class="user-stat-value">${CommonUtils.formatNumber(count)}</div>
+                        </div>
+                        <div class="user-stat-item">
+                            <div class="user-stat-label">总字数</div>
+                            <div class="user-stat-value">${CommonUtils.formatNumber(words)}</div>
+                        </div>
+                        <div class="user-stat-item">
+                            <div class="user-stat-label">活跃天数</div>
+                            <div class="user-stat-value">${CommonUtils.formatNumber(activeDays)}</div>
+                        </div>
+                        <div class="user-stat-item">
+                            <div class="user-stat-label">连续天数</div>
+                            <div class="user-stat-value">${CommonUtils.formatNumber(continuousDays)}</div>
+                        </div>
+                    </div>
                 </div>
             `
 
@@ -656,8 +690,10 @@ class TemplateManager {
 			</div>
         `
 
-        // 生成群聊统计卡片HTML
-        const groupsHtml = this.generateGroupsStatsHtml(globalStats.groups || [])
+        // 生成群聊统计列表HTML（每页固定显示 10 条）
+        const maxGroups = 10
+        const groups = (globalStats.groups || []).slice(0, maxGroups)
+        const groupsHtml = this.generateGroupsStatsHtml(groups)
 
         // 处理无群组情况
         const noGroupsHtml = globalStats.groups && globalStats.groups.length === 0 
@@ -674,58 +710,66 @@ class TemplateManager {
         return template
             .replace(/\{\{HEADER\}\}/g, headerHtml)
             .replace(/\{\{OVERVIEW_STATS\}\}/g, overviewCardsHtml)
-            .replace(/\{\{GROUPS_GRID\}\}/g, groupsHtml || '')
+            .replace(/\{\{GROUPS_LIST\}\}/g, groupsHtml || '')
             .replace(/\{\{NO_GROUPS\}\}/g, noGroupsHtml)
             .replace(/\{\{FOOTER\}\}/g, footerHtml)
     }
 
     /**
-     * 生成群聊统计卡片HTML
+     * 生成群聊统计列表HTML
      * @param {Array} groups 群组统计数组
-     * @returns {string} 群聊统计卡片HTML
+     * @returns {string} 群聊统计列表HTML
      */
     generateGroupsStatsHtml(groups) {
         if (!groups || groups.length === 0) {
             return ''
         }
 
-        const cards = groups.map(group => {
+        const items = groups.map((group, index) => {
             // 显示真实的群名称，如果groupName就是默认值就不使用
             const displayName = group.groupName && !group.groupName.startsWith('群') 
                 ? group.groupName 
-                : null; // 如果只有群号格式，不显示
+                : `群${group.groupId}`
             // 隐藏群号中间部分
             const maskedGroupId = CommonUtils.maskGroupId(group.groupId)
+            // 生成群聊头像URL
+            const avatarUrl = `http://p.qlogo.cn/gh/${group.groupId}/${group.groupId}/100/`
+            // 计算序号（考虑分页）
+            const rank = index + 1
             
             return `
-                <div class="group-card">
-                    <div class="group-header">
-                        ${displayName ? `<div class="group-name">${displayName}</div>` : ''}
-                        <div class="group-id">${maskedGroupId}</div>
+                <div class="group-item">
+                    <div class="group-rank">${rank}</div>
+                    <img src="${avatarUrl}" alt="${displayName}" class="group-avatar" onerror="this.style.display='none'">
+                    <div class="group-info">
+                        <div class="group-name-row">
+                            <div class="group-name">${displayName}</div>
+                            <div class="group-id">${maskedGroupId}</div>
+                        </div>
                     </div>
                     <div class="group-stats">
                         <div class="group-stat-item">
-                            <div class="group-stat-number">${CommonUtils.formatNumber(group.userCount || 0)}</div>
                             <div class="group-stat-label">用户数</div>
+                            <div class="group-stat-number">${CommonUtils.formatNumber(group.userCount || 0)}</div>
                         </div>
                         <div class="group-stat-item">
-                            <div class="group-stat-number">${CommonUtils.formatNumber(group.totalMessages || 0)}</div>
                             <div class="group-stat-label">消息数</div>
+                            <div class="group-stat-number">${CommonUtils.formatNumber(group.totalMessages || 0)}</div>
                         </div>
                         <div class="group-stat-item">
-                            <div class="group-stat-number">${CommonUtils.formatNumber(group.todayActive || 0)}</div>
                             <div class="group-stat-label">今日活跃</div>
+                            <div class="group-stat-number">${CommonUtils.formatNumber(group.todayActive || 0)}</div>
                         </div>
                         <div class="group-stat-item">
-                            <div class="group-stat-number">${CommonUtils.formatNumber(group.monthActive || 0)}</div>
                             <div class="group-stat-label">本月活跃</div>
+                            <div class="group-stat-number">${CommonUtils.formatNumber(group.monthActive || 0)}</div>
                         </div>
                     </div>
                 </div>
             `
         })
 
-        return cards.join('\n\t\t\t\t')
+        return items.join('\n\t\t\t\t')
     }
 
     /**
@@ -911,10 +955,9 @@ class TemplateManager {
 						</div>
 					</div>
 					<div class="achievement-info">
-						<div class="achievement-name-row">
-							<div class="achievement-name">${definition.name}</div>
-							${displayStatusHtml ? `<div class="achievement-display-status">${displayStatusHtml}</div>` : ''}
-						</div>
+						${displayStatusHtml ? `<div class="achievement-name-row">
+							<div class="achievement-display-status">${displayStatusHtml}</div>
+						</div>` : ''}
 						<div class="achievement-description-row">
 							<div class="achievement-description">${definition.description || '暂无描述'}</div>
 							${unlockTime ? `<div class="achievement-meta-row">
@@ -1012,10 +1055,9 @@ class TemplateManager {
 						</div>
 					</div>
 					<div class="achievement-info">
-						<div class="achievement-name-row">
-							<div class="achievement-name">${definition.name}</div>
-							${scopeLabel}
-						</div>
+						${scopeLabel ? `<div class="achievement-name-row">
+							<div class="achievement-display-status">${scopeLabel}</div>
+						</div>` : ''}
 						<div class="achievement-description-row">
 							<div class="achievement-description">${definition.description || '暂无描述'}</div>
 							<div class="achievement-meta-row">

@@ -21,15 +21,15 @@
 				max-width: 2200px;
 				margin: 0 auto;
 				background: #ffffff;
-				border-radius: 20px;
-				box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+				border-radius: 24px;
+				box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
 				overflow: hidden;
 			}
 
 			.header {
 				background: #58A4B0;
 				color: #FEF9FF;
-				padding: 40px 30px;
+				padding: 44px 36px;
 				text-align: center;
 				position: relative;
 			}
@@ -52,167 +52,188 @@
 			.title {
 				font-size: 64px;
 				font-weight: 1000;
-				line-height: 1.2;
+				line-height: 1.3;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 				overflow: hidden;
-				margin-bottom: 16px;
+				margin-bottom: 18px;
 				max-width: 100%;
 				color: #FEF9FF;
+				letter-spacing: 0.5px;
 			}
 
 			.subtitle {
 				font-size: 32px;
 				opacity: 0.95;
-				font-weight: bold;
+				font-weight: 700;
 				color: #FEF9FF;
+				letter-spacing: 0.3px;
 			}
 
 			.overview-stats {
 				display: grid;
 				grid-template-columns: repeat(3, 1fr);
-				gap: 30px;
-				padding: 40px;
+				gap: 32px;
+				padding: 48px;
 				background: #D8DBE2;
 			}
 
 			.overview-card {
-				background: #A9BCD0;
-				border-radius: 16px;
-				padding: 30px;
+				background: linear-gradient(135deg, #A9BCD0 0%, #C4D4E0 100%);
+				border-radius: 24px;
+				padding: 40px 32px;
 				text-align: center;
-				border: 1px solid rgba(88, 164, 176, 0.3);
-				box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-				transition: transform 0.3s ease, box-shadow 0.3s ease;
-			}
-
-			.overview-card:hover {
-				transform: translateY(-3px);
-				box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
-				background: #58A4B0;
+				border: 2px solid rgba(88, 164, 176, 0.4);
+				box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 			}
 
 			.overview-number {
-				font-size: 48px;
+				font-size: 64px;
 				font-weight: 1000;
 				color: #373F51;
-				margin-bottom: 8px;
+				margin-bottom: 12px;
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+				line-height: 1.2;
 			}
 
 			.overview-label {
-				font-size: 24px;
-				color: #373F51;
-				font-weight: 800;
+				font-size: 26px;
+				color: #2d3748;
+				font-weight: 900;
+				letter-spacing: 0.5px;
 			}
 
 			.groups-section {
-				padding: 40px;
+				padding: 44px;
 				background: #ffffff;
 			}
 
 			.section-title {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 52px;
+				font-weight: 1000;
+				color: #373F51;
+				margin: 0 auto 28px;
+				text-align: center;
+				position: relative;
+				letter-spacing: 0.6px;
+				padding: 12px 32px;
+				background: linear-gradient(90deg, rgba(88,164,176,0.16), rgba(88,164,176,0.08));
+				border-radius: 14px;
+				box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+			}
+
+			.groups-list {
+				margin-top: 36px;
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+			}
+
+			.group-item {
+				background: #A9BCD0;
+				border-radius: 20px;
+				padding: 28px 36px;
+				border: 1px solid rgba(88, 164, 176, 0.2);
+				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
+				display: flex;
+				align-items: center;
+				gap: 32px;
+			}
+
+			.group-rank {
 				font-size: 48px;
 				font-weight: 1000;
 				color: #373F51;
-				margin-bottom: 24px;
+				min-width: 80px;
 				text-align: center;
-				position: relative;
-			}
-
-			.section-title::after {
-				content: '';
-				position: absolute;
-				bottom: -12px;
-				left: 50%;
-				transform: translateX(-50%);
-				width: 80px;
-				height: 4px;
 				background: #58A4B0;
-				border-radius: 2px;
-			}
-
-			.groups-grid {
-				display: grid;
-				grid-template-columns: repeat(3, 1fr);
-				gap: 30px;
-				margin-top: 32px;
-			}
-
-			.group-card {
-				background: #A9BCD0;
+				color: #FEF9FF;
 				border-radius: 16px;
-				padding: 30px;
-				border: 1px solid rgba(88, 164, 176, 0.15);
-				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-				position: relative;
-				transition: transform 0.3s ease, box-shadow 0.3s ease;
+				padding: 12px 20px;
+				box-shadow: 0 4px 12px rgba(88, 164, 176, 0.4);
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+				flex-shrink: 0;
 			}
 
-			.group-card:hover {
-				transform: translateY(-3px);
-				box-shadow: 0 4px 16px rgba(88, 164, 176, 0.2);
+			.group-avatar {
+				width: 100px;
+				height: 100px;
+				border-radius: 16px;
+				flex-shrink: 0;
+				border: 3px solid rgba(88, 164, 176, 0.3);
+				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+				object-fit: cover;
+				background: #D8DBE2;
 			}
 
-			.group-header {
+			.group-info {
+				flex: 1;
+				min-width: 0;
 				display: flex;
 				flex-direction: column;
+				gap: 12px;
+			}
+
+			.group-name-row {
+				display: flex;
 				align-items: center;
-				margin-bottom: 20px;
-				text-align: center;
+				gap: 12px;
+				min-width: 0;
 			}
 
 			.group-name {
-				font-size: 24px;
-				font-weight: 800;
+				font-size: 32px;
+				font-weight: 1000;
 				color: #373F51;
-				margin-bottom: 8px;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 				overflow: hidden;
-				max-width: 100%;
 			}
 
 			.group-id {
-				font-size: 16px;
-				color: #718096;
+				font-size: 20px;
+				color: #2d3748;
 				background: #f8f9fa;
-				padding: 4px 10px;
+				padding: 6px 12px;
 				border-radius: 8px;
 				font-family: 'Courier New', monospace;
-				font-weight: 600;
+				font-weight: 900;
+				display: inline-block;
+				width: fit-content;
+				border: 1px solid rgba(88, 164, 176, 0.35);
 			}
 
 			.group-stats {
-				display: grid;
-				grid-template-columns: repeat(2, 1fr);
-				gap: 16px;
+				display: flex;
+				gap: 48px;
+				align-items: center;
+				flex-wrap: wrap;
 			}
 
 			.group-stat-item {
 				text-align: center;
-				padding: 16px;
-				background: transparent;
-				border-radius: 8px;
-				border: 1px solid rgba(88, 164, 176, 0.2);
-				transition: border-color 0.3s ease, transform 0.3s ease;
-			}
-
-			.group-stat-item:hover {
-				border-color: rgba(88, 164, 176, 0.4);
-				transform: translateY(-2px);
-			}
-
-			.group-stat-number {
-				font-size: 32px;
-				font-weight: 900;
-				color: #373F51;
-				margin-bottom: 4px;
+				min-width: 120px;
 			}
 
 			.group-stat-label {
-				font-size: 16px;
-				color: #718096;
-				font-weight: 600;
+				font-size: 20px;
+				color: #2d3748;
+				font-weight: 1000;
+				margin-bottom: 6px;
+				line-height: 1.2;
+				padding: 6px 10px;
+				background: rgba(55, 63, 81, 0.08);
+				border-radius: 8px;
+			}
+
+			.group-stat-number {
+				font-size: 36px;
+				font-weight: 800;
+				color: #373F51;
+				line-height: 1.2;
 			}
 
 			.no-groups {
@@ -228,11 +249,12 @@
 
 			.footer {
 				background: #D8DBE2;
-				padding: 20px 30px;
+				padding: 24px 36px;
 				text-align: center;
 				color: #373F51;
 				font-size: 18px;
 				border-top: 1px solid #A9BCD0;
+				font-weight: 500;
 			}
 
 			.footer .timestamp {
@@ -269,8 +291,8 @@
 			<div class="groups-section">
 				<div class="section-title">群聊详细统计</div>
 
-				<div class="groups-grid" id="groups-container">
-					{{GROUPS_GRID}}
+				<div class="groups-list" id="groups-container">
+					{{GROUPS_LIST}}
 				</div>
 
 				{{NO_GROUPS}}

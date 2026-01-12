@@ -24,8 +24,8 @@ class UserCommands {
      * @param {string} imagePath 图片路径
      * @returns {Object} segment 图片对象
      */
-    formatImageSegment(imagePath) {
-        return segment.image(`file:///${imagePath.replace(/\\/g, '/')}`)
+    formatImageSegment(base64) {
+        return segment.image(`base64://${base64}`)
     }
 
     /**

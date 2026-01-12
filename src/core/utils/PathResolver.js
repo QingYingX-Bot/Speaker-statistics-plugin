@@ -132,6 +132,16 @@ class PathResolver {
     static getDatabasePath() {
         return path.join(this.getDataDir(), 'speech_statistics.db')
     }
+
+    /**
+     * 确保目录存在（如果不存在则创建）
+     * @param {string} dirPath 目录路径
+     */
+    static ensureDirectory(dirPath) {
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true })
+        }
+    }
 }
 
 export { PathResolver }

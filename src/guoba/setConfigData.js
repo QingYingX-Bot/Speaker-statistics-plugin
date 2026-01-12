@@ -75,7 +75,7 @@ export async function setConfigData(data, { Result }) {
         if (Object.keys(userAchievementsData).length > 0) {
           const success = globalConfig.setUsersAchievementsConfig(userAchievementsData)
           if (!success) {
-            return Result.fail('保存用户成就配置失败，请查看日志')
+            return Result.error('保存用户成就配置失败，请查看日志')
           }
         } else {
           // 如果列表为空，清空用户成就文件
@@ -131,7 +131,7 @@ export async function setConfigData(data, { Result }) {
           for (const [groupId, achievements] of Object.entries(groupAchievementsByGroup)) {
             const success = globalConfig.setGroupAchievementsConfig(groupId, achievements)
             if (!success) {
-              return Result.fail(`保存群组 ${groupId} 专属成就失败，请查看日志`)
+              return Result.error(`保存群组 ${groupId} 专属成就失败，请查看日志`)
             }
           }
         } else {
@@ -158,7 +158,7 @@ export async function setConfigData(data, { Result }) {
     if (Object.keys(otherData).length > 0) {
       const success = globalConfig.setConfigData(otherData)
       if (!success) {
-        return Result.fail('保存配置失败，请查看日志')
+        return Result.error('保存配置失败，请查看日志')
       }
     }
     
@@ -166,7 +166,7 @@ export async function setConfigData(data, { Result }) {
     if (Object.keys(achievementsData).length > 0) {
       const success = globalConfig.setUserAchievementsConfig(achievementsData)
       if (!success) {
-        return Result.fail('保存成就配置失败，请查看日志')
+        return Result.error('保存成就配置失败，请查看日志')
       }
     } else {
       // 如果成就列表为空，清空自定义成就文件
@@ -176,7 +176,7 @@ export async function setConfigData(data, { Result }) {
     return Result.ok({}, '保存成功~')
   } catch (err) {
     globalConfig.error('[发言统计] 保存配置失败:', err)
-    return Result.fail('保存失败: ' + (err.message || '未知错误'))
+    return Result.error('保存失败: ' + (err.message || '未知错误'))
   }
 }
 

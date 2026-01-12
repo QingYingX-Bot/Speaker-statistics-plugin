@@ -23,8 +23,8 @@ class RankCommands {
      * @param {string} imagePath 图片路径
      * @returns {Object} segment 图片对象
      */
-    formatImageSegment(imagePath) {
-        return segment.image(`file:///${imagePath.replace(/\\/g, '/')}`)
+    formatImageSegment(base64) {
+        return segment.image(`base64://${base64}`)
     }
 
     async getUserRankInfo(userId, groupId, period, rankings) {
@@ -244,7 +244,10 @@ class RankCommands {
                 user_id: user.user_id,
                 nickname: user.nickname || '未知用户',
                 total_count: parseInt(user.total_count || 0, 10),
-                count: parseInt(user.total_count || 0, 10)
+                count: parseInt(user.total_count || 0, 10),
+                total_words: parseInt(user.total_words || 0, 10),
+                active_days: parseInt(user.active_days || 0, 10),
+                continuous_days: parseInt(user.continuous_days || 0, 10)
             }))
 
             // 构建群统计数据
@@ -401,7 +404,7 @@ class RankCommands {
             // 解析页码参数（如果有）
             const match = e.msg.match(/\s+(\d+)/)
             const page = match ? parseInt(match[1], 10) : 1
-            const pageSize = globalConfig.getConfig('display.globalStatsDisplayCount') || 9; // 从配置获取每页显示数量
+            const pageSize = globalConfig.getConfig('display.globalStatsDisplayCount') || 10; // 从配置获取每页显示数量，默认10条
 
             // 获取全局统计数据
             const globalStats = await this.dataService.getGlobalStats(page, pageSize)

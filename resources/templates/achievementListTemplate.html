@@ -17,155 +17,167 @@
 			}
 
 			.container {
-				max-width: 2800px;
+				max-width: 4000px;
 				margin: 0 auto;
-				background: #A9BCD0;
-				border-radius: 20px;
-				box-shadow: 0 20px 40px rgba(27, 27, 30, 0.15);
+				background: #ffffff;
+				border-radius: 24px;
+				box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
 				overflow: hidden;
-				backdrop-filter: blur(10px);
 			}
 
 			.header {
 				background: #58A4B0;
 				color: #FEF9FF;
-				padding: 24px 30px;
+				padding: 56px 48px;
 				text-align: center;
+				position: relative;
+			}
+
+			.header::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: rgba(255, 255, 255, 0.1);
+			}
+
+			.header>* {
+				position: relative;
+				z-index: 1;
 			}
 
 			.title {
-				font-size: 48px;
-				font-weight: 700;
-				line-height: 1.2;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-				overflow: hidden;
+				font-size: 72px;
+				font-weight: 1000;
+				margin-bottom: 20px;
+				color: #FEF9FF;
+				letter-spacing: 0.5px;
 			}
 
 			.achievement-count {
-				font-size: 32px;
-				margin-top: 8px;
-				font-weight: 600;
+				font-size: 40px;
+				font-weight: 700;
+				margin-bottom: 16px;
+				color: #FEF9FF;
 			}
 
 			.achievement-count span {
-				font-weight: 700;
-				font-size: 36px;
+				font-weight: 1000;
+				font-size: 52px;
 				color: #fff;
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 			}
 
 			.group-info {
-				font-size: 24px;
-				opacity: 0.9;
-				font-weight: 500;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-				overflow: hidden;
-				margin-top: 8px;
+				font-size: 28px;
+				opacity: 0.95;
+				font-weight: 600;
+				color: #FEF9FF;
+			}
+
+			.achievements-section {
+				padding: 56px;
+				background: #D8DBE2;
 			}
 
 			.achievements-list {
-				padding: 24px;
 				display: grid;
-				grid-template-columns: repeat(3, 1fr);
-				gap: 16px;
-				column-gap: 20px;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 28px;
 			}
 
 			.achievement-separator {
 				display: flex;
 				align-items: center;
-				margin: 20px 0 16px 0;
-				gap: 12px;
+				margin: 40px 0 28px 0;
+				gap: 20px;
 				grid-column: 1 / -1;
 			}
 
 			.separator-line {
 				flex: 1;
-				height: 1px;
+				height: 3px;
 				background: #58A4B0;
-				opacity: 0.3;
+				opacity: 0.4;
+				border-radius: 1px;
 			}
 
 			.separator-text {
-				font-size: 24px;
-				font-weight: 600;
-				color: #58A4B0;
-				padding: 0 12px;
+				font-size: 36px;
+				font-weight: 900;
+				color: #373F51;
+				padding: 0 20px;
+				letter-spacing: 0.5px;
 			}
 
 			.achievement-item {
+				background: #A9BCD0;
+				border-radius: 24px;
+				padding: 32px;
+				border: 2px solid rgba(88, 164, 176, 0.3);
+				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.03);
 				display: flex;
 				flex-direction: column;
-				gap: 10px;
-				padding: 14px 16px;
-				border-radius: 12px;
-				border: 1px solid rgba(88, 164, 176, 0.2);
-				background: #fff;
-				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-				min-height: 140px;
+				gap: 20px;
 			}
 
 			.achievement-item.unlocked {
-				background: rgba(88, 164, 176, 0.05);
-				border-color: rgba(88, 164, 176, 0.3);
+				background: linear-gradient(135deg, #A9BCD0 0%, #C4D4E0 100%);
+				border-color: rgba(88, 164, 176, 0.5);
 			}
 
 			.achievement-item.locked {
-				opacity: 0.6;
-				background: #f5f5f5;
+				opacity: 0.7;
+				background: #D8DBE2;
 			}
 
 			.achievement-header {
 				display: flex;
 				align-items: center;
-				gap: 12px;
-				flex-wrap: wrap;
+				gap: 16px;
 			}
 
 			.achievement-status {
-				width: 32px;
-				height: 32px;
-				font-size: 20px;
-				text-align: center;
-				flex-shrink: 0;
+				width: 52px;
+				height: 52px;
+				font-size: 28px;
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				border-radius: 8px;
-				background: #fff;
+				border-radius: 14px;
+				background: rgba(255, 255, 255, 0.4);
+				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+				flex-shrink: 0;
 			}
 
 			.achievement-status.unlocked {
-				color: #38a169;
-				background: rgba(56, 161, 105, 0.1);
+				background: rgba(56, 161, 105, 0.2);
 			}
 
 			.achievement-status.locked {
-				color: #a0aec0;
-				background: #f0f0f0;
+				background: rgba(160, 174, 192, 0.3);
 			}
 
 			.achievement-badge {
-				flex-shrink: 0;
-				display: flex;
-				align-items: center;
-				justify-content: flex-start;
+				flex: 1;
+				min-width: 0;
 			}
 
 			.achievement-inline {
-				font-size: 18px;
-				font-weight: 600;
-				padding: 6px 12px;
-				border-radius: 8px;
-				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+				font-size: 24px;
+				font-weight: 800;
+				padding: 10px 20px;
+				border-radius: 14px;
 				display: inline-block;
-				vertical-align: middle;
-				line-height: 1.2;
+				line-height: 1.3;
 				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				max-width: 100%;
 			}
 
-			/* 成就等级颜色样式 */
 			.achievement-inline.achievement-common {
 				background: #F2DFD7;
 				color: #373F51;
@@ -209,126 +221,90 @@
 			.achievement-info {
 				display: flex;
 				flex-direction: column;
-				gap: 8px;
-				flex: 1;
-				min-width: 0;
+				gap: 16px;
 			}
 
 			.achievement-name-row {
 				display: flex;
 				align-items: center;
-				gap: 8px;
+				gap: 12px;
 				flex-wrap: wrap;
 			}
 
 			.achievement-name {
-				font-size: 20px;
-				font-weight: 600;
-				color: #1a202c;
+				font-size: 26px;
+				font-weight: 900;
+				color: #373F51;
 				line-height: 1.3;
 				word-break: break-word;
 			}
 
-			.achievement-description-row {
-				display: flex;
-				flex-direction: column;
-				gap: 6px;
+			.achievement-item.locked .achievement-name {
+				color: #718096;
 			}
 
 			.achievement-description {
-				font-size: 16px;
-				color: #4a5568;
-				font-weight: 400;
-				line-height: 1.4;
+				font-size: 20px;
+				color: #2d3748;
+				font-weight: 600;
+				line-height: 1.5;
 				word-break: break-word;
+			}
+
+			.achievement-item.locked .achievement-description {
+				color: #a0aec0;
 			}
 
 			.achievement-meta-row {
 				display: flex;
 				align-items: center;
-				gap: 8px;
-				flex-shrink: 0;
-			}
-
-			.achievement-item.locked .achievement-name {
-				color: #a0aec0;
-			}
-
-			.achievement-item.locked .achievement-description {
-				color: #cbd5e0;
+				gap: 14px;
+				flex-wrap: wrap;
+				margin-top: 6px;
 			}
 
 			.achievement-display-status {
 				font-size: 18px;
 				font-weight: 700;
-				flex-shrink: 0;
 			}
 
 			.display-status {
 				display: inline-block;
-				padding: 2px 8px;
-				border-radius: 8px;
+				padding: 6px 12px;
+				border-radius: 10px;
 				font-size: 16px;
 				white-space: nowrap;
 			}
 
 			.display-status.manual {
-				background: rgba(72, 187, 120, 0.15);
+				background: rgba(72, 187, 120, 0.2);
 				color: #38a169;
 			}
 
 			.display-status.auto {
-				background: rgba(66, 153, 225, 0.15);
+				background: rgba(66, 153, 225, 0.2);
 				color: #2c5282;
 			}
 
 			.display-status.expired {
-				background: rgba(245, 101, 101, 0.15);
+				background: rgba(245, 101, 101, 0.2);
 				color: #c53030;
 			}
 
 			.achievement-unlock-time {
-				font-size: 14px;
+				font-size: 18px;
 				color: #2c5282;
-				font-weight: 500;
-				display: flex;
-				align-items: center;
-				gap: 6px;
-				white-space: nowrap;
+				font-weight: 700;
 			}
 
 			.footer {
-				background: #f7fafc;
-				padding: 20px;
+				background: #D8DBE2;
+				padding: 32px 48px;
 				text-align: center;
-				border-top: 1px solid #e2e8f0;
-				color: #718096;
+				color: #373F51;
 				font-size: 20px;
+				border-top: 1px solid #A9BCD0;
 				font-weight: 500;
-			}
-
-			.footer p {
-				margin: 0;
-				line-height: 1.5;
-			}
-
-			::selection {
-				background: rgba(102, 126, 234, 0.2);
-				color: #2d3748;
-			}
-
-			::-webkit-scrollbar {
-				width: 8px;
-			}
-
-			::-webkit-scrollbar-track {
-				background: #f1f1f1;
-				border-radius: 4px;
-			}
-
-			::-webkit-scrollbar-thumb {
-				background: #667eea;
-				border-radius: 4px;
 			}
 		</style>
 	</head>
@@ -337,13 +313,14 @@
 			<div class="header">
 				{{HEADER}}
 			</div>
-			<div class="achievements-list">
-				{{ACHIEVEMENT_ITEMS}}
+			<div class="achievements-section">
+				<div class="achievements-list">
+					{{ACHIEVEMENT_ITEMS}}
+				</div>
 			</div>
 			<div class="footer">
-				<p>生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}</p>
+				生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}
 			</div>
 		</div>
 	</body>
 </html>
-

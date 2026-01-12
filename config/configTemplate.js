@@ -27,7 +27,7 @@ const configTemplate = {
         // 显示的排行数量
         displayCount: 20,
         // 全局统计显示的群组数量
-        globalStatsDisplayCount: 6,
+        globalStatsDisplayCount: 10,
         // 是否使用转发消息展示排行
         useForward: false,
         // 是否使用图片模式展示排行

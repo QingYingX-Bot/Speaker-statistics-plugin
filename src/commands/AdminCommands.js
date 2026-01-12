@@ -306,7 +306,7 @@ class AdminCommands {
         const result = await this.processGroupAchievements(groupId, allDisplayAchievements)
         
         const msg = [[
-            `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
+                `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
         ]]
         
         if (result.errors.length > 0) {
@@ -379,7 +379,7 @@ class AdminCommands {
         }
         
         const msg = [[
-            `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
+                `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
         ]]
         
         if (groupResults.length > 0) {
@@ -716,7 +716,7 @@ class AdminCommands {
                 })
                 
                 const msg = [[
-                    `🔍 找到 ${zombieGroups.length} 个僵尸群（数据库中存在但机器人已不在群中）\n\n💡 归档说明：\n- 数据将移到暂存表，不会立即删除\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除\n\n💡 如需归档，请发送：\n#水群确认归档\n\n⏰ 确认有效期为5分钟`
+                        `🔍 找到 ${zombieGroups.length} 个僵尸群（数据库中存在但机器人已不在群中）\n\n💡 归档说明：\n- 数据将移到暂存表，不会立即删除\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除\n\n💡 如需归档，请发送：\n#水群确认归档\n\n⏰ 确认有效期为5分钟`
                 ]]
                 
                 const batchSize = 15
@@ -801,7 +801,7 @@ class AdminCommands {
                 AdminCommands.pendingCleanGroups.delete(userId)
                 
                 const msg = [[
-                    `✅ 僵尸群归档完成\n\n📊 统计信息：\n- 成功归档: ${successCount} 个\n- 归档失败: ${failCount} 个\n\n💡 提示：\n- 如果这些群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
+                        `✅ 僵尸群归档完成\n\n📊 统计信息：\n- 成功归档: ${successCount} 个\n- 归档失败: ${failCount} 个\n\n💡 提示：\n- 如果这些群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
                 ]]
                 
                 if (errors.length > 0) {
@@ -845,7 +845,7 @@ class AdminCommands {
                 }
 
                 const msg = [[
-                    `📋 归档群组列表\n\n📊 统计信息：\n- 归档总数: ${totalCount} 个\n- 显示数量: ${archivedGroups.length} 个\n\n💡 说明：\n- 归档的群组数据已移到暂存表\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
+                        `📋 归档群组列表\n\n📊 统计信息：\n- 归档总数: ${totalCount} 个\n- 显示数量: ${archivedGroups.length} 个\n\n💡 说明：\n- 归档的群组数据已移到暂存表\n- 如果群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
                 ]]
 
                 const batchSize = 15

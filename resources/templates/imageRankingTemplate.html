@@ -20,8 +20,8 @@
 				max-width: 1600px;
 				margin: 0 auto;
 				background: #A9BCD0;
-				border-radius: 20px;
-				box-shadow: 0 20px 40px rgba(27, 27, 30, 0.15);
+				border-radius: 24px;
+				box-shadow: 0 24px 48px rgba(27, 27, 30, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
 				overflow: hidden;
 				backdrop-filter: blur(10px);
 			}
@@ -29,7 +29,7 @@
 			.header {
 				background: #58A4B0;
 				color: #FEF9FF;
-				padding: 40px 30px;
+				padding: 44px 36px;
 				text-align: center;
 				position: relative;
 			}
@@ -53,15 +53,16 @@
 			.title {
 				font-size: 64px;
 				font-weight: 1000;
-				line-height: 1.2;
+				line-height: 1.3;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 				overflow: hidden;
+				letter-spacing: 0.5px;
 			}
 
 			.total-count {
 				font-size: 44px;
-				margin-bottom: 12px;
+				margin-bottom: 14px;
 				font-weight: 1000;
 			}
 
@@ -69,7 +70,7 @@
 				font-weight: 1000;
 				font-size: 52px;
 				color: #fff;
-				text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+				text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 			}
 
 			.group-info {
@@ -83,22 +84,23 @@
 			}
 
 			.ranking-list {
-				padding: 40px;
+				padding: 44px;
 			}
 
 			.rank-item {
 				display: flex;
 				align-items: center;
-				padding: 24px 30px;
-				margin-bottom: 16px;
-				border-radius: 16px;
-				border: 1px solid rgba(102, 126, 234, 0.1);
+				padding: 28px 32px;
+				margin-bottom: 18px;
+				border-radius: 20px;
+				border: 1px solid rgba(102, 126, 234, 0.15);
 				position: relative;
 				overflow: hidden;
 			}
 
 			.rank-item:not(.has-background) {
 				background: #D8DBE2;
+				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
 			}
 
 
@@ -329,16 +331,6 @@
 				background: linear-gradient(135deg, #9D4EDD 0%, #C77DFF 50%, #E0AAFF 100%);
 				color: #FEF9FF;
 				box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
-				animation: special-glow 2s ease-in-out infinite alternate;
-			}
-
-			@keyframes special-glow {
-				from {
-					box-shadow: 0 2px 8px rgba(157, 78, 221, 0.5);
-				}
-				to {
-					box-shadow: 0 4px 16px rgba(157, 78, 221, 0.8);
-				}
 			}
 
 			.stats {
@@ -432,7 +424,7 @@
 
 			.footer {
 				background: #f7fafc;
-				padding: 30px;
+				padding: 32px;
 				text-align: center;
 				border-top: 1px solid #e2e8f0;
 				color: #718096;
@@ -442,7 +434,7 @@
 
 			.footer p {
 				margin: 0;
-				line-height: 1.5;
+				line-height: 1.6;
 			}
 
 			::selection {
