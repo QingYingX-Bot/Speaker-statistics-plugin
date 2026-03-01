@@ -95,6 +95,9 @@ class DataService {
         this.rankingCache = new LRUCache(50, 2 * 60 * 1000) // 排行榜缓存，2分钟TTL
         this.globalStatsCache = new LRUCache(10, 3 * 60 * 1000) // 全局统计缓存，3分钟TTL
         this.messageRecorder = null // 消息记录器引用（由外部设置）
+        // 当前群列表缓存（Web 等拿不到 Bot.gl 时使用，与 #群列表 一致）
+        this.currentGroupIdsCache = { set: null, updatedAt: 0 }
+        this.currentGroupIdsCacheTTL = 10 * 60 * 1000 // 10 分钟
         
         // 确保数据库已初始化
         this.initialize()
@@ -587,18 +590,19 @@ class DataService {
             switch (type) {
                 case 'total':
                     const queryAllGroups = !groupId || groupId === 'all'
-                    
+                    const currentGroupIdsForRank = queryAllGroups ? this.getCurrentGroupIdsForFilter() : null
+
                     if (queryAllGroups) {
-                        const cacheKey = `ranking:total:all:${limit}`
+                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}`
                         const cached = this.rankingCache.get(cacheKey)
                         if (cached) {
                             return cached
                         }
                     }
-                    
+
                     let topUsers
                     if (queryAllGroups) {
-                        topUsers = await this.dbService.getTopUsersAllGroups(limit, 'total_count')
+                        topUsers = await this.dbService.getTopUsersAllGroups(limit, 'total_count', currentGroupIdsForRank)
                     } else {
                         const isArchived = await this.dbService.isGroupArchived(groupId)
                         if (isArchived) {
@@ -618,7 +622,7 @@ class DataService {
                     }))
                     
                     if (queryAllGroups) {
-                        const cacheKey = `ranking:total:all:${limit}`
+                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}`
                         this.rankingCache.set(cacheKey, result)
                     }
                     
@@ -702,7 +706,8 @@ class DataService {
                 case 'total':
                     const queryAllGroups = !groupId || groupId === 'all'
                     if (queryAllGroups) {
-                        const allUsers = await this.dbService.getTopUsersAllGroups(999999, 'total_count')
+                        const currentGroupIdsForUserRank = this.getCurrentGroupIdsForFilter()
+                        const allUsers = await this.dbService.getTopUsersAllGroups(999999, 'total_count', currentGroupIdsForUserRank)
                         
                         const userIndex = allUsers.findIndex(u => String(u.user_id) === String(userId))
                         if (userIndex === -1) return null
@@ -864,6 +869,51 @@ class DataService {
     }
 
     /**
+     * 获取当前群 ID 列表用于统计与 SQL 过滤
+     * 与 RobotManagement-plugin 的 showGroupList / memberStatistics 一致：仅统计 Bot.gl 中的群（排除 stdin）
+     * 归档群（cleanZombieGroups 归档的）不计入统计且不可查；Web 请求时使用缓存
+     * @returns {string[]|null} 当前群 ID 数组，null 表示无法获取（Web 等场景则不过滤）
+     */
+    getCurrentGroupIdsForFilter() {
+        if (typeof Bot !== 'undefined' && Bot.gl && Bot.gl.size > 0) {
+            const set = new Set()
+            for (const [gid, _] of Bot.gl) {
+                if (gid !== 'stdin') set.add(String(gid))
+            }
+            if (set.size > 0) return Array.from(set)
+        }
+        if (this.currentGroupIdsCache.set && this.currentGroupIdsCache.set.size > 0) {
+            const age = Date.now() - this.currentGroupIdsCache.updatedAt
+            if (age < this.currentGroupIdsCacheTTL) {
+                return Array.from(this.currentGroupIdsCache.set)
+            }
+        }
+        return null
+    }
+
+    /**
+     * 从 Bot.gl 刷新当前群列表缓存（供 Web 等拿不到 Bot.gl 时使用）
+     * @param {number} throttleMs 节流：距上次更新不足此毫秒数则跳过，0 表示不节流
+     * @returns {Set<string>|null} 当前群 ID 集合或 null
+     */
+    refreshCurrentGroupIdsFromBot(throttleMs = 0) {
+        if (typeof Bot === 'undefined' || !Bot.gl || Bot.gl.size === 0) return null
+        if (throttleMs > 0 && this.currentGroupIdsCache.updatedAt > 0 && (Date.now() - this.currentGroupIdsCache.updatedAt) < throttleMs) {
+            return this.currentGroupIdsCache.set
+        }
+        const set = new Set()
+        for (const [gid, _] of Bot.gl) {
+            if (gid !== 'stdin') set.add(String(gid))
+        }
+        if (set.size > 0) {
+            this.currentGroupIdsCache = { set, updatedAt: Date.now() }
+            this.globalStatsCache.clear()
+            return set
+        }
+        return null
+    }
+
+    /**
      * 获取全局统计数据
      * @param {number} page 页码（从1开始）
      * @param {number} pageSize 每页显示的群组数量
@@ -874,9 +924,11 @@ class DataService {
             const cacheKey = `globalStats:${page}:${pageSize}`
             const cached = this.globalStatsCache.get(cacheKey)
             if (cached) {
+                global.logger?.mark?.(`[发言统计] 全局统计 使用缓存 (page=${page}, pageSize=${pageSize}), 统计群数=${cached.totalGroups}`)
                 return cached
             }
-            
+
+            global.logger?.mark?.('[发言统计] 全局统计 开始从数据库与 Bot.gl 计算')
             const timeInfo = TimeUtils.getCurrentDateTime()
             const todayKey = timeInfo.formattedDate
             const monthKey = timeInfo.monthKey
@@ -910,7 +962,33 @@ class DataService {
             ])
             
             const archivedGroupIdsSet = archivedGroupIds || new Set()
-            
+
+            // 仅统计 Bot.gl 中的群（与 RobotManagement-plugin #群列表/#群员统计 一致）；归档群不计入；优先 Bot.gl，Web 用缓存
+            let currentGroupIds = null
+            if (typeof Bot !== 'undefined' && Bot.gl && Bot.gl.size > 0) {
+                const set = new Set()
+                for (const [gid, _] of Bot.gl) {
+                    if (gid !== 'stdin') set.add(String(gid))
+                }
+                if (set.size > 0) {
+                    currentGroupIds = set
+                    this.currentGroupIdsCache = { set, updatedAt: Date.now() }
+                }
+            }
+            if (currentGroupIds === null && this.currentGroupIdsCache.set && this.currentGroupIdsCache.set.size > 0) {
+                const age = Date.now() - this.currentGroupIdsCache.updatedAt
+                if (age < this.currentGroupIdsCacheTTL) {
+                    currentGroupIds = this.currentGroupIdsCache.set
+                    global.logger?.mark?.(`[发言统计] 全局统计 当前群列表来自缓存, 群数=${currentGroupIds.size}, 缓存已存在${Math.round(age / 1000)}秒`)
+                }
+            }
+            if (currentGroupIds !== null && currentGroupIds.size > 0) {
+                global.logger?.mark?.(`[发言统计] 全局统计 当前群列表: 来源=${typeof Bot !== 'undefined' && Bot.gl && Bot.gl.size > 0 ? 'Bot.gl' : '缓存'}, 群数=${currentGroupIds.size}`)
+            } else {
+                global.logger?.mark?.('[发言统计] 全局统计 未获取到当前群列表(Bot.gl/缓存均不可用), 将统计数据库全部非归档群')
+            }
+            global.logger?.mark?.(`[发言统计] 全局统计 数据库群数=${allGroupIds.length}, 已归档群数=${archivedGroupIdsSet.size}`)
+
             let totalGroups = 0
             let totalUsersSet = new Set()
             let totalMessages = totalMessagesResult || 0
@@ -922,6 +1000,10 @@ class DataService {
 
             for (const groupId of allGroupIds) {
                 if (archivedGroupIdsSet.has(String(groupId))) {
+                    continue
+                }
+                // 只统计当前仍在的群，与 #群列表 一致
+                if (currentGroupIds !== null && !currentGroupIds.has(String(groupId))) {
                     continue
                 }
                 try {
@@ -998,6 +1080,13 @@ class DataService {
 
             groupStatsList.sort((a, b) => b.totalMessages - a.totalMessages)
 
+            // 仅统计当前群时，消息总量和字数按当前群重新汇总，与统计群数一致
+            if (currentGroupIds !== null) {
+                totalMessages = groupStatsList.reduce((s, g) => s + (g.totalMessages || 0), 0)
+                totalWords = groupStatsList.reduce((s, g) => s + (g.totalWords || 0), 0)
+            }
+            global.logger?.mark?.(`[发言统计] 全局统计 计算完成: 统计群数=${totalGroups}, 统计用户数=${totalUsersSet.size}, 消息总量=${totalMessages}, 群列表条数=${groupStatsList.length}`)
+
             const totalPages = Math.ceil(groupStatsList.length / pageSize)
             const startIndex = (page - 1) * pageSize
             const endIndex = startIndex + pageSize
@@ -1006,11 +1095,20 @@ class DataService {
             let earliestTime = null
             let statsDurationHours = 0
             try {
-                const earliestResult = await this.dbService.get(
-                    'SELECT MIN(created_at) as earliest_time FROM user_stats'
-                )
-                earliestTime = earliestResult?.earliest_time || null
-                
+                if (currentGroupIds !== null && currentGroupIds.size > 0) {
+                    const ids = Array.from(currentGroupIds)
+                    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',')
+                    const earliestResult = await this.dbService.get(
+                        `SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id IN (${placeholders})`,
+                        ...ids
+                    )
+                    earliestTime = earliestResult?.earliest_time || null
+                } else {
+                    const earliestResult = await this.dbService.get(
+                        'SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
+                    )
+                    earliestTime = earliestResult?.earliest_time || null
+                }
                 if (earliestTime) {
                     const earliestDate = new Date(earliestTime)
                     const now = new Date()

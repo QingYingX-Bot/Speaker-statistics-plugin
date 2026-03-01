@@ -690,9 +690,8 @@ class TemplateManager {
 			</div>
         `
 
-        // 生成群聊统计列表HTML（每页固定显示 10 条）
-        const maxGroups = 10
-        const groups = (globalStats.groups || []).slice(0, maxGroups)
+        // 生成群聊统计列表HTML（使用当前页的群列表，与 pageSize 一致，不截断）
+        const groups = globalStats.groups || []
         const groupsHtml = this.generateGroupsStatsHtml(groups)
 
         // 处理无群组情况

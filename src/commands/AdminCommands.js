@@ -648,6 +648,9 @@ class AdminCommands {
 
     /**
      * 归档僵尸群（列出待归档的群组，等待确认）
+     * 与 #群列表 一致：当前群 = Bot.gl（排除 stdin）
+     * 第一步：已归档的群若当前在 Bot.gl 中则自动恢复（移出归档）。
+     * 第二步：数据库中有统计记录(user_stats)但不在 Bot.gl 中的群 = 僵尸，可确认后归档；归档后不计入统计、不可查询；60 天后自动清理；群重加回来会恢复。
      */
     async cleanZombieGroups(e) {
         if (!(await CommandWrapper.validateAndReply(e, getPermissionManager().validateAdminPermission(e)))) return
@@ -655,8 +658,26 @@ class AdminCommands {
         return await CommandWrapper.safeExecute(
             async () => {
                 const userId = String(e.user_id)
-                
-                const currentGroups = new Set()
+                global.logger?.mark?.('[发言统计] #水群归档僵尸群 开始，先刷新 Bot.gl 以与 #群列表 一致')
+
+                // 与 #群列表 / #群员统计 一致：先尝试刷新 Bot.gl，再以 Bot.gl 为当前群列表
+                try {
+                    if (global.Bot && global.Bot.uin && Array.isArray(global.Bot.uin)) {
+                        for (const uin of global.Bot.uin) {
+                            if (uin === 'stdin') continue
+                            const bot = global.Bot[uin]
+                            if (bot && typeof bot.reloadGroupList === 'function') {
+                                await bot.reloadGroupList()
+                            }
+                        }
+                    } else if (global.Bot && typeof global.Bot.reloadGroupList === 'function') {
+                        await global.Bot.reloadGroupList()
+                    }
+                } catch (err) {
+                    globalConfig.warn('[发言统计] #水群归档僵尸群 刷新 Bot.gl 失败，使用当前 Bot.gl:', err?.message || err)
+                }
+
+                let currentGroups = new Set()
                 if (global.Bot && global.Bot.gl) {
                     for (const [groupId] of global.Bot.gl) {
                         if (groupId !== 'stdin') {
@@ -664,27 +685,66 @@ class AdminCommands {
                         }
                     }
                 }
-                
-                const allGroups = await this.dataService.dbService.all(
-                    'SELECT group_id, group_name, updated_at FROM group_info ORDER BY updated_at ASC'
-                )
-                
+                // Bot.gl 为空时用缓存（与全局统计一致），避免误把全部群当僵尸
+                if (currentGroups.size === 0 && this.dataService.getCurrentGroupIdsForFilter()) {
+                    currentGroups = new Set(this.dataService.getCurrentGroupIdsForFilter())
+                    global.logger?.mark?.(`[发言统计] #水群归档僵尸群 当前群列表: 来源=缓存( Bot.gl 为空 ), 群数=${currentGroups.size}`)
+                } else {
+                    global.logger?.mark?.(`[发言统计] #水群归档僵尸群 当前群列表: 来源=Bot.gl, 群数=${currentGroups.size}`)
+                }
+                if (currentGroups.size === 0) {
+                    return e.reply('❌ 无法获取当前群列表（Bot.gl 与缓存均无）。请先在任意群内发一条消息或使用 #群列表 后再试 #水群归档僵尸群。')
+                }
+
+                // 第一步：已在 Bot.gl 的群若在归档表中则恢复（重加回来的群移出归档）
+                const archivedList = await this.dataService.dbService.all('SELECT group_id FROM archived_groups').catch(() => [])
+                let restoredCount = 0
+                for (const row of archivedList || []) {
+                    const gid = String(row.group_id)
+                    if (currentGroups.has(gid)) {
+                        try {
+                            const ok = await this.dataService.restoreGroupStats(gid)
+                            if (ok) restoredCount++
+                        } catch (err) {
+                            globalConfig.warn(`[发言统计] 恢复归档群 ${gid} 失败:`, err?.message || err)
+                        }
+                    }
+                }
+                if (restoredCount > 0) {
+                    global.logger?.mark?.(`[发言统计] #水群归档僵尸群 已恢复 ${restoredCount} 个群（当前在 Bot.gl，已移出归档）`)
+                }
+
+                // 第二步：数据库中不在 Bot.gl 的群 = 僵尸（待归档）；数据来源与统计一致用 user_stats
+                const dbGroupsRows = await this.dataService.dbService.all(
+                    `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, gi.updated_at
+                     FROM (SELECT DISTINCT group_id FROM user_stats) us
+                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
+                     ORDER BY gi.updated_at ASC`
+                ).catch(() => [])
+                const allGroups = dbGroupsRows && dbGroupsRows.length > 0
+                    ? dbGroupsRows
+                    : await this.dataService.dbService.all(
+                        'SELECT group_id, group_name, updated_at FROM group_info ORDER BY updated_at ASC'
+                    ).catch(() => [])
+
                 if (!allGroups || allGroups.length === 0) {
                     return e.reply('✅ 没有找到任何群组数据')
                 }
-                
+
+                const archivedCount = await this.dataService.dbService.get('SELECT COUNT(*) as count FROM archived_groups').then(r => parseInt(r?.count || 0, 10)).catch(() => 0)
+                global.logger?.mark?.(`[发言统计] #水群归档僵尸群 数据库群数(有统计记录的)=${allGroups.length}, 已归档群数=${archivedCount}`)
+
                 const zombieGroups = []
                 const now = TimeUtils.getUTC8Date()
-                
+
                 for (const group of allGroups) {
                     const groupId = String(group.group_id)
-                    
-                    // 排除已归档的群组
+
                     const isArchived = await this.dataService.dbService.isGroupArchived(groupId)
                     if (isArchived) {
                         continue
                     }
-                    
+
                     if (!currentGroups.has(groupId)) {
                         let updatedAt
                         if (group.updated_at instanceof Date) {
@@ -706,10 +766,15 @@ class AdminCommands {
                     }
                 }
                 
+                global.logger?.mark?.(`[发言统计] #水群归档僵尸群 计算完成: 僵尸群数=${zombieGroups.length} (数据库中不在 Bot.gl 且未归档)`)
+
                 if (zombieGroups.length === 0) {
-                    return e.reply('✅ 没有找到僵尸群（所有数据库中的群组都在当前群列表中）')
+                    const noZombieMsg = restoredCount > 0
+                        ? `✅ 已自动恢复 ${restoredCount} 个已重加的群（已移出归档）。\n✅ 没有找到僵尸群（所有有统计记录的群都在当前群列表中）`
+                        : '✅ 没有找到僵尸群（所有数据库中的群组都在当前群列表中）'
+                    return e.reply(noZombieMsg)
                 }
-                
+
                 AdminCommands.pendingCleanGroups.set(userId, {
                     groups: zombieGroups,
                     timestamp: Date.now()

@@ -140,6 +140,9 @@ class MessageRecorder {
         }
 
         const groupId = String(e.group_id)
+
+        // 刷新“当前群列表”缓存（节流 60s），供 Web 全局统计与 #群列表 一致
+        this.dataService.refreshCurrentGroupIdsFromBot(60 * 1000)
         
         // 检查群组是否已归档，如果是则恢复（异步执行，不阻塞消息处理）
         // 使用缓存优化：避免每次消息都查询数据库

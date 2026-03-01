@@ -5,6 +5,7 @@ import { CommandWrapper } from '../core/utils/CommandWrapper.js'
 import { ImageGenerator } from '../render/ImageGenerator.js'
 import { TextFormatter } from '../render/TextFormatter.js'
 import { TimeUtils } from '../core/utils/TimeUtils.js'
+import common from '../../../../lib/common/common.js'
 import { segment } from 'oicq'
 
 /**
@@ -114,7 +115,7 @@ class RankCommands {
                 fnc: 'showGroupInfo'
             },
             {
-                reg: '^#水群总统计(\\s+\\d+)?$|^#总水群统计(\\s+\\d+)?$',
+                reg: '^#水群总统计(\\s+(\\d+|all))?$|^#总水群统计(\\s+(\\d+|all))?$',
                 fnc: 'showGlobalStats'
             },
             {
@@ -345,21 +346,42 @@ class RankCommands {
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            // 获取全局信息（所有群组）
-            const allGroupIds = await this.dataService.dbService.getAllGroupIds()
-            const groupCount = allGroupIds.length
-            
-            // 获取总用户数（不重复）
-            const uniqueUsers = await this.dataService.dbService.all(
-                'SELECT DISTINCT user_id FROM user_stats'
-            )
-            const totalUsers = uniqueUsers.length
-            
-            // 获取最早记录时间
-            const earliestResult = await this.dataService.dbService.get(
-                'SELECT MIN(created_at) as earliest_time FROM user_stats'
-            )
-            const earliestTime = earliestResult?.earliest_time || null
+            // 与全局统计一致：仅统计群列表中的群，排除归档
+            const currentGroupIds = this.dataService.getCurrentGroupIdsForFilter()
+            const archivedSet = await this.dataService.dbService.all('SELECT group_id FROM archived_groups').then(g => new Set((g || []).map(r => String(r.group_id)))).catch(() => new Set())
+            let groupCount = 0
+            let totalUsers = 0
+            let earliestTime = null
+            if (currentGroupIds && currentGroupIds.length > 0) {
+                const placeholders = currentGroupIds.map((_, i) => `$${i + 1}`).join(',')
+                const groupCountResult = await this.dataService.dbService.get(
+                    `SELECT COUNT(DISTINCT group_id) as c FROM user_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                    ...currentGroupIds
+                )
+                groupCount = parseInt(groupCountResult?.c || 0, 10)
+                const uniqueResult = await this.dataService.dbService.get(
+                    `SELECT COUNT(DISTINCT user_id) as c FROM user_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                    ...currentGroupIds
+                )
+                totalUsers = parseInt(uniqueResult?.c || 0, 10)
+                const earliestResult = await this.dataService.dbService.get(
+                    `SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id IN (${placeholders})`,
+                    ...currentGroupIds
+                )
+                earliestTime = earliestResult?.earliest_time || null
+            } else {
+                const allGroupIds = await this.dataService.dbService.getAllGroupIds()
+                const filtered = (allGroupIds || []).filter(gid => !archivedSet.has(String(gid)))
+                groupCount = filtered.length
+                const uniqueResult = await this.dataService.dbService.get(
+                    'SELECT COUNT(DISTINCT user_id) as c FROM user_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
+                )
+                totalUsers = parseInt(uniqueResult?.c || 0, 10)
+                const earliestResult = await this.dataService.dbService.get(
+                    'SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
+                )
+                earliestTime = earliestResult?.earliest_time || null
+            }
 
             // 格式化最早时间
             let earliestTimeStr = '未知'
@@ -401,13 +423,51 @@ class RankCommands {
         }
 
         return await CommandWrapper.safeExecute(async () => {
-            // 解析页码参数（如果有）
-            const match = e.msg.match(/\s+(\d+)/)
-            const page = match ? parseInt(match[1], 10) : 1
-            const pageSize = globalConfig.getConfig('display.globalStatsDisplayCount') || 10; // 从配置获取每页显示数量，默认10条
+            // 解析参数：all（合并转发全量）或页码数字
+            const isAllMode = /#(?:水群总统计|总水群统计)\s+all\s*$/i.test(e.msg.trim())
+            const pageMatch = e.msg.match(/\s+(\d+)\s*$/)
+            const page = pageMatch ? parseInt(pageMatch[1], 10) : 1
+            const pageSize = globalConfig.getConfig('display.globalStatsDisplayCount') || 20
 
-            // 获取全局统计数据
+            global.logger?.mark?.('[发言统计] #水群总统计 开始获取全局统计')
+            // all 模式：拉取全部群（单次大 pageSize），用合并转发发送，每批 20 个群
+            if (isAllMode) {
+                const allPageSize = 99999
+                const globalStats = await this.dataService.getGlobalStats(1, allPageSize)
+                global.logger?.mark?.(`[发言统计] #水群总统计 all 完成: 统计群数=${globalStats.totalGroups}`)
+                const summaryText = `📊 全局统计\n\n` +
+                    `统计群数: ${CommonUtils.formatNumber(globalStats.totalGroups)}\n` +
+                    `统计用户总数: ${CommonUtils.formatNumber(globalStats.totalUsers)}\n` +
+                    `消息总量: ${CommonUtils.formatNumber(globalStats.totalMessages)}\n` +
+                    `今日活跃人数: ${CommonUtils.formatNumber(globalStats.todayActive)}\n` +
+                    `本月活跃人数: ${CommonUtils.formatNumber(globalStats.monthActive)}\n` +
+                    `统计时长(小时): ${CommonUtils.formatNumber(globalStats.statsDurationHours ?? 0)}\n`
+                const forwardMessages = [ [ summaryText ] ]
+                const groups = globalStats.groups || []
+                const chunkSize = 20
+                for (let i = 0; i < groups.length; i += chunkSize) {
+                    const chunk = groups.slice(i, i + chunkSize)
+                    const startRank = i + 1
+                    const endRank = i + chunk.length
+                    let block = `群聊详细统计（${startRank}-${endRank}）\n\n`
+                    chunk.forEach((group, idx) => {
+                        const rank = startRank + idx
+                        const maskedId = CommonUtils.maskGroupId(String(group.groupId))
+                        block += `${rank}. ${group.groupName || `群${group.groupId}`}\n`
+                        block += `   群号: ${maskedId}\n`
+                        block += `   用户数: ${CommonUtils.formatNumber(group.userCount)} | 消息数: ${CommonUtils.formatNumber(group.totalMessages)} | 今日活跃: ${CommonUtils.formatNumber(group.todayActive)} | 本月活跃: ${CommonUtils.formatNumber(group.monthActive)}\n\n`
+                    })
+                    forwardMessages.push([ block ])
+                }
+                if (forwardMessages.length === 1 && groups.length === 0) {
+                    forwardMessages.push([ '暂无群聊详细数据' ])
+                }
+                return e.reply(common.makeForwardMsg(e, forwardMessages, '全局统计'))
+            }
+
+            // 分页模式：获取当前页
             const globalStats = await this.dataService.getGlobalStats(page, pageSize)
+            global.logger?.mark?.(`[发言统计] #水群总统计 完成: 统计群数=${globalStats.totalGroups}, 用户数=${globalStats.totalUsers}, 消息总量=${globalStats.totalMessages}`)
 
             // 检查是否使用图片模式
             const usePicture = globalConfig.getConfig('display.usePicture')
@@ -428,18 +488,18 @@ class RankCommands {
                 `消息总量: ${CommonUtils.formatNumber(globalStats.totalMessages)}\n` +
                 `今日活跃人数: ${CommonUtils.formatNumber(globalStats.todayActive)}\n` +
                 `本月活跃人数: ${CommonUtils.formatNumber(globalStats.monthActive)}\n\n` +
-                `第 ${globalStats.currentPage} 页，共 ${globalStats.totalPages} 页\n\n`
+                `第 ${globalStats.currentPage} 页，共 ${globalStats.totalPages} 页（每页 ${pageSize} 个群聊）\n\n`
 
-            // 添加群组统计（前5个）
+            // 添加当前页群组统计
             if (globalStats.groups && globalStats.groups.length > 0) {
-                const topGroups = globalStats.groups.slice(0, 5)
-                let groupsText = '群组统计（前5个）:\n'
-                topGroups.forEach((group, index) => {
-                    groupsText += `${index + 1}. ${group.groupName || `群${group.groupId}`} (${group.groupId})\n`
-                    groupsText += `   用户数: ${CommonUtils.formatNumber(group.userCount)} | `
-                    groupsText += `消息数: ${CommonUtils.formatNumber(group.totalMessages)} | `
-                    groupsText += `今日活跃: ${CommonUtils.formatNumber(group.todayActive)} | `
-                    groupsText += `本月活跃: ${CommonUtils.formatNumber(group.monthActive)}\n`
+                const startRank = (globalStats.currentPage - 1) * pageSize + 1
+                let groupsText = `群聊详细统计（${startRank}-${startRank + globalStats.groups.length - 1}）:\n\n`
+                globalStats.groups.forEach((group, index) => {
+                    const rank = startRank + index
+                    const maskedId = CommonUtils.maskGroupId(String(group.groupId))
+                    groupsText += `${rank}. ${group.groupName || `群${group.groupId}`}\n`
+                    groupsText += `   群号: ${maskedId}\n`
+                    groupsText += `   用户数: ${CommonUtils.formatNumber(group.userCount)} | 消息数: ${CommonUtils.formatNumber(group.totalMessages)} | 今日活跃: ${CommonUtils.formatNumber(group.todayActive)} | 本月活跃: ${CommonUtils.formatNumber(group.monthActive)}\n\n`
                 })
                 return e.reply(text + groupsText)
             }

@@ -39,46 +39,73 @@ export class AdminApi extends BaseApi {
         this.app.get('/api/admin/overview',
             this.authMiddleware.requireAdmin.bind(this.authMiddleware),
             ApiResponse.asyncHandler(async (req, res) => {
+                // 与 #群列表 一致：仅统计当前 Bot 仍在的群（Web 使用缓存）
+                const currentGroupIds = this.dataService.getCurrentGroupIdsForFilter()
+                const groupInClause = currentGroupIds && currentGroupIds.length > 0
+                    ? ` WHERE group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')})`
+                    : ''
+                const groupInParams = currentGroupIds || []
+
                 // 获取统计概览
                 const totalGroups = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT group_id) as count FROM user_stats'
+                    groupInClause
+                        ? `SELECT COUNT(DISTINCT group_id) as count FROM user_stats${groupInClause}`
+                        : 'SELECT COUNT(DISTINCT group_id) as count FROM user_stats',
+                    ...groupInParams
                 )
                 
                 const totalUsers = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT user_id) as count FROM user_stats'
+                    groupInClause
+                        ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause}`
+                        : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats',
+                    ...groupInParams
                 )
                 
                 const totalMessages = await this.dataService.dbService.get(
-                    'SELECT SUM(total_count) as total FROM user_stats'
+                    groupInClause
+                        ? `SELECT SUM(total_count) as total FROM user_stats${groupInClause}`
+                        : 'SELECT SUM(total_count) as total FROM user_stats',
+                    ...groupInParams
                 )
 
                 // 使用 LEFT JOIN 一次性获取群名和统计数据（用于群组活跃度分布和消息密度散点图）
-                const groupStats = await this.dataService.dbService.all(`
-                    SELECT 
-                        us.group_id,
-                        COALESCE(gi.group_name, '') as group_name,
-                        COUNT(DISTINCT us.user_id) as user_count,
-                        SUM(us.total_count) as message_count
+                const groupStatsWhere = groupInClause ? groupInClause.replace('group_id', 'us.group_id') : ''
+                const groupStats = await this.dataService.dbService.all(
+                    groupStatsWhere
+                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
+                    FROM user_stats us
+                    LEFT JOIN group_info gi ON us.group_id = gi.group_id
+                    ${groupStatsWhere}
+                    GROUP BY us.group_id, gi.group_name
+                    ORDER BY SUM(us.total_count) DESC
+                    LIMIT 10`
+                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
                     FROM user_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     GROUP BY us.group_id, gi.group_name
                     ORDER BY SUM(us.total_count) DESC
-                    LIMIT 10
-                `)
+                    LIMIT 10`,
+                    ...groupInParams
+                )
                 
                 // 获取所有群组的数据（用于消息密度散点图）
-                const allGroupStats = await this.dataService.dbService.all(`
-                    SELECT 
-                        us.group_id,
-                        COALESCE(gi.group_name, '') as group_name,
-                        COUNT(DISTINCT us.user_id) as user_count,
-                        SUM(us.total_count) as message_count
+                const allGroupStats = await this.dataService.dbService.all(
+                    groupStatsWhere
+                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
+                    FROM user_stats us
+                    LEFT JOIN group_info gi ON us.group_id = gi.group_id
+                    ${groupStatsWhere}
+                    GROUP BY us.group_id, gi.group_name
+                    HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_count) > 0
+                    ORDER BY SUM(us.total_count) DESC`
+                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
                     FROM user_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     GROUP BY us.group_id, gi.group_name
                     HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_count) > 0
-                    ORDER BY SUM(us.total_count) DESC
-                `)
+                    ORDER BY SUM(us.total_count) DESC`,
+                    ...groupInParams
+                )
                 
                 // 格式化所有群组信息
                 const formattedAllGroupStats = await Promise.all(allGroupStats.map(async (row) => {
@@ -107,10 +134,16 @@ export class AdminApi extends BaseApi {
                 todayUTC8.setHours(0, 0, 0, 0)
                 // date_key 格式为 YYYY-MM-DD（UTC+8）
                 const todayDateKey = TimeUtils.formatDate(todayUTC8)
+                const dailyGroupInClause = currentGroupIds && currentGroupIds.length > 0
+                    ? ` AND group_id IN (${currentGroupIds.map((_, i) => `$${i + 2}`).join(',')})`
+                    : ''
+                const dailyParamsBase = (dateKey) => (currentGroupIds && currentGroupIds.length > 0 ? [dateKey, ...currentGroupIds] : [dateKey])
                 // 使用 = 精确匹配今天的日期，确保数据一致性
                 const todayMessages = await this.dataService.dbService.get(
-                    'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1',
-                    todayDateKey
+                    dailyGroupInClause
+                        ? `SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1${dailyGroupInClause}`
+                        : 'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1',
+                    ...dailyParamsBase(todayDateKey)
                 )
                 
                 // 获取活跃群数（最近7天有消息的群）
@@ -119,16 +152,20 @@ export class AdminApi extends BaseApi {
                 const sevenDaysAgoDateKey = TimeUtils.formatDate(sevenDaysAgoUTC8)
                 
                 const activeGroups = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1',
-                    sevenDaysAgoDateKey
+                    dailyGroupInClause
+                        ? `SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1${dailyGroupInClause}`
+                        : 'SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1',
+                    ...dailyParamsBase(sevenDaysAgoDateKey)
                 )
                 
                 // 获取近7天的每日消息统计（用于图表）
                 let dailyStats = []
                 try {
                     dailyStats = await this.dataService.dbService.all(
-                        'SELECT date_key as date, SUM(message_count) as count FROM daily_stats WHERE date_key >= $1 GROUP BY date_key ORDER BY date_key ASC',
-                        sevenDaysAgoDateKey
+                        dailyGroupInClause
+                            ? `SELECT date_key as date, SUM(message_count) as count FROM daily_stats WHERE date_key >= $1${dailyGroupInClause} GROUP BY date_key ORDER BY date_key ASC`
+                            : 'SELECT date_key as date, SUM(message_count) as count FROM daily_stats WHERE date_key >= $1 GROUP BY date_key ORDER BY date_key ASC',
+                        ...dailyParamsBase(sevenDaysAgoDateKey)
                     )
                 } catch (err) {
                     globalConfig.warn('[管理API] 获取每日统计失败:', err)
@@ -258,67 +295,66 @@ export class AdminApi extends BaseApi {
                     })
                 }
                 
-                // 获取今日新增用户数（从 user_stats 表的 created_at 字段）
-                // 根据数据库类型使用不同的查询方式，使用=精确匹配今天
+                // 获取今日新增用户数（仅统计 Bot.gl 中的群，与 #群列表 一致）
+                const n = groupInParams.length
                 let todayNewUsers
                 try {
                     const dbType = this.dataService.dbService.getDatabaseType()
-                    if (dbType === 'postgresql') {
-                        // PostgreSQL 查询
+                    if (groupInClause && n > 0) {
+                        const pgDate = `DATE(created_at AT TIME ZONE 'Asia/Shanghai') = $${n + 1}`
+                        const sqliteDate = `date(created_at, 'localtime') = $${n + 1}`
                         todayNewUsers = await this.dataService.dbService.get(
-                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE \'Asia/Shanghai\') = $1',
+                            dbType === 'postgresql'
+                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND ${pgDate}`
+                                : `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND ${sqliteDate}`,
+                            ...groupInParams,
                             todayDateKey
                         )
                     } else {
-                        // SQLite 查询
                         todayNewUsers = await this.dataService.dbService.get(
-                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, \'localtime\') = $1',
+                            dbType === 'postgresql'
+                                ? 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE \'Asia/Shanghai\') = $1'
+                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, \'localtime\') = $1',
                             todayDateKey
                         )
                     }
                 } catch (error) {
-                    // 如果失败，使用字符串比较（SQLite datetime 格式）
                     try {
                         const todayStart = `${todayDateKey} 00:00:00`
                         const todayEnd = `${todayDateKey} 23:59:59`
                         todayNewUsers = await this.dataService.dbService.get(
-                            'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE created_at >= $1 AND created_at <= $2',
-                            [todayStart, todayEnd]
+                            groupInClause && n > 0
+                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND created_at >= $${n + 1} AND created_at <= $${n + 2}`
+                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE created_at >= $1 AND created_at <= $2',
+                            groupInClause && n > 0 ? [...groupInParams, todayStart, todayEnd] : [todayStart, todayEnd]
                         ).catch(() => ({ count: 0 }))
                     } catch (error2) {
                         todayNewUsers = { count: 0 }
                     }
                 }
 
-                // 获取近7天的新增用户趋势（按日期统计新增用户数）
+                // 获取近7天的新增用户趋势（仅统计 Bot.gl 中的群）
                 let newUserStats = []
                 try {
-                    // 使用 user_stats 表的 created_at 字段统计每日新增用户数
-                    // 根据数据库类型选择相应的查询语句
                     const dbType = this.dataService.dbService.getDatabaseType()
-                    
-                    if (dbType === 'postgresql') {
-                        // PostgreSQL 查询
-                        newUserStats = await this.dataService.dbService.all(`
-                            SELECT 
-                                DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date,
-                                COUNT(DISTINCT user_id) as count
-                            FROM user_stats
-                            WHERE DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $1
-                            GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai')
-                            ORDER BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ASC
-                        `, sevenDaysAgoDateKey).catch(() => [])
+                    const dateParamIndex = groupInParams.length + 1
+                    if (groupInClause && groupInParams.length > 0) {
+                        const pgWhere = `WHERE group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')}) AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $${dateParamIndex}`
+                        const sqliteWhere = `WHERE group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')}) AND date(created_at, 'localtime') >= $${dateParamIndex}`
+                        newUserStats = await this.dataService.dbService.all(
+                            dbType === 'postgresql'
+                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_stats ${pgWhere} GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
+                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_stats ${sqliteWhere} GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
+                            ...groupInParams,
+                            sevenDaysAgoDateKey
+                        ).catch(() => [])
                     } else {
-                        // SQLite 查询
-                        newUserStats = await this.dataService.dbService.all(`
-                            SELECT 
-                                date(created_at, 'localtime') as date,
-                                COUNT(DISTINCT user_id) as count
-                            FROM user_stats
-                            WHERE date(created_at, 'localtime') >= $1
-                            GROUP BY date(created_at, 'localtime')
-                            ORDER BY date(created_at, 'localtime') ASC
-                        `, sevenDaysAgoDateKey).catch(() => [])
+                        newUserStats = await this.dataService.dbService.all(
+                            dbType === 'postgresql'
+                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $1 GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
+                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, 'localtime') >= $1 GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
+                            sevenDaysAgoDateKey
+                        ).catch(() => [])
                     }
                 } catch (error) {
                     globalConfig.error('获取新增用户趋势失败:', error)

@@ -113,12 +113,21 @@ class UserCommands {
                 totalUsers = globalStats.totalUsers || 0
                 totalMessages = globalStats.totalMessages || 0
                 
-                const userStatsList = await dbService.all(
-                    'SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1',
-                    userId
-                )
-                if (userStatsList?.length > 0) {
-                    groupCount = parseInt(userStatsList[0].group_count || 0, 10)
+                const currentGroupIds = this.dataService.getCurrentGroupIdsForFilter()
+                if (currentGroupIds && currentGroupIds.length > 0) {
+                    const placeholders = currentGroupIds.map((_, i) => `$${i + 2}`).join(',')
+                    const groupCountResult = await dbService.get(
+                        `SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1 AND group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                        userId,
+                        ...currentGroupIds
+                    )
+                    groupCount = parseInt(groupCountResult?.group_count || 0, 10)
+                } else {
+                    const userStatsList = await dbService.all(
+                        'SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups)',
+                        userId
+                    )
+                    if (userStatsList?.length > 0) groupCount = parseInt(userStatsList[0].group_count || 0, 10)
                 }
             } catch {
                 globalConfig.debug('获取排名信息失败')
@@ -202,10 +211,15 @@ class UserCommands {
             const mentionedUser = userInfo.isMentioned ? userInfo : null
             const dbService = this.dataService.dbService
             
-            const userStatsList = await dbService.all(
-                'SELECT * FROM user_stats WHERE user_id = $1 ORDER BY total_count DESC',
+            let userStatsList = await dbService.all(
+                'SELECT * FROM user_stats WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups) ORDER BY total_count DESC',
                 userId
             )
+            const currentGroupIds = this.dataService.getCurrentGroupIdsForFilter()
+            if (currentGroupIds && currentGroupIds.length > 0) {
+                const currentSet = new Set(currentGroupIds.map(String))
+                userStatsList = (userStatsList || []).filter(row => currentSet.has(String(row.group_id)))
+            }
 
             if (!userStatsList?.length) {
                 const message = mentionedUser 

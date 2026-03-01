@@ -559,14 +559,18 @@ class DatabaseService {
             const existing = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId)
             const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId)
             const groupName = groupInfo?.group_name || ''
-                
-                const lastActivity = await this.get(
-                    'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
-                    groupId
+            // PostgreSQL 的 archived_groups 有外键 REFERENCES group_info(group_id)，归档前必须保证 group_info 有该群
+            if (!groupInfo) {
+                await this.saveGroupInfo(groupId, groupName || `群${groupId}`)
+            }
+
+            const lastActivity = await this.get(
+                'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
+                groupId
             )
             const lastActivityAt = this._formatDateTime(lastActivity?.last_activity)
             const now = this.getCurrentTime()
-            
+
             if (existing) {
                 await this.run(`
                     UPDATE archived_groups 
@@ -768,49 +772,38 @@ class DatabaseService {
      * 获取所有群聊的排行榜（用于总榜）
      * @param {number} limit 限制数量
      * @param {string} orderBy 排序字段
-     * @returns {Promise<Array>} 排行榜数据（按用户ID聚合所有群聊的数据）
+     * @param {string[]|null} currentGroupIds 仅统计这些群（与群列表一致）；null 则仅排除归档
+     * @returns {Promise<Array>} 排行榜数据（按用户ID聚合）
      */
-    async getTopUsersAllGroups(limit, orderBy = 'total_count') {
+    async getTopUsersAllGroups(limit, orderBy = 'total_count', currentGroupIds = null) {
         const allowedColumns = ['total_count', 'total_words', 'active_days', 'continuous_days']
         if (!allowedColumns.includes(orderBy)) {
             orderBy = 'total_count'
         }
-        return this.all(
-            `WITH user_aggregated AS (
-                SELECT 
-                    user_id,
-                    MAX(nickname) as nickname,
-                    SUM(${orderBy}) as ${orderBy},
-                    SUM(total_words) as total_words,
-                    MAX(continuous_days) as continuous_days,
-                    MAX(last_speaking_time) as last_speaking_time
+        const groupFilter =
+            currentGroupIds && currentGroupIds.length > 0
+                ? ` AND group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')})`
+                : ''
+        const baseParams = currentGroupIds && currentGroupIds.length > 0 ? currentGroupIds : []
+        const limitParamIndex = baseParams.length + 1
+        const sql = `WITH user_aggregated AS (
+                SELECT user_id, MAX(nickname) as nickname, SUM(${orderBy}) as ${orderBy}, SUM(total_words) as total_words, MAX(continuous_days) as continuous_days, MAX(last_speaking_time) as last_speaking_time
                 FROM user_stats
-                WHERE group_id NOT IN (SELECT group_id FROM archived_groups)
+                WHERE group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilter}
                 GROUP BY user_id
             ),
             active_days_stats AS (
-                SELECT 
-                    user_id,
-                    COUNT(DISTINCT date_key) as active_days
+                SELECT user_id, COUNT(DISTINCT date_key) as active_days
                 FROM daily_stats
-                WHERE (message_count > 0 OR word_count > 0)
-                AND group_id NOT IN (SELECT group_id FROM archived_groups)
+                WHERE (message_count > 0 OR word_count > 0) AND group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilter}
                 GROUP BY user_id
             )
-            SELECT 
-                ua.user_id,
-                ua.nickname,
-                ua.${orderBy},
-                ua.total_words,
-                COALESCE(ads.active_days, 0) as active_days,
-                ua.continuous_days,
-                ua.last_speaking_time
+            SELECT ua.user_id, ua.nickname, ua.${orderBy}, ua.total_words, COALESCE(ads.active_days, 0) as active_days, ua.continuous_days, ua.last_speaking_time
             FROM user_aggregated ua
             LEFT JOIN active_days_stats ads ON ua.user_id = ads.user_id
-            ORDER BY ua.${orderBy} DESC 
-            LIMIT $1`,
-            limit
-        )
+            ORDER BY ua.${orderBy} DESC
+            LIMIT $${limitParamIndex}`
+        return this.all(sql, ...baseParams, limit)
     }
 
     // ========== 日统计相关方法 ==========
