@@ -42,6 +42,7 @@
 #### 渲染与文档
 - 渲染链路增强：`ImageGenerator` 使用 `domcontentloaded + timeout`，并支持 Puppeteer 代理参数，降低网络环境导致的渲染阻塞。
 - 模板层重构：`TemplateManager` 增加平台感知群名/头像能力，模板渲染优先复用 `DataService` 能力。
+- 文档清理：移除无用文档 `API.md`、`项目迁移计划书.md`。
 - 文档重构：`DATABASE_SETUP.md` 下线，安装与数据库说明并入 `README.md`；帮助命令与帮助面板同步当前命令集与策略口径。
 
 ---
