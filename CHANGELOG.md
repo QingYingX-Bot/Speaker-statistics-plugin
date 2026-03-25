@@ -4,6 +4,51 @@
 
 ---
 
+## [5.0.0] - 2025-03-25
+
+### 🎨 Web 控制台视觉升级
+
+- Web 管理端整体改为现代黑白灰风格，统一页面层级、边框与阴影体系。
+- 左侧导航栏重做为深灰玻璃质感样式，优化激活态与移动端菜单观感。
+- `Background` 页面交互重构：支持拖拽选择、实时构图预览、缩放/偏移控制与一键上传流程。
+
+### ⚠️ 破坏性更新
+
+- 统计数据模型切换为新结构：核心表统一为 `message_granular_stats` + `user_agg_stats`，旧结构 `user_stats/daily_stats/weekly_stats/monthly_stats/yearly_stats` 不再作为默认依赖。
+- 数据查询字段口径切换：主统计字段统一为 `total_msg/total_word`（旧脚本若依赖 `total_count/total_words` 需要同步调整）。
+- SQLite 默认路径策略变更：未配置 `database.path` 时固定使用 `speech_statistics_db.db`，不会自动沿用 `speech_statistics.db`。
+- 默认数据库类型切换：默认从 `sqlite` 调整为 `postgresql`（`index.js` 与 `config/configTemplate.js` 同步）。
+- 更新命令策略变更：`#水群更新` 使用 `git pull --ff-only` 且检测本地改动时拒绝执行；`#水群强制更新` 保持覆盖本地修改语义。
+
+### ♻️ 重构更新
+
+#### 核心与数据层
+- `DataService` 大规模重构：补齐平台感知（QQ/Discord/Telegram）群名与头像解析；新增 Discord 用户/服务器/频道缓存（内存 LRU + 持久化文件 `data/cache/discord_profile_cache.json`）。
+- 新增代理工具 `src/core/utils/ProxyUtils.js`，统一读取框架代理配置；`DataService` 与 `ImageGenerator` 支持代理链路。
+- `DatabaseService` 及 PostgreSQL/SQLite 适配器重构：建表、索引、归档、统计查询全面对齐新结构；兼容层旧表/旧视图在初始化阶段清理。
+- SQLite 适配器增强：`better-sqlite3` 异常时自动回退 `sqlite3`；支持 PostgreSQL 风格占位符在 SQLite 下按出现顺序展开。
+
+#### 命令与交互层
+- `Plugin` 重构为共享核心组件（单例化命令/服务实例），并在启动阶段预加载成就定义。
+- 背景命令链路正式接入：`#水群设置背景`、`#水群删除背景`、`#水群背景帮助` 走真实实现。
+- 管理命令增强：更新命令增加分支识别与分类提示；归档确认前增加二次群列表校验与“安全跳过”统计输出。
+- 用户与排行榜命令升级：群名称统一走平台感知名称解析；`#水群查询群列表` 在不支持合并转发时自动降级为纯文本输出。
+
+#### API 与管理端
+- `AdminApi`、`StatsApi`、`AuthService`、`GroupManagementApi` 查询全面切换到 `user_agg_stats/message_granular_stats`。
+- 成就链路重构：`AchievementService` 改为共享实例；命令端与 API 端统一 `groupId/userId` 解析、全局/群专属成就口径与稀有度排序规则。
+- 管理端成就接口与页面联动更新：管理员页按当前选中群拉取成就列表，统计接口路由注册顺序调整并补齐全量统计路径。
+
+#### 渲染与文档
+- 渲染链路增强：`ImageGenerator` 使用 `domcontentloaded + timeout`，并支持 Puppeteer 代理参数，降低网络环境导致的渲染阻塞。
+- 模板层重构：`TemplateManager` 增加平台感知群名/头像能力，模板渲染优先复用 `DataService` 能力。
+- 文档重构：`DATABASE_SETUP.md` 下线，安装与数据库说明并入 `README.md`；帮助命令与帮助面板同步当前命令集与策略口径。
+
+---
+
+<details>
+<summary><strong>历史版本（4.0.1 及之前，默认折叠）</strong></summary>
+
 ## [4.0.1] - 2026-03-01
 
 ### 🚀 代码优化
@@ -2301,6 +2346,8 @@
 
 ---
 
+</details>
+
 ## 版本说明
 
 - **主版本号（Major）**：不兼容的 API 变更
@@ -2312,4 +2359,3 @@
 ## 贡献指南
 
 如果你发现文档中缺少某项更新，欢迎提交 Issue 或 Pull Request 来完善本文档。
-
