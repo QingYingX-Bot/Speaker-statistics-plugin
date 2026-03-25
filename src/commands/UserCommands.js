@@ -117,14 +117,14 @@ class UserCommands {
                 if (currentGroupIds && currentGroupIds.length > 0) {
                     const placeholders = currentGroupIds.map((_, i) => `$${i + 2}`).join(',')
                     const groupCountResult = await dbService.get(
-                        `SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1 AND group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                        `SELECT COUNT(DISTINCT group_id) as group_count FROM user_agg_stats WHERE user_id = $1 AND group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
                         userId,
                         ...currentGroupIds
                     )
                     groupCount = parseInt(groupCountResult?.group_count || 0, 10)
                 } else {
                     const userStatsList = await dbService.all(
-                        'SELECT COUNT(DISTINCT group_id) as group_count FROM user_stats WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups)',
+                        'SELECT COUNT(DISTINCT group_id) as group_count FROM user_agg_stats WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups)',
                         userId
                     )
                     if (userStatsList?.length > 0) groupCount = parseInt(userStatsList[0].group_count || 0, 10)
@@ -212,9 +212,29 @@ class UserCommands {
             const dbService = this.dataService.dbService
             
             let userStatsList = await dbService.all(
-                'SELECT * FROM user_stats WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups) ORDER BY total_count DESC',
+                `SELECT *
+                 FROM user_agg_stats
+                 WHERE user_id = $1 AND group_id NOT IN (SELECT group_id FROM archived_groups)
+                 ORDER BY total_msg DESC`,
                 userId
             )
+            userStatsList = (userStatsList || []).map(row => {
+                let statsJson = {}
+                try {
+                    if (typeof row.stats_json === 'string') {
+                        statsJson = JSON.parse(row.stats_json)
+                    } else if (row.stats_json && typeof row.stats_json === 'object') {
+                        statsJson = row.stats_json
+                    }
+                } catch {}
+                return {
+                    ...row,
+                    nickname: statsJson.nickname || '',
+                    total_count: parseInt(row.total_msg || 0, 10),
+                    total_words: parseInt(row.total_word || 0, 10),
+                    active_days: parseInt(statsJson.active_days || 0, 10)
+                }
+            })
             const currentGroupIds = this.dataService.getCurrentGroupIdsForFilter()
             if (currentGroupIds && currentGroupIds.length > 0) {
                 const currentSet = new Set(currentGroupIds.map(String))
@@ -235,20 +255,9 @@ class UserCommands {
                 const activeDays = parseInt(userStats.active_days || 0, 10)
                 
                 if (totalCount > 0 || totalWords > 0 || activeDays > 0) {
-                    let groupName = `群${userStats.group_id}`
+                    let groupName = this.dataService.getDefaultGroupDisplayName(userStats.group_id)
                     try {
-                        const groupInfo = await dbService.getGroupInfo(userStats.group_id)
-                        if (groupInfo?.group_name) {
-                            groupName = groupInfo.group_name
-                        } else if (typeof Bot !== 'undefined' && Bot.gl) {
-                            const botGroupInfo = Bot.gl.get(userStats.group_id)
-                            if (botGroupInfo) {
-                                groupName = botGroupInfo.group_name || botGroupInfo.name || groupName
-                                if (groupName !== `群${userStats.group_id}`) {
-                                    dbService.saveGroupInfo(userStats.group_id, groupName).catch(() => {})
-                                }
-                            }
-                        }
+                        groupName = await this.dataService.getPreferredGroupName(userStats.group_id, e)
                     } catch {
                         globalConfig.debug('获取群名称失败')
                     }
@@ -304,8 +313,33 @@ class UserCommands {
                 `总字数: ${CommonUtils.formatNumber(totalWords)} 字`
             ])
 
-            // 发送合并转发消息
-            return e.reply(common.makeForwardMsg(e, msg, '水群查询群列表'))
+            // 优先发送合并转发消息；若运行环境不支持 forward，自动回落到纯文本
+            try {
+                return e.reply(common.makeForwardMsg(e, msg, '水群查询群列表'))
+            } catch (err) {
+                globalConfig.warn('合并转发不可用，回落到文本发送:', err?.message || err)
+
+                const plainText = []
+                plainText.push(titleText.trim())
+                for (const group of userGroups) {
+                    const maskedGroupId = CommonUtils.maskGroupId(group.groupId)
+                    plainText.push(
+                        `${group.groupName}\n` +
+                        `群号: ${maskedGroupId}\n` +
+                        `总发言: ${CommonUtils.formatNumber(group.totalCount)} 条\n` +
+                        `总字数: ${CommonUtils.formatNumber(group.totalWords)} 字\n` +
+                        `活跃天数: ${group.activeDays} 天\n` +
+                        `最后发言: ${group.lastSpeakingTime}`
+                    )
+                }
+                plainText.push(
+                    `📊 总计统计\n` +
+                    `总发言: ${CommonUtils.formatNumber(totalCount)} 条\n` +
+                    `总字数: ${CommonUtils.formatNumber(totalWords)} 字`
+                )
+
+                return e.reply(plainText.join('\n\n'))
+            }
         }, '查询用户群列表失败', async () => {
             return e.reply('查询失败，请稍后重试')
         })
@@ -334,4 +368,3 @@ class UserCommands {
 
 export { UserCommands }
 export default UserCommands
-

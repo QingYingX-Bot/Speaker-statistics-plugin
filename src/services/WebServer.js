@@ -3,7 +3,6 @@ import fs from 'fs'
 import { PathResolver } from '../core/utils/PathResolver.js'
 import { globalConfig } from '../core/ConfigManager.js'
 import { getDataService } from '../core/DataService.js'
-import { AchievementService } from '../core/AchievementService.js'
 import { WebLinkGenerator } from '../core/utils/WebLinkGenerator.js'
 import { TokenManager } from './auth/TokenManager.js'
 import { VerificationCodeManager } from './auth/VerificationCodeManager.js'
@@ -11,7 +10,6 @@ import { AuthService } from './auth/AuthService.js'
 import { PageRoutes } from './routes/PageRoutes.js'
 import { AuthApi } from './api/AuthApi.js'
 import { StatsApi } from './api/StatsApi.js'
-import { AchievementApi } from './api/AchievementApi.js'
 import { BackgroundApi } from './api/BackgroundApi.js'
 import { AdminApi } from './api/AdminApi.js'
 
@@ -26,7 +24,6 @@ class WebServer {
         this.isRunning = false
         this._starting = false; // 防止并发启动的标志
         this.dataService = getDataService()
-        this.achievementService = new AchievementService(this.dataService)
         
         // 服务实例
         this.tokenManager = new TokenManager()
@@ -120,9 +117,6 @@ class WebServer {
         const statsApi = new StatsApi(this.app)
         statsApi.registerRoutes()
 
-        const achievementApi = new AchievementApi(this.app, this.achievementService, this.authService)
-        achievementApi.registerRoutes()
-
         const backgroundApi = new BackgroundApi(this.app, this.authService)
         backgroundApi.registerRoutes()
 
@@ -193,7 +187,7 @@ class WebServer {
                         resolve()
                     })
 
-                    this.server.on('err', (err) => {
+                    this.server.on('error', (err) => {
                         this.server = null; // 清除服务器实例引用
                         
                         if (err.code === 'EADDRINUSE') {
@@ -226,7 +220,7 @@ class WebServer {
             this._starting = false; // 启动失败，清除启动标志
             this.isRunning = false
             this.server = null; // 清除服务器实例引用
-            globalConfig.err('[发言统计] Web服务器启动失败:', err)
+            globalConfig.error('[发言统计] Web服务器启动失败:', err)
             throw err
         }
     }

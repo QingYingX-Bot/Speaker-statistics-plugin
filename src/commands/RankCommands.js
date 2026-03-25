@@ -61,7 +61,13 @@ class RankCommands {
         }
 
         const { userInfo, userRankData } = await this.getUserRankInfo(userId, groupId, period, rankings)
-        const finalGroupName = groupName || (groupId ? (e.group?.name || `群${groupId}`) : '全局总榜')
+        let finalGroupName = groupName
+        if (!finalGroupName && groupId) {
+            finalGroupName = await this.dataService.getPreferredGroupName(groupId, e)
+        }
+        if (!finalGroupName) {
+            finalGroupName = '全局总榜'
+        }
 
         try {
             const imagePath = await this.imageGenerator.generateRankingImage(
@@ -230,7 +236,7 @@ class RankCommands {
 
         return await CommandWrapper.safeExecute(async () => {
             const groupId = String(e.group_id)
-            const groupName = e.group?.name || `群${groupId}`
+            const groupName = await this.dataService.getPreferredGroupName(groupId, e)
             const users = await this.dataService.dbService.getAllGroupUsers(groupId)
             
             const totalMessages = users.reduce((sum, user) => sum + parseInt(user.total_count || 0, 10), 0)
@@ -355,17 +361,17 @@ class RankCommands {
             if (currentGroupIds && currentGroupIds.length > 0) {
                 const placeholders = currentGroupIds.map((_, i) => `$${i + 1}`).join(',')
                 const groupCountResult = await this.dataService.dbService.get(
-                    `SELECT COUNT(DISTINCT group_id) as c FROM user_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                    `SELECT COUNT(DISTINCT group_id) as c FROM user_agg_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
                     ...currentGroupIds
                 )
                 groupCount = parseInt(groupCountResult?.c || 0, 10)
                 const uniqueResult = await this.dataService.dbService.get(
-                    `SELECT COUNT(DISTINCT user_id) as c FROM user_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
+                    `SELECT COUNT(DISTINCT user_id) as c FROM user_agg_stats WHERE group_id IN (${placeholders}) AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
                     ...currentGroupIds
                 )
                 totalUsers = parseInt(uniqueResult?.c || 0, 10)
                 const earliestResult = await this.dataService.dbService.get(
-                    `SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id IN (${placeholders})`,
+                    `SELECT MIN(created_at) as earliest_time FROM user_agg_stats WHERE group_id IN (${placeholders})`,
                     ...currentGroupIds
                 )
                 earliestTime = earliestResult?.earliest_time || null
@@ -374,11 +380,11 @@ class RankCommands {
                 const filtered = (allGroupIds || []).filter(gid => !archivedSet.has(String(gid)))
                 groupCount = filtered.length
                 const uniqueResult = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT user_id) as c FROM user_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
+                    'SELECT COUNT(DISTINCT user_id) as c FROM user_agg_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
                 )
                 totalUsers = parseInt(uniqueResult?.c || 0, 10)
                 const earliestResult = await this.dataService.dbService.get(
-                    'SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
+                    'SELECT MIN(created_at) as earliest_time FROM user_agg_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
                 )
                 earliestTime = earliestResult?.earliest_time || null
             }
@@ -453,7 +459,10 @@ class RankCommands {
                     chunk.forEach((group, idx) => {
                         const rank = startRank + idx
                         const maskedId = CommonUtils.maskGroupId(String(group.groupId))
-                        block += `${rank}. ${group.groupName || `群${group.groupId}`}\n`
+                        const fallbackName = this.dataService.getDefaultGroupDisplayName(group.groupId)
+                        const channelCount = parseInt(group.channelCount || 1, 10)
+                        const dcSuffix = group.platform === 'discord' && channelCount > 1 ? ` [DC/${channelCount}频道]` : ''
+                        block += `${rank}. ${(group.groupName || fallbackName)}${dcSuffix}\n`
                         block += `   群号: ${maskedId}\n`
                         block += `   用户数: ${CommonUtils.formatNumber(group.userCount)} | 消息数: ${CommonUtils.formatNumber(group.totalMessages)} | 今日活跃: ${CommonUtils.formatNumber(group.todayActive)} | 本月活跃: ${CommonUtils.formatNumber(group.monthActive)}\n\n`
                     })
@@ -497,7 +506,10 @@ class RankCommands {
                 globalStats.groups.forEach((group, index) => {
                     const rank = startRank + index
                     const maskedId = CommonUtils.maskGroupId(String(group.groupId))
-                    groupsText += `${rank}. ${group.groupName || `群${group.groupId}`}\n`
+                    const fallbackName = this.dataService.getDefaultGroupDisplayName(group.groupId)
+                    const channelCount = parseInt(group.channelCount || 1, 10)
+                    const dcSuffix = group.platform === 'discord' && channelCount > 1 ? ` [DC/${channelCount}频道]` : ''
+                    groupsText += `${rank}. ${(group.groupName || fallbackName)}${dcSuffix}\n`
                     groupsText += `   群号: ${maskedId}\n`
                     groupsText += `   用户数: ${CommonUtils.formatNumber(group.userCount)} | 消息数: ${CommonUtils.formatNumber(group.totalMessages)} | 今日活跃: ${CommonUtils.formatNumber(group.todayActive)} | 本月活跃: ${CommonUtils.formatNumber(group.monthActive)}\n\n`
                 })
@@ -555,12 +567,9 @@ class RankCommands {
             
             if (groupId) {
                 // 获取群名称
-                let groupName = `群${groupId}`
+                let groupName = this.dataService.getDefaultGroupDisplayName(groupId)
                 try {
-                    const groupInfo = await this.dataService.dbService.getGroupInfo(groupId)
-                    if (groupInfo && groupInfo.group_name) {
-                        groupName = groupInfo.group_name
-                    }
+                    groupName = await this.dataService.getPreferredGroupName(groupId, e)
                 } catch (err) {
                     // 忽略错误
                 }
@@ -619,4 +628,3 @@ class RankCommands {
 
 export { RankCommands }
 export default RankCommands
-

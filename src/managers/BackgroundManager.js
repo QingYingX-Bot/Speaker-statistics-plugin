@@ -17,7 +17,7 @@ class BackgroundManager {
     static getRules() {
         return [
             {
-                reg: '^#水群设置背景$',
+                reg: '^#水群(设置背景|背景设置)$',
                 fnc: 'openBackgroundPage'
             },
             {
@@ -112,7 +112,7 @@ class BackgroundManager {
 • 排行榜背景: 1520×200像素
 
 【命令】
-#水群设置背景 - 打开背景编辑器
+#水群设置背景 / #水群背景设置 - 打开背景编辑器
 #水群删除背景 - 删除所有背景图片
 
 【背景编辑器】
@@ -125,4 +125,3 @@ class BackgroundManager {
 
 export { BackgroundManager }
 export default BackgroundManager
-

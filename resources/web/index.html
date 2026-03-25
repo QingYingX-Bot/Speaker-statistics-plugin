@@ -1,88 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>发言统计 - 管理平台</title>
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/assets/favicon-light.ico" id="favicon">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- ECharts -->
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4A90E2',
-                        'primary-hover': '#357ABD',
-                    }
-                }
-            }
-        }
-    </script>
-    <link rel="stylesheet" href="/assets/css/common.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>水群统计 5.0</title>
     <!-- Umami Tracking Script -->
     <!-- End Umami Tracking Script -->
-</head>
-<body class="h-screen overflow-hidden">
-    <!-- 导航栏容器（将由 Navigation 组件动态渲染） -->
-    <div id="navigationContainer"></div>
-
-    <!-- 主内容区 -->
-    <div id="mainContent" class="main-content">
-        <!-- 固定页面标题栏（仅在左侧导航栏模式下显示） -->
-        <div id="pageHeaderBar" class="fixed top-0 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm z-40 hidden lg:hidden" style="display: none;">
-            <div class="flex items-center gap-3 px-4 py-3">
-                <button class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300" id="leftSidebarToggleBtn" aria-label="打开菜单">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-                <div class="flex-1">
-                    <h1 id="pageTitle" class="text-lg font-semibold text-gray-900 dark:text-gray-100">页面标题</h1>
-                </div>
-            </div>
-        </div>
-        <div id="pageContent" class="page-content">
-            <!-- 页面内容将由路由系统动态加载 -->
-        </div>
-    </div>
-
-    <!-- Toast 提示 -->
-    <div class="toast" id="toast">
-        <div class="toast-content">
-            <span class="toast-icon" id="toastIcon">ℹ️</span>
-            <span class="toast-message" id="toastMessage">提示信息</span>
-        </div>
-    </div>
-
-    <!-- 模态框 -->
-    <div class="modal-overlay" id="modalOverlay" style="display: none;">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h3 class="modal-title" id="modalTitle">标题</h3>
-                <button class="modal-close" id="modalClose">×</button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- 模态框内容 -->
-            </div>
-            <div class="modal-footer" id="modalFooter" style="display: none;">
-                <!-- 模态框按钮 -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 脚本 -->
-    <script type="module">
-        // 导入组件
-        import '/assets/js/components/index.js';
-    </script>
-    <script src="/assets/js/utils.js"></script>
-    <script src="/assets/js/api.js"></script>
-    <script src="/assets/js/router.js"></script>
-    <script src="/assets/js/app.js"></script>
-</body>
+    <script type="module" crossorigin src="/assets/index-CoWGihkD.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DMZysnSs.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
 </html>

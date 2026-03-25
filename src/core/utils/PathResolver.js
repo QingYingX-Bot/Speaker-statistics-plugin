@@ -130,7 +130,7 @@ class PathResolver {
      * @returns {string} 数据库文件路径
      */
     static getDatabasePath() {
-        return path.join(this.getDataDir(), 'speech_statistics.db')
+        return path.join(this.getDataDir(), 'speech_statistics_db.db')
     }
 
     /**
@@ -145,4 +145,3 @@ class PathResolver {
 }
 
 export { PathResolver }
-

@@ -17,9 +17,7 @@ const configTemplate = {
         // 是否启用数据备份功能
         enableBackup: true,
         // 是否启用完成标记（用于大文件）
-        useOkMarker: false,
-        // 是否启用成就解锁日志
-        enableAchievementLog: true
+        useOkMarker: false
     },
 
     // 显示配置
@@ -49,7 +47,7 @@ const configTemplate = {
         // 服务器主机地址 (127.0.0.1 本地访问, 0.0.0.0 允许外部访问)
         host: "127.0.0.1",
         // 服务器端口
-        port: 39999,
+        port: 8080,
         // 协议类型 (http/https)
         protocol: "http",
         // 域名配置 (用于生成编辑器链接，可以是域名或IP地址)
@@ -72,26 +70,26 @@ const configTemplate = {
     // 数据库配置
     database: {
         // 数据库类型：'postgresql' 或 'sqlite'
-        // 如果不指定，默认使用 'sqlite'
-        type: "sqlite",
+        // 当前重构阶段默认使用 PostgreSQL
+        type: "postgresql",
         
         // SQLite 配置（仅当 type === 'sqlite' 时需要）
         // 数据库文件路径（可选）
-        // - 如果只写文件名（如 "speech_statistics.db"），会自动放在插件 data 目录下
+        // - 如果只写文件名（如 "speech_statistics_db.db"），会自动放在插件 data 目录下
         // - 如果写相对路径（如 "data/my.db"），会相对于插件目录
         // - 如果写绝对路径，则使用该路径
-        // - 如果不指定，默认使用 "speech_statistics.db"（在插件 data 目录下）
-        path: "speech_statistics.db",
+        // - 如果不指定，默认使用 "speech_statistics_db.db"（在插件 data 目录下）
+        path: "speech_statistics_db.db",
         
         // PostgreSQL 配置（仅当 type === 'postgresql' 时需要）
         // 数据库主机地址
-        host: "localhost",
+        host: "",
         // 数据库端口
         port: 5432,
         // 数据库名称
-        database: "speech_statistics",
+        database: "speech_statistics_db",
         // 数据库用户名
-        user: "postgres",
+        user: "speech_statistics_db",
         // 数据库密码
         password: "",
         // 连接池配置
@@ -125,16 +123,6 @@ const configTemplate = {
         maxRetryDelay: 1000
     },
 
-    // 成就系统配置
-    achievements: {
-        // 是否启用成就系统
-        enabled: true,
-        // 成就检查频率（毫秒，0表示每次消息都检查）
-        checkInterval: 0,
-        // 成就排行榜显示数量
-        rankingDisplayCount: 10
-    },
-
     // 归档群组配置
     archivedGroups: {
         // 清理任务配置
@@ -154,4 +142,3 @@ const configTemplate = {
 };
 
 export { configTemplate };
-

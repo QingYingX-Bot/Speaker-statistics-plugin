@@ -15,7 +15,7 @@ try {
     packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 } catch (err) {
     global.logger.error('[发言统计] 读取package.json失败:', err)
-    packageJson = { version: '4.0.0' }
+    packageJson = { version: '5.0.0' }
 }
 
 const version = packageJson.version;
@@ -41,7 +41,7 @@ try {
     // 获取数据库类型用于日志显示
     const { globalConfig } = await import('./src/core/ConfigManager.js');
     const dbConfig = globalConfig.getConfig('database') || {};
-    const dbType = (dbConfig.type || 'sqlite').toLowerCase();
+    const dbType = (dbConfig.type || 'postgresql').toLowerCase();
     const dbTypeName = dbType === 'sqlite' ? 'SQLite' : 'PostgreSQL';
     
     global.logger.info('[发言统计] ---------^_^---------')

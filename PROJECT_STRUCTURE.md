@@ -1,372 +1,153 @@
-# 📁 项目结构说明
+# 📁 项目结构说明（5.0.0）
 
-本文档详细说明了 Speaker-statistics-plugin 项目的文件结构和组织方式。
+本文档描述当前 `Speaker-statistics-plugin` 的实际目录与职责分工。
 
 ---
 
-## 📂 根目录结构
+## 📂 根目录
 
-```
+```text
 Speaker-statistics-plugin/
-├── 📄 index.js                    # 插件入口文件
-├── 📄 package.json                # 项目配置和依赖
-├── 📄 guoba.support.js            # Guoba-Plugin 集成支持
-├── 📄 LICENSE                     # MIT 许可证
+├── index.js                     # 插件入口（初始化数据库与 Web 服务）
+├── package.json                 # 依赖与版本信息
+├── guoba.support.js             # Guoba-Plugin 接入入口
+├── LICENSE
+├── README.md
+├── API.md                       # Web API 文档
+├── CHANGELOG.md
+├── PROJECT_STRUCTURE.md         # 本文档
 │
-├── 📖 README.md                   # 项目说明文档
-├── 📖 CHANGELOG.md                # 更新日志
-├── 📖 DATABASE_SETUP.md           # 数据库安装教程
-├── 📖 PROJECT_STRUCTURE.md        # 本文件：项目结构说明
+├── config/
+│   └── configTemplate.js        # 默认配置模板
 │
-├── 📁 config/                     # 配置文件目录
-│   ├── configTemplate.js          # 配置模板（所有可配置项）
-│   ├── achievements-config.json   # 成就分类和稀有度配置
-│   └── achievements/              # 系统默认成就目录（60个，只读）
-│       ├── basic.json             # 基础类成就
-│       ├── count.json             # 计数类成就
-│       ├── words.json             # 字数类成就
-│       ├── active.json            # 活跃类成就
-│       ├── daily.json             # 每日类成就
-│       ├── streak.json            # 连续类成就
-│       ├── time.json              # 时段类成就
-│       ├── social.json            # 社交类成就
-│       ├── competition.json       # 竞赛类成就
-│       └── festival.json          # 节日类成就
+├── data/                        # 运行期数据目录（通常不提交）
+│   ├── global.json              # 全局配置
+│   ├── key.json                 # 用户秘钥与角色信息
+│   ├── *.db                     # SQLite 数据库文件
+│   ├── backgrounds/             # 背景图片（normal/ranking/temp）
+│   └── cache/                   # 运行缓存
 │
-├── 📁 data/                       # 数据目录（用户数据，不提交到Git）
-│   ├── global.json                # 全局配置（数据库、显示、通知等）
-│   ├── key.json                   # 用户秘钥和权限配置（hash+salt存储）
-│   ├── *.db                       # SQLite 数据库文件（如果使用SQLite）
-│   ├── achievements/              # 用户自定义成就目录
-│   │   ├── README.md              # 成就配置说明文档
-│   │   ├── *.json                 # 用户自定义成就文件
-│   │   └── group/                 # 群专属成就目录
-│   │       └── {群ID}/            # 特定群组目录
-│   │           └── *.json         # 群专属成就文件
-│   ├── backgrounds/               # 用户背景图片目录
-│   ├── temp/                      # 临时文件目录（自动清理）
-│   └── backups/                   # 数据库备份目录
+├── src/                         # 后端源码
+├── resources/
+│   ├── templates/               # 图片渲染 HTML 模板
+│   └── web/                     # Web 前端构建产物（部署目录）
 │
-├── 📁 src/                        # 源代码目录
-│   ├── core/                      # 核心模块
-│   │   ├── Plugin.js              # 插件主入口类
-│   │   ├── ConfigManager.js       # 配置管理器
-│   │   ├── DataService.js         # 数据服务（单例，包含LRU缓存）
-│   │   ├── AchievementService.js  # 成就服务
-│   │   ├── MessageRecorder.js     # 消息记录器（单例）
-│   │   ├── database/              # 数据库相关
-│   │   │   ├── DatabaseService.js # 数据库服务（适配器选择器）
-│   │   │   └── adapters/          # 数据库适配器
-│   │   │       ├── BaseAdapter.js      # 适配器基类
-│   │   │       ├── PostgreSQLAdapter.js # PostgreSQL 适配器
-│   │   │       └── SQLiteAdapter.js    # SQLite 适配器
-│   │   └── utils/                 # 工具类
-│   │       ├── PathResolver.js         # 路径解析器
-│   │       ├── TimeUtils.js            # 时间工具（UTC+8）
-│   │       ├── CommonUtils.js          # 通用工具（验证、格式化等）
-│   │       ├── AchievementUtils.js    # 成就工具（稀有度配置和排序）
-│   │       ├── CommandWrapper.js      # 命令包装器（统一验证和错误处理）
-│   │       ├── PermissionManager.js    # 权限管理器（统一权限检查）
-│   │       ├── WebLinkGenerator.js     # Web链接生成器
-│   │       ├── UserParser.js           # 用户解析器
-│   │       └── index.js                # 工具类统一导出
-│   │
-│   ├── commands/                  # 命令处理模块
-│   │   ├── RankCommands.js        # 排行榜命令（总榜、日榜、周榜等）
-│   │   ├── UserCommands.js        # 用户查询命令（个人统计、查询他人等）
-│   │   ├── AchievementCommands.js # 成就命令（成就列表、设置显示等）
-│   │   ├── AdminCommands.js       # 管理员命令（清除统计、更新插件等）
-│   │   └── HelpCommands.js        # 帮助命令
-│   │
-│   ├── managers/                  # 管理器模块
-│   │   └── BackgroundManager.js   # 背景管理器
-│   │
-│   ├── render/                    # 渲染模块
-│   │   ├── ImageGenerator.js      # 图片生成器（Puppeteer化）
-│   │   ├── TemplateManager.js    # 模板管理器
-│   │   └── TextFormatter.js      # 文本格式化器
-│   │
-│   ├── services/                  # 服务模块
-│   │   ├── WebServer.js           # Web服务器（主服务器，单例）
-│   │   ├── api/                   # API路由
-│   │   │   ├── BaseApi.js              # API基类
-│   │   │   ├── AuthApi.js              # 认证API
-│   │   │   ├── StatsApi.js              # 统计API
-│   │   │   ├── AchievementApi.js       # 成就API
-│   │   │   ├── BackgroundApi.js        # 背景API
-│   │   │   ├── AdminApi.js              # 管理API
-│   │   │   ├── admin/                   # 管理员API
-│   │   │   │   ├── GroupManagementApi.js    # 群组管理API
-│   │   │   │   ├── UserManagementApi.js     # 用户管理API
-│   │   │   │   └── AchievementManagementApi.js # 成就管理API
-│   │   │   ├── middleware/             # 中间件
-│   │   │   │   └── AuthMiddleware.js   # 认证中间件
-│   │   │   └── utils/                  # API工具
-│   │   │       └── ApiResponse.js      # API响应封装
-│   │   ├── auth/                  # 认证相关服务
-│   │   │   ├── TokenManager.js         # Token管理（包含清理机制）
-│   │   │   ├── VerificationCodeManager.js # 验证码管理
-│   │   │   └── AuthService.js          # 认证服务
-│   │   └── routes/                # 页面路由
-│   │       └── PageRoutes.js      # 页面路由处理
-│   │
-│   └── guoba/                     # Guoba-Plugin 集成
-│       ├── pluginInfo.js          # 插件信息
-│       ├── configSchemas.js       # 配置模式（定义配置项结构）
-│       ├── getConfigData.js       # 获取配置数据（提取了 addConditionFields 公共方法）
-│       └── setConfigData.js       # 设置配置数据（提取了 buildAchievementCondition 公共方法）
-│
-├── 📁 resources/                  # 资源文件目录
-│   ├── templates/                 # HTML模板文件（后端渲染）
-│   │   ├── userStatsTemplate.html      # 用户统计模板
-│   │   ├── imageRankingTemplate.html   # 排行榜图片模板
-│   │   ├── groupStatsTemplate.html     # 群组统计模板
-│   │   ├── globalStatsTemplate.html    # 全局统计模板
-│   │   ├── achievementListTemplate.html # 成就列表模板
-│   │   └── helpPanel.html              # 帮助面板模板
-│   └── web/                      # Web前端资源
-│       ├── index.html             # 主入口HTML文件（SPA）
-│       ├── README.md              # Web项目说明文档
-│       ├── STRUCTURE.md           # Web文件夹结构说明
-│       ├── assets/                # 静态资源
-│       │   ├── css/               # 样式文件
-│       │   │   ├── common.css     # 公共样式
-│       │   │   └── components.css # 组件样式
-│       │   ├── js/                # JavaScript文件
-│       │   │   ├── app.js         # 主应用入口
-│       │   │   ├── router.js      # 路由系统
-│       │   │   ├── api.js         # API封装
-│       │   │   ├── utils.js       # 工具函数
-│       │   │   └── components/    # 公共组件
-│       │   │       ├── index.js   # 组件统一导出
-│       │   │       ├── README.md  # 组件使用文档
-│       │   │       ├── Navbar.js  # 导航栏组件
-│       │   │       ├── Sidebar.js # 侧边栏组件
-│       │   │       ├── Card.js        # 卡片组件
-│       │   │       ├── Modal.js       # 模态框组件
-│       │   │       ├── Button.js      # 按钮组件
-│       │   │       ├── Input.js       # 输入框组件
-│       │   │       ├── Select.js      # 下拉选择器组件
-│       │   │       ├── SearchInput.js # 搜索输入框组件
-│       │   │       ├── Badge.js       # 徽章组件
-│       │   │       ├── Tabs.js        # 标签页组件
-│       │   │       ├── RankCard.js    # 排名卡片组件
-│       │   │       ├── ChartCard.js   # 图表卡片组件
-│       │   │       ├── AchievementCard.js # 成就卡片组件
-│       │   │       ├── Loading.js     # 加载组件
-│       │   │       └── EmptyState.js  # 空状态组件
-│       │   └── favicon-*.ico      # 网站图标
-│       └── pages/                 # 页面组件
-│           ├── Home.js            # 首页
-│           ├── Ranking.js         # 排行榜页面
-│           ├── Achievement.js     # 成就页面
-│           ├── Background.js      # 背景设置页面
-│           ├── Admin.js           # 管理页面
-│           └── templates/         # HTML模板文件
-│               └── Home.html      # 首页HTML模板
-│
-└── 📁 node_modules/               # 依赖包目录（npm/pnpm安装）
+└── web/                         # Vue3 + Vite + TS 前端源码（开发目录，默认不提交）
 ```
 
 ---
 
-## 📋 目录说明
+## 🧩 后端源码结构（`src/`）
 
-### `/config/` - 配置文件目录
-- **系统配置**：包含所有可配置项的模板和系统默认成就
-- **只读文件**：`config/achievements/` 目录下的成就文件为系统默认，不应修改
-- **配置模板**：`configTemplate.js` 定义了所有可配置项的默认值和说明
-
-### `/data/` - 数据目录
-- **用户数据**：所有用户生成的数据都存放在此目录
-- **Git忽略**：此目录下的文件（除README.md外）不应提交到Git
-- **自动清理**：`temp/` 目录下的临时文件会被自动清理（每小时清理超过1小时的文件）
-
-### `/src/` - 源代码目录
-- **核心模块** (`core/`)：插件核心功能，包括数据库、数据服务、成就服务等
-- **命令模块** (`commands/`)：所有QQ命令的处理逻辑
-- **渲染模块** (`render/`)：图片生成和模板渲染
-- **服务模块** (`services/`)：Web服务器、API路由、认证服务等
-- **工具类** (`core/utils/`)：通用工具函数，可被多个模块复用
-
----
-
-## 🔧 关键文件说明
-
-### 插件入口
-- **`index.js`**：插件入口文件，负责初始化数据库和Web服务器
-- **`src/core/Plugin.js`**：插件主类，处理消息监听和命令分发
-
-### 数据库相关
-- **`src/core/database/DatabaseService.js`**：数据库服务，根据配置选择适配器
-- **`src/core/database/adapters/`**：数据库适配器（PostgreSQL/SQLite）
-
-### 核心服务
-- **`src/core/DataService.js`**：数据服务，提供统一的数据访问接口（包含LRU缓存）
-- **`src/core/AchievementService.js`**：成就服务，处理成就检查和解锁
-- **`src/core/MessageRecorder.js`**：消息记录器，记录和统计消息
-
-### Web服务
-- **`src/services/WebServer.js`**：Web服务器主类（单例）
-- **`src/services/api/`**：RESTful API路由
-- **`src/services/routes/PageRoutes.js`**：页面路由处理
-
-### 工具类说明
-
-#### `TimeUtils.js` - 时间工具
-- **功能**：提供UTC+8时区的时间格式化、计算等功能
-- **主要方法**：
-  - `getUTC8Date()` - 获取UTC+8时区的当前时间
-  - `getCurrentDateTime()` - 获取当前时间的详细信息
-  - `formatDate()` - 格式化日期
-  - `formatDateTime()` - 格式化日期时间
-  - `calculateContinuousDays()` - 计算连续天数
-  - `getWeekNumber()` - 获取周数
-  - `getMonthString()` - 获取月份字符串
-
-#### `CommonUtils.js` - 通用工具
-- **功能**：提供验证、格式化等通用功能
-- **主要方法**：
-  - `validateGroupMessage()` - 验证群聊消息事件
-  - `validateNumber()` - 验证数字参数
-  - `validateToggle()` - 验证开关参数
-  - `formatFileSize()` - 格式化文件大小
-  - `formatDuration()` - 格式化时间间隔
-  - `formatNumber()` - 格式化数字（千分位）
-  - `maskGroupId()` - 隐藏群号部分位数
-  - `truncateString()` - 截断字符串
-
-#### `PathResolver.js` - 路径解析器
-- **功能**：提供统一的路径解析功能
-- **主要方法**：
-  - `getDataDir()` - 获取数据目录
-  - `getConfigDir()` - 获取配置目录
-  - `getTempDir()` - 获取临时文件目录
-  - `getBackgroundsDir()` - 获取背景图片目录
-
-#### `UserParser.js` - 用户解析器
-- **功能**：解析用户ID和昵称
-- **主要方法**：
-  - `parseUserId()` - 解析用户ID
-  - `parseUserNickname()` - 解析用户昵称
-
-#### `WebLinkGenerator.js` - Web链接生成器
-- **功能**：生成Web访问链接
-- **主要方法**：
-  - `getServerConfig()` - 获取Web服务器配置
-  - `generateLink()` - 生成链接
-
-#### `ImageGenerator.js` - 图片生成器
-- **功能**：使用Puppeteer生成图片
-- **主要方法**：
-  - `initBrowser()` - 初始化浏览器
-  - `closeBrowser()` - 关闭浏览器
-  - `generateRankingImage()` - 生成排行榜图片
-  - `generateUserStatsImage()` - 生成用户统计图片
-  - `generateGroupStatsImage()` - 生成群组统计图片
-  - `generateHelpPanelImage()` - 生成帮助面板图片
-  - `generateGlobalStatsImage()` - 生成全局统计图片
-  - `generateAchievementListImage()` - 生成成就列表图片
-  - `generateAchievementStatisticsImage()` - 生成成就统计图片
-
-#### `BackgroundApi.js` - 背景API
-- **功能**：处理背景图片上传和管理
-- **主要方法**：
-  - `uploadMiddleware()` - 上传中间件
-  - `createUploadValidationMiddleware()` - 创建上传验证中间件
-  - `createImageProcessingMiddleware()` - 创建图片处理中间件
-  - `registerGetBackgroundRoute()` - 注册获取背景路由
-  - `registerDeleteBackgroundRoute()` - 注册删除背景路由
-  - `registerBackgroundInfoRoute()` - 注册背景信息路由
-  - `registerStatusRoute()` - 注册状态路由
-  - `cleanupTempFile()` - 清理临时文件
-  - `cleanupTempDirectory()` - 清理临时目录
-
-#### `DataService.js` - 数据服务
-- **功能**：提供统一的数据访问接口，包含LRU缓存
-- **主要方法**：
-  - `getUserData()` - 获取用户数据（带缓存）
-  - `saveUserData()` - 保存用户数据
-  - `updateUserStats()` - 更新用户统计
-  - `getRankingData()` - 获取排行榜数据
-  - `getUserRankData()` - 获取用户排名数据
-  - `getGlobalStats()` - 获取全局统计数据
-  - `clearCache()` - 清理缓存
+```text
+src/
+├── core/
+│   ├── Plugin.js                # 主插件类，命令分发与生命周期
+│   ├── ConfigManager.js         # 全局配置加载/监听/保存
+│   ├── DataService.js           # 统计业务数据服务
+│   ├── MessageRecorder.js       # 消息记录与入库调度
+│   ├── database/
+│   │   ├── DatabaseService.js   # 统一数据库服务入口
+│   │   └── adapters/
+│   │       ├── BaseAdapter.js
+│   │       ├── PostgreSQLAdapter.js
+│   │       └── SQLiteAdapter.js
+│   └── utils/
+│       ├── CommandWrapper.js
+│       ├── CommonUtils.js
+│       ├── PathResolver.js
+│       ├── PermissionManager.js
+│       ├── ProxyUtils.js
+│       ├── TimeUtils.js
+│       ├── UserParser.js
+│       ├── WebLinkGenerator.js
+│       └── index.js
+│
+├── commands/
+│   ├── RankCommands.js          # 排行榜/趋势/群统计
+│   ├── UserCommands.js          # 个人查询与网页入口
+│   ├── AdminCommands.js         # 管理员命令（更新/归档/配置等）
+│   └── HelpCommands.js          # 帮助命令
+│
+├── managers/
+│   └── BackgroundManager.js     # 背景页面入口与命令
+│
+├── render/
+│   ├── ImageGenerator.js        # 图片渲染入口
+│   ├── TemplateManager.js       # 模板数据拼装
+│   └── TextFormatter.js         # 文本模式格式化
+│
+├── services/
+│   ├── WebServer.js             # Express 服务入口
+│   ├── routes/
+│   │   └── PageRoutes.js        # 页面路由与 token 访问
+│   ├── auth/
+│   │   ├── AuthService.js
+│   │   ├── TokenManager.js
+│   │   └── VerificationCodeManager.js
+│   └── api/
+│       ├── BaseApi.js
+│       ├── AuthApi.js
+│       ├── StatsApi.js
+│       ├── BackgroundApi.js
+│       ├── AdminApi.js
+│       ├── middleware/
+│       │   └── AuthMiddleware.js
+│       ├── utils/
+│       │   └── ApiResponse.js
+│       └── admin/
+│           ├── GroupManagementApi.js
+│           └── UserManagementApi.js
+│
+└── guoba/
+    ├── pluginInfo.js
+    ├── configSchemas.js
+    ├── getConfigData.js
+    └── setConfigData.js
+```
 
 ---
 
-## 🧹 文件清理机制
+## 🌐 Web 前端结构
 
-### 临时文件清理
-- **位置**：`data/temp/` 目录
-- **清理机制**：`ImageGenerator.js` 每小时自动清理超过1小时的临时文件
-- **实现方式**：在生成图片时直接使用 `fs.mkdirSync()` 确保目录存在，无需额外方法
+### 运行时目录（部署使用）
 
-### Token清理
-- **位置**：内存中
-- **清理机制**：`TokenManager.js` 每分钟清理过期的Token
+- `resources/web/index.html`
+- `resources/web/assets/*`（Vite 构建后的 JS/CSS 资源）
 
-### 验证码清理
-- **位置**：内存中
-- **清理机制**：`VerificationCodeManager.js` 自动清理过期的验证码
+### 开发目录（源码）
 
-### 缓存清理
-- **位置**：内存中（LRU缓存）
-- **清理机制**：`DataService.js` 中的LRU缓存自动过期清理
+```text
+web/
+├── src/
+│   ├── main.ts
+│   ├── App.vue
+│   ├── router.ts
+│   ├── api/
+│   ├── stores/
+│   ├── pages/
+│   ├── components/
+│   ├── layouts/
+│   ├── styles/
+│   └── types/
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
 
----
-
-## 📝 开发规范
-
-### 文件命名
-- **JS文件**：PascalCase（如 `DataService.js`, `AchievementService.js`）
-- **配置文件**：camelCase（如 `configTemplate.js`, `global.json`）
-- **模板文件**：camelCase（如 `userStatsTemplate.html`）
-
-### 代码组织
-- **单例模式**：核心服务使用单例模式（`DataService`, `MessageRecorder`, `WebServer`）
-- **适配器模式**：数据库使用适配器模式，支持多种数据库
-- **模块化**：功能按模块划分，每个模块职责单一
-
-### 代码优化原则
-- **避免过度提取**：简单逻辑（如字符串拼接、目录创建）直接内联，不提取为单独方法
-- **移除未使用代码**：定期清理未使用的方法和工具函数（如 ErrorHandler、KeyFileOptimizer、PerformanceMonitor 已移除）
-- **保持可读性**：在优化代码的同时，确保代码易于理解和维护
-- **统一代码风格**：移除分号，统一错误变量命名为 `err`，统一日志系统为 `globalConfig`
-
-### 依赖关系
-- **核心模块**：不依赖命令模块和服务模块
-- **命令模块**：依赖核心模块
-- **服务模块**：依赖核心模块和命令模块
+说明：当前仓库策略为“运行端只依赖 `resources/web` 构建产物”；`web/` 主要用于本地开发与重新构建。
 
 ---
 
-## 🔍 查找文件指南
+## 🗄️ 数据与配置说明
 
-### 查找命令处理逻辑
-→ `src/commands/` 目录
-
-### 查找数据库操作
-→ `src/core/database/` 目录
-
-### 查找API路由
-→ `src/services/api/` 目录
-
-### 查找工具函数
-→ `src/core/utils/` 目录
-
-### 查找HTML模板
-→ `resources/templates/` 或 `resources/web/pages/templates/`
-
-### 查找前端页面
-→ `resources/web/pages/` 目录
+- 默认 SQLite 文件名：`speech_statistics_db.db`
+- 不会自动沿用历史文件 `speech_statistics.db`，如需使用需手动配置 `database.path`
+- `data/global.json` 已收敛为 5.0.0 口径（无成就模块旧配置项）
 
 ---
 
-## 📚 相关文档
+## 📌 备注
 
-- [README.md](./README.md) - 项目说明文档
-- [CHANGELOG.md](./CHANGELOG.md) - 更新日志
-- [DATABASE_SETUP.md](./DATABASE_SETUP.md) - 数据库安装教程
-- [resources/web/README.md](./resources/web/README.md) - Web前端说明文档
-- [resources/web/STRUCTURE.md](./resources/web/STRUCTURE.md) - Web文件夹结构说明
+- 5.0.0 为破坏性版本：不包含成就系统相关代码、接口与数据结构。
+- API 详情请查看 `API.md`，命令说明以 `README.md` 为准。

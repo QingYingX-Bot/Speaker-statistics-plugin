@@ -24,7 +24,7 @@ export class GroupManagementApi extends BaseApi {
             ApiResponse.asyncHandler(async (req, res) => {
                 // 获取所有群ID
                 const groupRows = await this.dataService.dbService.all(
-                    'SELECT DISTINCT group_id FROM user_stats'
+                    'SELECT DISTINCT group_id FROM user_agg_stats WHERE group_id NOT IN (SELECT group_id FROM archived_groups)'
                 )
                 
                 // 格式化群信息
@@ -136,4 +136,3 @@ export class GroupManagementApi extends BaseApi {
         )
     }
 }
-

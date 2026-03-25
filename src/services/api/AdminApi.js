@@ -8,7 +8,6 @@ import { globalConfig } from '../../core/ConfigManager.js'
 import { TimeUtils } from '../../core/utils/TimeUtils.js'
 import { GroupManagementApi } from './admin/GroupManagementApi.js'
 import { UserManagementApi } from './admin/UserManagementApi.js'
-import { AchievementManagementApi } from './admin/AchievementManagementApi.js'
 
 /**
  * 管理员相关API路由（核心功能：概览、统计、配置）
@@ -23,7 +22,6 @@ export class AdminApi extends BaseApi {
         // 初始化子模块
         this.groupManagementApi = new GroupManagementApi(app, authService)
         this.userManagementApi = new UserManagementApi(app, authService)
-        this.achievementManagementApi = new AchievementManagementApi(app, authService)
     }
 
     /**
@@ -33,7 +31,6 @@ export class AdminApi extends BaseApi {
         // 注册子模块路由
         this.groupManagementApi.registerRoutes()
         this.userManagementApi.registerRoutes()
-        this.achievementManagementApi.registerRoutes()
 
         // 获取统计概览（管理员）
         this.app.get('/api/admin/overview',
@@ -49,22 +46,22 @@ export class AdminApi extends BaseApi {
                 // 获取统计概览
                 const totalGroups = await this.dataService.dbService.get(
                     groupInClause
-                        ? `SELECT COUNT(DISTINCT group_id) as count FROM user_stats${groupInClause}`
-                        : 'SELECT COUNT(DISTINCT group_id) as count FROM user_stats',
+                        ? `SELECT COUNT(DISTINCT group_id) as count FROM user_agg_stats${groupInClause}`
+                        : 'SELECT COUNT(DISTINCT group_id) as count FROM user_agg_stats',
                     ...groupInParams
                 )
                 
                 const totalUsers = await this.dataService.dbService.get(
                     groupInClause
-                        ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause}`
-                        : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats',
+                        ? `SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats${groupInClause}`
+                        : 'SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats',
                     ...groupInParams
                 )
                 
                 const totalMessages = await this.dataService.dbService.get(
                     groupInClause
-                        ? `SELECT SUM(total_count) as total FROM user_stats${groupInClause}`
-                        : 'SELECT SUM(total_count) as total FROM user_stats',
+                        ? `SELECT SUM(total_msg) as total FROM user_agg_stats${groupInClause}`
+                        : 'SELECT SUM(total_msg) as total FROM user_agg_stats',
                     ...groupInParams
                 )
 
@@ -72,18 +69,18 @@ export class AdminApi extends BaseApi {
                 const groupStatsWhere = groupInClause ? groupInClause.replace('group_id', 'us.group_id') : ''
                 const groupStats = await this.dataService.dbService.all(
                     groupStatsWhere
-                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
-                    FROM user_stats us
+                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_msg) as message_count
+                    FROM user_agg_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     ${groupStatsWhere}
                     GROUP BY us.group_id, gi.group_name
-                    ORDER BY SUM(us.total_count) DESC
+                    ORDER BY SUM(us.total_msg) DESC
                     LIMIT 10`
-                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
-                    FROM user_stats us
+                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_msg) as message_count
+                    FROM user_agg_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     GROUP BY us.group_id, gi.group_name
-                    ORDER BY SUM(us.total_count) DESC
+                    ORDER BY SUM(us.total_msg) DESC
                     LIMIT 10`,
                     ...groupInParams
                 )
@@ -91,19 +88,19 @@ export class AdminApi extends BaseApi {
                 // 获取所有群组的数据（用于消息密度散点图）
                 const allGroupStats = await this.dataService.dbService.all(
                     groupStatsWhere
-                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
-                    FROM user_stats us
+                        ? `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_msg) as message_count
+                    FROM user_agg_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     ${groupStatsWhere}
                     GROUP BY us.group_id, gi.group_name
-                    HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_count) > 0
-                    ORDER BY SUM(us.total_count) DESC`
-                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_count) as message_count
-                    FROM user_stats us
+                    HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_msg) > 0
+                    ORDER BY SUM(us.total_msg) DESC`
+                        : `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, COUNT(DISTINCT us.user_id) as user_count, SUM(us.total_msg) as message_count
+                    FROM user_agg_stats us
                     LEFT JOIN group_info gi ON us.group_id = gi.group_id
                     GROUP BY us.group_id, gi.group_name
-                    HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_count) > 0
-                    ORDER BY SUM(us.total_count) DESC`,
+                    HAVING COUNT(DISTINCT us.user_id) > 0 AND SUM(us.total_msg) > 0
+                    ORDER BY SUM(us.total_msg) DESC`,
                     ...groupInParams
                 )
                 
@@ -134,6 +131,10 @@ export class AdminApi extends BaseApi {
                 todayUTC8.setHours(0, 0, 0, 0)
                 // date_key 格式为 YYYY-MM-DD（UTC+8）
                 const todayDateKey = TimeUtils.formatDate(todayUTC8)
+                const dbType = this.dataService.dbService.getDatabaseType()
+                const dateExpr = dbType === 'postgresql'
+                    ? `to_char(stat_hour, 'YYYY-MM-DD')`
+                    : `substr(stat_hour, 1, 10)`
                 const dailyGroupInClause = currentGroupIds && currentGroupIds.length > 0
                     ? ` AND group_id IN (${currentGroupIds.map((_, i) => `$${i + 2}`).join(',')})`
                     : ''
@@ -141,8 +142,8 @@ export class AdminApi extends BaseApi {
                 // 使用 = 精确匹配今天的日期，确保数据一致性
                 const todayMessages = await this.dataService.dbService.get(
                     dailyGroupInClause
-                        ? `SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1${dailyGroupInClause}`
-                        : 'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1',
+                        ? `SELECT SUM(message_count) as total FROM message_granular_stats WHERE ${dateExpr} = $1${dailyGroupInClause}`
+                        : `SELECT SUM(message_count) as total FROM message_granular_stats WHERE ${dateExpr} = $1`,
                     ...dailyParamsBase(todayDateKey)
                 )
                 
@@ -153,8 +154,8 @@ export class AdminApi extends BaseApi {
                 
                 const activeGroups = await this.dataService.dbService.get(
                     dailyGroupInClause
-                        ? `SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1${dailyGroupInClause}`
-                        : 'SELECT COUNT(DISTINCT group_id) as count FROM daily_stats WHERE date_key >= $1',
+                        ? `SELECT COUNT(DISTINCT group_id) as count FROM message_granular_stats WHERE ${dateExpr} >= $1${dailyGroupInClause}`
+                        : `SELECT COUNT(DISTINCT group_id) as count FROM message_granular_stats WHERE ${dateExpr} >= $1`,
                     ...dailyParamsBase(sevenDaysAgoDateKey)
                 )
                 
@@ -163,8 +164,8 @@ export class AdminApi extends BaseApi {
                 try {
                     dailyStats = await this.dataService.dbService.all(
                         dailyGroupInClause
-                            ? `SELECT date_key as date, SUM(message_count) as count FROM daily_stats WHERE date_key >= $1${dailyGroupInClause} GROUP BY date_key ORDER BY date_key ASC`
-                            : 'SELECT date_key as date, SUM(message_count) as count FROM daily_stats WHERE date_key >= $1 GROUP BY date_key ORDER BY date_key ASC',
+                            ? `SELECT ${dateExpr} as date, SUM(message_count) as count FROM message_granular_stats WHERE ${dateExpr} >= $1${dailyGroupInClause} GROUP BY ${dateExpr} ORDER BY ${dateExpr} ASC`
+                            : `SELECT ${dateExpr} as date, SUM(message_count) as count FROM message_granular_stats WHERE ${dateExpr} >= $1 GROUP BY ${dateExpr} ORDER BY ${dateExpr} ASC`,
                         ...dailyParamsBase(sevenDaysAgoDateKey)
                     )
                 } catch (err) {
@@ -225,19 +226,18 @@ export class AdminApi extends BaseApi {
                     
                     // 如果历史消息数据不足，使用数据库统计作为补充
                     if (hourlyStats.length === 0 || hourlyStats.reduce((sum, item) => sum + item.count, 0) < 100) {
-                        // 从 daily_stats 表获取今日的消息统计
+                        // 从 message_granular_stats 表获取今日的消息统计
                         const todayDailyStats = await this.dataService.dbService.all(
-                            'SELECT SUM(message_count) as total FROM daily_stats WHERE date_key = $1',
+                            `SELECT SUM(message_count) as total FROM message_granular_stats WHERE ${dateExpr} = $1`,
                             todayDateKey
                         ).catch(() => [])
                         
                         const todayTotal = todayDailyStats[0]?.total || 0
                         
                         if (todayTotal > 0) {
-                            // 从 user_stats 表获取今日活跃用户的更新时间分布
+                            // 从 user_agg_stats 表获取今日活跃用户的更新时间分布
                             // 使用 updated_at 的小时分布来估算消息分布
                             // 根据数据库类型选择相应的查询语句
-                            const dbType = this.dataService.dbService.getDatabaseType()
                             let userHourlyStats = []
                             
                             if (dbType === 'postgresql') {
@@ -246,7 +246,7 @@ export class AdminApi extends BaseApi {
                                     SELECT 
                                         EXTRACT(HOUR FROM updated_at AT TIME ZONE 'Asia/Shanghai')::INTEGER as hour,
                                         COUNT(DISTINCT user_id) as user_count
-                                    FROM user_stats
+                                    FROM user_agg_stats
                                     WHERE DATE(updated_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
                                     GROUP BY EXTRACT(HOUR FROM updated_at AT TIME ZONE 'Asia/Shanghai')
                                     ORDER BY hour ASC
@@ -257,7 +257,7 @@ export class AdminApi extends BaseApi {
                                     SELECT 
                                         CAST(strftime('%H', datetime(updated_at, 'localtime')) AS INTEGER) as hour,
                                         COUNT(DISTINCT user_id) as user_count
-                                    FROM user_stats
+                                    FROM user_agg_stats
                                     WHERE date(updated_at) = date('now', 'localtime')
                                     GROUP BY hour
                                     ORDER BY hour ASC
@@ -305,16 +305,16 @@ export class AdminApi extends BaseApi {
                         const sqliteDate = `date(created_at, 'localtime') = $${n + 1}`
                         todayNewUsers = await this.dataService.dbService.get(
                             dbType === 'postgresql'
-                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND ${pgDate}`
-                                : `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND ${sqliteDate}`,
+                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats${groupInClause} AND ${pgDate}`
+                                : `SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats${groupInClause} AND ${sqliteDate}`,
                             ...groupInParams,
                             todayDateKey
                         )
                     } else {
                         todayNewUsers = await this.dataService.dbService.get(
                             dbType === 'postgresql'
-                                ? 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE \'Asia/Shanghai\') = $1'
-                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, \'localtime\') = $1',
+                                ? 'SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE DATE(created_at AT TIME ZONE \'Asia/Shanghai\') = $1'
+                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE date(created_at, \'localtime\') = $1',
                             todayDateKey
                         )
                     }
@@ -324,8 +324,8 @@ export class AdminApi extends BaseApi {
                         const todayEnd = `${todayDateKey} 23:59:59`
                         todayNewUsers = await this.dataService.dbService.get(
                             groupInClause && n > 0
-                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_stats${groupInClause} AND created_at >= $${n + 1} AND created_at <= $${n + 2}`
-                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE created_at >= $1 AND created_at <= $2',
+                                ? `SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats${groupInClause} AND created_at >= $${n + 1} AND created_at <= $${n + 2}`
+                                : 'SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE created_at >= $1 AND created_at <= $2',
                             groupInClause && n > 0 ? [...groupInParams, todayStart, todayEnd] : [todayStart, todayEnd]
                         ).catch(() => ({ count: 0 }))
                     } catch (error2) {
@@ -343,16 +343,16 @@ export class AdminApi extends BaseApi {
                         const sqliteWhere = `WHERE group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')}) AND date(created_at, 'localtime') >= $${dateParamIndex}`
                         newUserStats = await this.dataService.dbService.all(
                             dbType === 'postgresql'
-                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_stats ${pgWhere} GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
-                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_stats ${sqliteWhere} GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
+                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_agg_stats ${pgWhere} GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
+                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_agg_stats ${sqliteWhere} GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
                             ...groupInParams,
                             sevenDaysAgoDateKey
                         ).catch(() => [])
                     } else {
                         newUserStats = await this.dataService.dbService.all(
                             dbType === 'postgresql'
-                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_stats WHERE DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $1 GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
-                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_stats WHERE date(created_at, 'localtime') >= $1 GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
+                                ? `SELECT DATE(created_at AT TIME ZONE 'Asia/Shanghai') as date, COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE DATE(created_at AT TIME ZONE 'Asia/Shanghai') >= $1 GROUP BY DATE(created_at AT TIME ZONE 'Asia/Shanghai') ORDER BY date ASC`
+                                : `SELECT date(created_at, 'localtime') as date, COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE date(created_at, 'localtime') >= $1 GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
                             sevenDaysAgoDateKey
                         ).catch(() => [])
                     }
@@ -434,19 +434,23 @@ export class AdminApi extends BaseApi {
                 
                 const startDateKey = TimeUtils.formatDate(startUTC8)
                 const endDateKey = TimeUtils.formatDate(endUTC8)
+                const dbType = this.dataService.dbService.getDatabaseType()
+                const dateExpr = dbType === 'postgresql'
+                    ? `to_char(stat_hour, 'YYYY-MM-DD')`
+                    : `substr(stat_hour, 1, 10)`
                 
                 // 获取日期范围内的统计数据
                 const dailyStats = await this.dataService.dbService.all(
                     `SELECT 
-                        date_key as date,
+                        ${dateExpr} as date,
                         SUM(message_count) as message_count,
                         SUM(word_count) as word_count,
                         COUNT(DISTINCT user_id) as active_users,
                         COUNT(DISTINCT group_id) as active_groups
-                    FROM daily_stats 
-                    WHERE date_key >= $1 AND date_key <= $2 
-                    GROUP BY date_key 
-                    ORDER BY date_key ASC`,
+                    FROM message_granular_stats
+                    WHERE ${dateExpr} >= $1 AND ${dateExpr} <= $2
+                    GROUP BY ${dateExpr}
+                    ORDER BY ${dateExpr} ASC`,
                     startDateKey,
                     endDateKey
                 ).catch(() => [])
@@ -458,8 +462,8 @@ export class AdminApi extends BaseApi {
                         SUM(word_count) as total_words,
                         COUNT(DISTINCT user_id) as total_active_users,
                         COUNT(DISTINCT group_id) as total_active_groups
-                    FROM daily_stats 
-                    WHERE date_key >= $1 AND date_key <= $2`,
+                    FROM message_granular_stats
+                    WHERE ${dateExpr} >= $1 AND ${dateExpr} <= $2`,
                     startDateKey,
                     endDateKey
                 ).catch(() => ({
@@ -486,8 +490,8 @@ export class AdminApi extends BaseApi {
                         SUM(word_count) as total_words,
                         COUNT(DISTINCT user_id) as total_active_users,
                         COUNT(DISTINCT group_id) as total_active_groups
-                    FROM daily_stats 
-                    WHERE date_key >= $1 AND date_key <= $2`,
+                    FROM message_granular_stats
+                    WHERE ${dateExpr} >= $1 AND ${dateExpr} <= $2`,
                     prevStartDateKey,
                     prevEndDateKey
                 ).catch(() => ({

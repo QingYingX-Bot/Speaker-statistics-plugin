@@ -49,21 +49,21 @@ export class StatsApi extends BaseApi {
                 
                 // 获取群用户总数
                 const userCountResult = await this.dataService.dbService.get(
-                    'SELECT COUNT(DISTINCT user_id) as count FROM user_stats WHERE group_id = $1',
+                    'SELECT COUNT(DISTINCT user_id) as count FROM user_agg_stats WHERE group_id = $1',
                     groupId
                 )
                 const userCount = parseInt(userCountResult?.count || 0, 10)
                 
                 // 获取总消息数
                 const totalMessagesResult = await this.dataService.dbService.get(
-                    'SELECT SUM(total_count) as total FROM user_stats WHERE group_id = $1',
+                    'SELECT SUM(total_msg) as total FROM user_agg_stats WHERE group_id = $1',
                     groupId
                 )
                 const totalMessages = parseInt(totalMessagesResult?.total || 0, 10)
                 
                 // 获取总字数
                 const totalWordsResult = await this.dataService.dbService.get(
-                    'SELECT SUM(total_words) as total FROM user_stats WHERE group_id = $1',
+                    'SELECT SUM(total_word) as total FROM user_agg_stats WHERE group_id = $1',
                     groupId
                 )
                 const totalWords = parseInt(totalWordsResult?.total || 0, 10)
@@ -309,23 +309,31 @@ export class StatsApi extends BaseApi {
                     new_users_today: 0 // 需要从今日统计中计算
                 }
 
-                // 计算今日消息数（从今日的 daily_stats 中统计）
+                // 计算今日消息数（从 message_granular_stats 中统计）
                 try {
-                    const timeInfo = TimeUtils.getCurrentDateTime()
+                    const todayDate = TimeUtils.getUTC8Date()
+                    todayDate.setHours(0, 0, 0, 0)
+                    const tomorrowDate = new Date(todayDate)
+                    tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+                    const todayStart = `${TimeUtils.formatDate(todayDate)} 00:00:00`
+                    const tomorrowStart = `${TimeUtils.formatDate(tomorrowDate)} 00:00:00`
+
                     const todayStats = await this.dataService.dbService.all(
                         `SELECT SUM(message_count) as total 
-                         FROM daily_stats 
-                         WHERE date_key = $1`,
-                        timeInfo.formattedDate
+                         FROM message_granular_stats
+                         WHERE stat_hour >= $1 AND stat_hour < $2`,
+                        todayStart,
+                        tomorrowStart
                     )
                     result.today_messages = parseInt(todayStats[0]?.total || 0, 10)
 
                     // 计算今日活跃群组数
                     const activeGroups = await this.dataService.dbService.all(
                         `SELECT COUNT(DISTINCT group_id) as count 
-                         FROM daily_stats 
-                         WHERE date_key = $1 AND message_count > 0`,
-                        timeInfo.formattedDate
+                         FROM message_granular_stats
+                         WHERE stat_hour >= $1 AND stat_hour < $2 AND message_count > 0`,
+                        todayStart,
+                        tomorrowStart
                     )
                     result.active_groups_today = parseInt(activeGroups[0]?.count || 0, 10)
                 } catch (error) {

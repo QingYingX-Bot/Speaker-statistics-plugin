@@ -1,8 +1,6 @@
 import { getDataService } from './DataService.js'
-import { AchievementService } from './AchievementService.js'
 import { globalConfig } from './ConfigManager.js'
 import { TimeUtils } from './utils/TimeUtils.js'
-import { AchievementUtils } from './utils/AchievementUtils.js'
 
 /**
  * 消息记录处理类
@@ -11,18 +9,14 @@ import { AchievementUtils } from './utils/AchievementUtils.js'
 class MessageRecorder {
     constructor(dataService = null) {
         this.dataService = dataService || getDataService()
-        this.achievementService = null // 延迟加载
         this.batchWriteQueue = new Map() // 批量写入队列
         this.batchWriteTimer = null // 批量写入定时器
         this.maxBatchSize = 50 // 最大批量大小
         this.batchWriteInterval = 2000 // 批量写入间隔（毫秒）
-        this.achievementCheckQueue = new Set() // 成就检查队列
-        this.achievementCheckTimer = null // 成就检查定时器
-        this.isProcessingAchievements = false // 是否正在处理成就检查（严格的单例锁）
-        this.processingPromise = null // 正在处理的 Promise（用于确保真正的单例）
-        this.processedLogTimes = new Set() // 已处理的日志时间戳集合（用于去重，包括消息统计和成就解锁）
-        this.recentMessageTexts = new Map() // 最新消息文本缓存（1分钟内，用于成就检查）
         this.processedMessages = new Set() // 已处理的消息ID集合（用于去重）
+        this.botIdsCache = null // 机器人ID缓存（降低每条消息重复扫描开销）
+        this.botIdsCacheTime = 0
+        this.botIdsCacheTTL = 60 * 1000 // 60秒
         this.recordMessageLock = false // 记录消息的锁（防止并发处理）
         this.messageQueue = [] // 消息队列（用于处理并发情况下的消息）
         this.isProcessingQueue = false // 是否正在处理消息队列
@@ -37,63 +31,144 @@ class MessageRecorder {
     }
 
     /**
-     * 获取成就服务实例（延迟加载）
-     * @returns {AchievementService|null} 成就服务实例
+     * 从事件中提取群 ID（兼容 QQ/Discord/Telegram）
+     * @param {Object} e 消息事件
+     * @returns {string}
      */
-    getAchievementService() {
-        // 检查成就系统是否启用
-        if (!globalConfig.getConfig('achievements.enabled')) {
-            return null
-        }
+    extractEventGroupId(e) {
+        const rawGroupId = e?.group_id
+            ?? e?.group?.id
+            ?? e?.channel_id
+            ?? e?.channel?.id
+            ?? e?.chat_id
+            ?? e?.chat?.id
 
-        // 如果还没有创建实例，则创建
-        if (!this.achievementService) {
-            this.achievementService = new AchievementService(this.dataService)
-        }
-
-        return this.achievementService
+        if (rawGroupId === null || rawGroupId === undefined) return ''
+        return String(rawGroupId).trim()
     }
 
     /**
-     * 根据稀有度获取对应的颜色函数
-     * @param {string} rarity 稀有度
-     * @returns {Function} chalk 颜色函数
+     * 从事件中提取用户 ID（兼容 QQ/Discord/Telegram）
+     * @param {Object} e 消息事件
+     * @returns {string}
      */
-    getRarityColor(rarity) {
-        // 安全检查：确保 global.logger 存在且有所需方法
-        const logger = global.logger
-        const hasLogger = logger && typeof logger === 'object'
-        
-        // 默认函数：如果 logger 不存在或方法不存在，返回原字符串
-        const defaultColor = (text) => text
-        
-        // 安全获取颜色方法
-        const getColorMethod = (methodName, fallback = defaultColor) => {
-            if (hasLogger && typeof logger[methodName] === 'function') {
-                try {
-                    return logger[methodName].bind(logger)
-                } catch (err) {
-                    globalConfig.error(`[MessageRecorder] 获取颜色方法 ${methodName} 失败:`, err)
-                    return fallback
-                }
+    extractEventUserId(e) {
+        const rawUserId = e?.sender?.user_id
+            ?? e?.user_id
+            ?? e?.author?.id
+            ?? e?.from?.id
+
+        if (rawUserId === null || rawUserId === undefined) return ''
+        return String(rawUserId).trim()
+    }
+
+    /**
+     * 从事件中提取昵称
+     * @param {Object} e 消息事件
+     * @returns {string}
+     */
+    extractEventNickname(e) {
+        return e?.sender?.card
+            || e?.sender?.nickname
+            || e?.nickname
+            || e?.author?.global_name
+            || e?.author?.username
+            || e?.from?.first_name
+            || e?.from?.username
+            || '未知用户'
+    }
+
+    /**
+     * 获取已知机器人 ID 集合（字符串）
+     * @returns {Set<string>}
+     */
+    getKnownBotIds() {
+        const now = Date.now()
+        if (this.botIdsCache && now - this.botIdsCacheTime < this.botIdsCacheTTL) {
+            return this.botIdsCache
+        }
+
+        const globalBot = typeof Bot !== 'undefined' ? Bot : null
+        const ids = new Set()
+        const addId = (id) => {
+            if (id === null || id === undefined) return
+            const normalizedId = String(id).trim()
+            if (normalizedId) {
+                ids.add(normalizedId)
             }
-            return fallback
         }
-        
-        const colorMap = {
-            common: getColorMethod('gray', defaultColor),
-            uncommon: getColorMethod('green', defaultColor),
-            rare: getColorMethod('blue', defaultColor),
-            epic: getColorMethod('magenta', defaultColor),
-            legendary: getColorMethod('yellow', defaultColor),
-            mythic: getColorMethod('red', defaultColor),
-            festival: getColorMethod('red', defaultColor),
-            special: (hasLogger && typeof logger.rainbow === 'function') 
-                ? getColorMethod('rainbow', defaultColor)
-                : getColorMethod('cyan', defaultColor)
+
+        const botUins = Array.isArray(globalBot?.uin) ? globalBot.uin : []
+        for (const botUin of botUins) {
+            addId(botUin)
         }
-        
-        return colorMap[rarity?.toLowerCase()] || colorMap.common
+
+        if (globalBot && typeof globalBot === 'object') {
+            for (const [key, value] of Object.entries(globalBot)) {
+                addId(key)
+                addId(value?.uin)
+                addId(value?.self_id)
+                addId(value?.id)
+            }
+        }
+
+        this.botIdsCache = ids
+        this.botIdsCacheTime = now
+        return ids
+    }
+
+    /**
+     * 判断当前消息是否来自机器人
+     * @param {Object} e 消息事件
+     * @param {string} userId 用户ID
+     * @returns {boolean}
+     */
+    isBotMessage(e, userId) {
+        if (!e || typeof e !== 'object') return false
+
+        const botFlags = [
+            e.is_bot,
+            e.isBot,
+            e.bot,
+            e.from_me,
+            e.is_self,
+            e.self,
+            e?.sender?.is_bot,
+            e?.sender?.bot,
+            e?.author?.bot,
+            e?.from?.is_bot,
+            e?.from?.bot
+        ]
+
+        if (botFlags.some(flag => flag === true)) {
+            return true
+        }
+
+        const normalizedUserId = String(userId || '').trim()
+        if (!normalizedUserId) return false
+
+        const selfCandidates = [e.self_id, e.bot_id, e.robot_id, e.client_id]
+        for (const selfId of selfCandidates) {
+            if (selfId === null || selfId === undefined) continue
+            const normalizedSelfId = String(selfId).trim()
+            if (!normalizedSelfId) continue
+
+            if (normalizedSelfId === normalizedUserId) {
+                return true
+            }
+
+            if (`dc_${normalizedSelfId}` === normalizedUserId || `tg_${normalizedSelfId}` === normalizedUserId) {
+                return true
+            }
+        }
+
+        const knownBotIds = this.getKnownBotIds()
+        if (knownBotIds.has(normalizedUserId)) {
+            return true
+        }
+
+        const strippedUserId = normalizedUserId.replace(/^(dc|tg)_/i, '')
+        return knownBotIds.has(strippedUserId)
     }
 
     /**
@@ -102,19 +177,22 @@ class MessageRecorder {
      * @returns {Promise<void>}
      */
     async recordMessage(e) {
+        const groupId = this.extractEventGroupId(e)
+        const userId = this.extractEventUserId(e)
+
         // 先进行消息去重检查（在加锁之前，避免不必要的锁竞争）
         let messageId = null
         if (e.message_id) {
             messageId = `msg_${e.message_id}`
         } else if (e.seq) {
             messageId = `seq_${e.seq}`
-        } else if (e.time && e.group_id && e.sender?.user_id) {
+        } else if (e.time && groupId && userId) {
             // 使用时间戳+群ID+用户ID+毫秒时间戳（确保唯一性）
             const uniqueTime = e.time.toString() + (Date.now() % 1000000).toString()
-            messageId = `time_${e.group_id}_${e.sender.user_id}_${uniqueTime}`
+            messageId = `time_${groupId}_${userId}_${uniqueTime}`
         } else {
             // 如果所有标识都不存在，使用群ID+用户ID+时间戳+随机数组合（确保唯一性）
-            const uniqueId = `${e.group_id || 'unknown'}_${e.sender?.user_id || 'unknown'}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+            const uniqueId = `${groupId || 'unknown'}_${userId || 'unknown'}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
             messageId = `fallback_${uniqueId}`
         }
         
@@ -135,11 +213,9 @@ class MessageRecorder {
         }
 
         // 只处理群消息
-        if (!e.group_id || !e.sender || !e.sender.user_id) {
+        if (!groupId || !userId) {
             return
         }
-
-        const groupId = String(e.group_id)
 
         // 刷新“当前群列表”缓存（节流 60s），供 Web 全局统计与 #群列表 一致
         this.dataService.refreshCurrentGroupIdsFromBot(60 * 1000)
@@ -253,19 +329,37 @@ class MessageRecorder {
                 keysToDelete.forEach(key => this.processedMessages.delete(key))
             }
 
-            const groupId = String(e.group_id)
-            const userId = String(e.sender.user_id)
-            const nickname = e.sender.card || e.sender.nickname || '未知用户'
+            let nickname = this.extractEventNickname(e)
 
-            // 获取并保存群信息（如果有群名称）
-            const groupName = e.group?.name
-            if (groupName) {
-                try {
+            // Discord 事件：仅使用 global_name / username（依赖缓存，不会高频走远程）
+            if (this.dataService.detectGroupPlatform(groupId) === 'discord') {
+                const eventGlobalName = String(e?.author?.global_name || '').trim()
+                const eventUsername = String(e?.author?.username || '').trim()
+                const discordUserInfo = await this.dataService.getDiscordUserInfo(userId).catch(() => null)
+                const preferredName = String(
+                    discordUserInfo?.globalName
+                    || discordUserInfo?.username
+                    || eventGlobalName
+                    || eventUsername
+                    || ''
+                ).trim()
+
+                if (preferredName) {
+                    nickname = preferredName
+                } else {
+                    nickname = userId
+                }
+            }
+
+            // 获取并保存群信息（事件 -> Bot.gl）
+            try {
+                const groupName = this.dataService.extractGroupNameFromEvent(e, groupId)
+                if (groupName) {
                     await this.dataService.dbService.saveGroupInfo(groupId, groupName)
-                } catch (err) {
-                    if (globalConfig.getConfig('global.debugLog')) {
-                        globalConfig.debug(`保存群信息失败: group_id=${groupId}`, err)
-                    }
+                }
+            } catch (err) {
+                if (globalConfig.getConfig('global.debugLog')) {
+                    globalConfig.debug(`保存群信息失败: group_id=${groupId}`, err)
                 }
             }
 
@@ -274,10 +368,25 @@ class MessageRecorder {
             
             // 获取消息时间戳（用于日志去重和 Redis 存储）
             const messageTime = e.time || Date.now()
-            
-            // 保存最新消息文本（用于成就检查）
-            this.saveRecentMessageText(groupId, userId, messageText)
 
+            // 可选过滤：是否统计机器人消息
+            const countBotMessages = globalConfig.getConfig('message.countBotMessages') === true
+            if (!countBotMessages && this.isBotMessage(e, userId)) {
+                if (globalConfig.getConfig('global.debugLog')) {
+                    globalConfig.debug(`[消息记录] 已跳过机器人消息: group_id=${groupId}, user_id=${userId}`)
+                }
+                return
+            }
+
+            // 可选过滤：是否仅统计包含文本内容的消息
+            const onlyTextMessages = globalConfig.getConfig('message.onlyTextMessages') === true
+            if (onlyTextMessages && messageText.trim().length === 0) {
+                if (globalConfig.getConfig('global.debugLog')) {
+                    globalConfig.debug(`[消息记录] 已跳过非文本消息: group_id=${groupId}, user_id=${userId}`)
+                }
+                return
+            }
+            
             // 计算消息字数
             let wordCount = 0
             if (globalConfig.getConfig('global.enableWordCount')) {
@@ -303,10 +412,6 @@ class MessageRecorder {
             // 调试日志：仅在调试模式下输出（减少日志噪音）
             // 消息成功记录的信息已经通过水群统计日志输出，这里不需要重复
 
-            // 添加到成就检查队列
-            if (globalConfig.getConfig('achievements.enabled')) {
-                this.addToAchievementCheck(groupId, userId)
-            }
         } catch (err) {
             this.failureCount++
             this.lastFailureTime = Date.now()
@@ -317,9 +422,9 @@ class MessageRecorder {
             }
             
             if (this.degradedMode) {
-                globalConfig.warn(`[消息记录] 降级模式: 记录消息失败: ${messageId}, user_id=${e.sender?.user_id}, group_id=${e.group_id}`, err.message)
+                globalConfig.warn(`[消息记录] 降级模式: 记录消息失败: ${messageId}, user_id=${userId || e.sender?.user_id}, group_id=${groupId || e.group_id}`, err.message)
             } else {
-                globalConfig.error(`记录消息失败: ${messageId}, user_id=${e.sender?.user_id}, group_id=${e.group_id}`, err)
+                globalConfig.error(`记录消息失败: ${messageId}, user_id=${userId || e.sender?.user_id}, group_id=${groupId || e.group_id}`, err)
             }
             
             if (this.degradedMode && Date.now() - this.lastFailureTime > this.degradedModeResetInterval) {
@@ -409,48 +514,6 @@ class MessageRecorder {
 
         return ''
     }
-
-    /**
-     * 保存最新消息文本（用于成就检查）
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @param {string} text 消息文本
-     */
-    saveRecentMessageText(groupId, userId, text) {
-        const key = `recent_text_${groupId}_${userId}`
-        const now = Date.now()
-        
-        // 确保 recentMessageTexts 存在
-        if (!this.recentMessageTexts) {
-            this.recentMessageTexts = new Map()
-        }
-        
-        // 保存最新消息（用于成就检查，只保留1分钟）
-            this.recentMessageTexts.set(key, {
-                text: text,
-            timestamp: now
-        })
-        
-    }
-
-    /**
-     * 获取最新消息文本（用于成就检查）
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @returns {string} 最新消息文本
-     */
-    getRecentMessageText(groupId, userId) {
-        const key = `recent_text_${groupId}_${userId}`
-        if (this.recentMessageTexts && this.recentMessageTexts.has(key)) {
-            const data = this.recentMessageTexts.get(key)
-            // 只返回1分钟内的消息
-            if (Date.now() - data.timestamp < 60 * 1000) {
-                return data.text
-            }
-        }
-        return ''
-    }
-    
 
     /**
      * 计算消息字数
@@ -549,284 +612,6 @@ class MessageRecorder {
     }
 
     /**
-     * 添加到成就检查队列
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     */
-    addToAchievementCheck(groupId, userId) {
-        const key = `${groupId}_${userId}`
-        
-        // 如果用户已经在队列中，直接返回（Set会自动去重）
-        if (this.achievementCheckQueue.has(key)) {
-            return
-        }
-        
-        // 添加到队列
-        this.achievementCheckQueue.add(key)
-
-        // 如果正在处理，不需要创建新定时器（队列会被处理）
-        if (this.isProcessingAchievements || this.processingPromise) {
-            return
-        }
-
-        // 如果已经有定时器，不需要创建新定时器
-        if (this.achievementCheckTimer) {
-            return
-        }
-
-        // 创建定时器（延迟1秒执行，批量处理）
-        // 使用定时器引用确保只有一个定时器在执行
-        const timerRef = setTimeout(() => {
-            // 检查定时器是否仍然有效（防止在回调执行前定时器被清除）
-            if (this.achievementCheckTimer !== timerRef) {
-                return
-            }
-            
-            // 立即清理定时器
-            this.achievementCheckTimer = null
-            
-            // 原子性地检查并设置锁（防止并发执行）
-            // 关键：先检查处理标志和 Promise，如果任何一个已存在，直接返回
-            if (this.isProcessingAchievements || this.processingPromise) {
-                // 如果正在处理或已有 Promise，直接返回（不等待，避免阻塞）
-                return
-            }
-            
-            // 立即设置处理标志（在检查后立即设置，减少时间窗口）
-            // 这是关键：必须在检查后立即设置，确保原子性
-            this.isProcessingAchievements = true
-            
-            // 再次检查 Promise（双重检查，防止竞态条件）
-            // 如果在设置标志期间，另一个定时器也设置了标志并创建了 Promise
-            if (this.processingPromise) {
-                // 恢复标志，让已有的 Promise 处理
-                this.isProcessingAchievements = false
-                return
-            }
-            
-            // 原子性地创建 Promise（必须在检查之后立即创建）
-            // 这是唯一的执行点，确保只有一个定时器回调能够执行到这里
-            this.processingPromise = this._doProcessAchievementChecks()
-            
-            // 执行 Promise 并清理
-            this.processingPromise.finally(() => {
-                this.processingPromise = null
-            }).catch(() => {
-                // 忽略错误，已在 _doProcessAchievementChecks 中处理
-            })
-        }, 1000)
-        this.achievementCheckTimer = timerRef
-    }
-
-    /**
-     * 处理成就检查队列（已废弃：现在由定时器回调直接处理）
-     * @deprecated 现在由定时器回调直接调用 _doProcessAchievementChecks
-     */
-    async processAchievementChecks() {
-        // 如果已经有 Promise 在执行，直接返回
-        if (this.processingPromise) {
-            return
-        }
-
-        // 立即清理定时器，防止多个定时器同时触发
-        if (this.achievementCheckTimer) {
-            clearTimeout(this.achievementCheckTimer)
-            this.achievementCheckTimer = null
-        }
-
-        // 创建处理 Promise，确保同一时间只有一个处理在进行
-        this.processingPromise = this._doProcessAchievementChecks()
-        
-        try {
-            await this.processingPromise
-        } finally {
-            this.processingPromise = null
-        }
-    }
-
-    /**
-     * 实际执行成就检查处理（内部方法）
-     * @private
-     */
-    async _doProcessAchievementChecks() {
-        // 注意：处理标志已在定时器回调中设置，这里不需要再次设置
-
-        try {
-            // 获取队列数据并清空队列（必须在锁内进行，原子操作）
-            const queue = Array.from(this.achievementCheckQueue)
-            this.achievementCheckQueue.clear()
-
-            // 如果队列为空，直接返回
-            if (queue.length === 0) {
-                return
-            }
-
-            const achievementService = this.getAchievementService()
-            if (!achievementService) {
-                return
-            }
-
-            // 去重：同一个用户在同一批处理中只检查一次
-            const uniqueKeys = [...new Set(queue)]
-            const processedUsers = new Set()
-            let totalNewAchievements = 0
-
-            // 批量检查成就
-            for (const key of uniqueKeys) {
-                try {
-                    const [groupId, userId] = key.split('_')
-                    const userKey = `${groupId}_${userId}`
-                    
-                    // 避免重复处理同一个用户
-                    if (processedUsers.has(userKey)) {
-                        continue
-                    }
-                    processedUsers.add(userKey)
-
-                    const userData = await this.dataService.getUserData(groupId, userId)
-
-                    if (userData) {
-                        const newAchievements = await achievementService.checkAndUpdateAchievements(
-                            groupId,
-                            userId,
-                            userData
-                        )
-
-                        if (newAchievements.length > 0) {
-                            totalNewAchievements += newAchievements.length
-                            // 输出成就解锁日志（带颜色，带去重）
-                            const userNickname = userData?.nickname || userId
-                            
-                            // 检查是否需要自动设置显示成就
-                            // 规则：史诗及以上成就自动佩戴，使用解锁时间（unlocked_at）作为 auto_display_at
-                            let shouldAutoSetDisplay = false
-                            let bestAchievement = null
-                            
-                            // 检查当前是否有显示成就（手动或自动）
-                            const currentDisplay = await achievementService.dataService.dbService.getDisplayAchievement(groupId, userId)
-                            const hasManualDisplay = currentDisplay && currentDisplay.is_manual === true
-                            
-                            // 如果没有手动设置的显示成就，检查新解锁的成就是否符合自动佩戴条件
-                            // 注意：即使已有自动佩戴的成就，新解锁的更高稀有度成就也会替换
-                            if (!hasManualDisplay) {
-                                for (const achievement of newAchievements) {
-                                    const rarity = achievement.rarity || 'common'
-                                    // 检查是否是史诗及以上
-                                    if (AchievementUtils.isRarityOrHigher(rarity, 'epic')) {
-                                        // 选择稀有度最高的成就，如果稀有度相同，选择最新解锁的
-                                        if (!bestAchievement || 
-                                            AchievementUtils.compareRarity(rarity, bestAchievement.rarity) > 0 ||
-                                            (AchievementUtils.compareRarity(rarity, bestAchievement.rarity) === 0 && 
-                                             new Date(achievement.unlockedAt).getTime() > new Date(bestAchievement.unlockedAt).getTime())) {
-                                            bestAchievement = achievement
-                                            shouldAutoSetDisplay = true
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // 如果符合条件，自动设置为显示成就
-                            // 使用解锁时间（unlocked_at）作为 auto_display_at，24小时后自动卸下
-                            if (shouldAutoSetDisplay && bestAchievement) {
-                                try {
-                                    // 获取成就的解锁时间（UTC+8 时区的字符串格式）
-                                    const unlockedAt = bestAchievement.unlockedAt || TimeUtils.formatDateTime(TimeUtils.getUTC8Date())
-                                    
-                                    // 检查是否是全局成就（特殊成就或节日成就）
-                                    const isGlobal = AchievementUtils.isGlobalAchievement(bestAchievement.rarity)
-                                    
-                                    if (isGlobal) {
-                                        // 全局成就：在所有群都自动佩戴
-                                        const userGroups = await achievementService.dataService.dbService.getUserGroups(userId)
-                                        for (const gId of userGroups) {
-                                            await achievementService.setDisplayAchievement(
-                                                gId,
-                                                userId,
-                                                bestAchievement.id,
-                                                bestAchievement.name || bestAchievement.id,
-                                                bestAchievement.rarity || 'common',
-                                                false,  // isManual = false，自动佩戴
-                                                unlockedAt  // 使用解锁时间作为 auto_display_at
-                                            )
-                                        }
-                                    } else {
-                                        // 普通成就：只在当前群自动佩戴
-                                    await achievementService.setDisplayAchievement(
-                                        groupId,
-                                        userId,
-                                        bestAchievement.id,
-                                        bestAchievement.name || bestAchievement.id,
-                                        bestAchievement.rarity || 'common',
-                                            false,  // isManual = false，自动佩戴
-                                            unlockedAt  // 使用解锁时间作为 auto_display_at
-                                    )
-                                    }
-                                } catch (err) {
-                                    globalConfig.error('自动设置显示成就失败:', err)
-                                }
-                            }
-                            
-                            newAchievements.forEach(achievement => {
-                                const rarity = achievement.rarity || 'common'
-                                const rarityColor = this.getRarityColor(rarity)
-                                const achievementName = achievement.name || achievement.id
-                                
-                                // 生成成就日志唯一标识
-                                const achievementLogKey = `achievement_${groupId}_${userId}_${achievement.id}`
-                                
-                                // 使用 size 变化判断：先添加，然后通过 size 变化判断是否是我们添加的
-                                // 这样可以确保原子性，防止并发问题
-                                const sizeBefore = this.processedLogTimes.size
-                                this.processedLogTimes.add(achievementLogKey)
-                                const sizeAfter = this.processedLogTimes.size
-                                
-                                // 如果大小增加了，说明是我们添加的（之前不存在），应该输出日志
-                                if (sizeAfter > sizeBefore) {
-                                    // 定期清理旧记录，避免内存泄漏
-                                    if (this.processedLogTimes.size > 200) {
-                                        const keysArray = Array.from(this.processedLogTimes)
-                                        // 移除最旧的100条
-                                        keysArray.slice(0, 100).forEach(key => {
-                                            this.processedLogTimes.delete(key)
-                                        })
-                                    }
-                                    
-                                    // 输出日志（检查配置开关）
-                                    if (globalConfig.getConfig('global.enableAchievementLog') !== false) {
-                                        try {
-                                            const logger = global.logger
-                                            if (logger && typeof logger.mark === 'function') {
-                                                const cyan = (logger.cyan && typeof logger.cyan === 'function') ? logger.cyan.bind(logger) : (text) => text
-                                                const green = (logger.green && typeof logger.green === 'function') ? logger.green.bind(logger) : (text) => text
-                                                logger.mark(
-                                                    `${cyan('[成就解锁]')} ${green(userNickname)}(${userId}) 在群 ${groupId} 解锁成就: ${rarityColor(achievementName)}`
-                                                )
-                                            } else {
-                                                // 降级方案：使用 globalConfig 输出日志
-                                                globalConfig.info(`[成就解锁] ${userNickname}(${userId}) 在群 ${groupId} 解锁成就: ${achievementName}`)
-                                            }
-                                        } catch (err) {
-                                            globalConfig.info(`[成就解锁] ${userNickname}(${userId}) 在群 ${groupId} 解锁成就: ${achievementName}`)
-                                        }
-                                    }
-                                }
-                            })
-                        }
-                    }
-                } catch (err) {
-                    globalConfig.error(`成就检查失败 ${key}:`, err)
-                }
-            }
-
-        } catch (err) {
-            globalConfig.error('批量成就检查失败:', err)
-        } finally {
-            // 清除处理标志（必须在 finally 中执行，确保锁被释放）
-            this.isProcessingAchievements = false
-        }
-    }
-
-    /**
      * 清理归档群组缓存中的过期条目
      */
     cleanupArchivedGroupsCache() {
@@ -886,4 +671,3 @@ export function getMessageRecorder(dataService = null) {
 
 export { MessageRecorder }
 export default MessageRecorder
-

@@ -223,13 +223,30 @@ class ConfigManager {
                     ...mergedConfig.dataStorage
                 }
             }
-            if (mergedConfig.achievements && defaultConfig.achievements) {
-                mergedConfig.achievements = {
-                    ...defaultConfig.achievements,
-                    ...mergedConfig.achievements
+            if (mergedConfig.database && defaultConfig.database) {
+                mergedConfig.database = {
+                    ...defaultConfig.database,
+                    ...mergedConfig.database
+                }
+                if (mergedConfig.database.pool && defaultConfig.database.pool) {
+                    mergedConfig.database.pool = {
+                        ...defaultConfig.database.pool,
+                        ...mergedConfig.database.pool
+                    }
                 }
             }
-
+            if (mergedConfig.archivedGroups && defaultConfig.archivedGroups) {
+                mergedConfig.archivedGroups = {
+                    ...defaultConfig.archivedGroups,
+                    ...mergedConfig.archivedGroups
+                }
+                if (mergedConfig.archivedGroups.cleanup && defaultConfig.archivedGroups.cleanup) {
+                    mergedConfig.archivedGroups.cleanup = {
+                        ...defaultConfig.archivedGroups.cleanup,
+                        ...mergedConfig.archivedGroups.cleanup
+                    }
+                }
+            }
             return mergedConfig
         } catch (err) {
             this.error('读取配置文件失败:', err)
@@ -408,9 +425,9 @@ class ConfigManager {
      * 手动触发配置重载（用于测试）
      */
     forceReload() {
-        logger.info('[发言统计] 开始强制重载配置...')
+        global.logger.info('[发言统计] 开始强制重载配置...')
         this.reloadConfig()
-        logger.info('[发言统计] 配置重载完成')
+        global.logger.info('[发言统计] 配置重载完成')
         return this.config
     }
 
@@ -450,250 +467,8 @@ class ConfigManager {
         }
     }
 
-    /**
-     * 获取默认成就配置数据（系统内置）
-     * 从 config/achievements/ 目录加载所有成就文件，并从 achievements-config.json 加载分类和稀有度配置
-     * @returns {Object} 默认成就配置对象 { achievements: {}, categories: {}, rarities: {} }
-     */
-    getDefaultAchievementsConfig() {
-        try {
-            const configDir = PathResolver.getConfigDir()
-            const achievementsDir = path.join(configDir, 'achievements')
-            const achievementsConfigPath = path.join(configDir, 'achievements-config.json')
-            const achievements = {}
-            let categories = {}
-            let rarities = {}
-
-            // 加载成就配置（分类和稀有度）
-            if (fs.existsSync(achievementsConfigPath)) {
-                try {
-                    const configContent = fs.readFileSync(achievementsConfigPath, 'utf8')
-                    const config = JSON.parse(configContent)
-                    categories = config.categories || {}
-                    rarities = config.rarities || {}
-                } catch (err) {
-                    this.error('读取成就配置文件失败:', err)
-                }
-            }
-
-            // 加载所有成就文件
-            if (fs.existsSync(achievementsDir)) {
-                const files = fs.readdirSync(achievementsDir).filter(file => file.endsWith('.json'))
-                for (const file of files) {
-                    const filePath = path.join(achievementsDir, file)
-                    try {
-                        const fileContent = fs.readFileSync(filePath, 'utf8')
-                        const fileData = JSON.parse(fileContent)
-                        Object.assign(achievements, fileData)
-                    } catch (err) {
-                        this.error(`加载成就文件失败: ${file}`, err)
-                    }
-                }
-            }
-
-            return { achievements, categories, rarities }
-        } catch (err) {
-            this.error('读取默认成就配置失败:', err)
-            return { achievements: {}, categories: {}, rarities: {} }
-        }
-    }
-
-    /**
-     * 获取用户自定义成就配置数据（不包括 users.json）
-     * @returns {Object} 用户成就配置对象
-     */
-    getUserAchievementsConfig() {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const achievementsDir = path.join(dataDir, 'achievements')
-            const achievements = {}
-
-            // 检查是否存在用户自定义目录
-            if (fs.existsSync(achievementsDir)) {
-                const files = fs.readdirSync(achievementsDir).filter(file => 
-                    file.endsWith('.json') && file !== 'users.json'  // 排除 users.json
-                )
-                for (const file of files) {
-                    const filePath = path.join(achievementsDir, file)
-                    try {
-                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-                        Object.assign(achievements, fileData)
-                    } catch (err) {
-                        this.error(`加载用户成就文件失败: ${file}`, err)
-                    }
-                }
-            }
-
-            return achievements
-        } catch (err) {
-            this.error('读取用户成就配置失败:', err)
-            return {}
-        }
-    }
-
-    /**
-     * 获取用户成就配置数据（来自 users.json）
-     * @returns {Object} 用户成就配置对象
-     */
-    getUsersAchievementsConfig() {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const usersJsonPath = path.join(dataDir, 'achievements', 'users.json')
-            const achievements = {}
-
-            if (fs.existsSync(usersJsonPath)) {
-                try {
-                    const fileData = JSON.parse(fs.readFileSync(usersJsonPath, 'utf8'))
-                    Object.assign(achievements, fileData)
-                } catch (err) {
-                    this.error('加载用户成就文件失败: users.json', err)
-                }
-            }
-
-            return achievements
-        } catch (err) {
-            this.error('读取用户成就配置失败:', err)
-            return {}
-        }
-    }
-
-    /**
-     * 保存用户成就配置数据（保存到 users.json）
-     * @param {Object} achievements 成就对象
-     * @returns {boolean} 是否成功
-     */
-    setUsersAchievementsConfig(achievements) {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const achievementsDir = path.join(dataDir, 'achievements')
-            
-            // 确保目录存在
-            PathResolver.ensureDirectory(achievementsDir)
-            
-            const filePath = path.join(achievementsDir, 'users.json')
-            const configContent = JSON.stringify(achievements, null, 2)
-            fs.writeFileSync(filePath, configContent)
-            
-            if (this.config?.global?.debugLog) {
-                this.debug('用户成就配置保存成功 (users.json)')
-            }
-            return true
-        } catch (err) {
-            this.error('保存用户成就配置文件失败:', err)
-            return false
-        }
-    }
-
-    /**
-     * 保存用户自定义成就配置数据（保存为单个文件）
-     * @param {Object} achievements 成就对象
-     * @param {string} fileName 文件名（默认：custom.json）
-     * @returns {boolean} 是否成功
-     */
-    setUserAchievementsConfig(achievements, fileName = 'custom.json') {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const achievementsDir = path.join(dataDir, 'achievements')
-            
-            // 确保目录存在
-            PathResolver.ensureDirectory(achievementsDir)
-            
-            const filePath = path.join(achievementsDir, fileName)
-            const configContent = JSON.stringify(achievements, null, 2)
-            fs.writeFileSync(filePath, configContent)
-            
-            if (this.config?.global?.debugLog) {
-                this.debug('用户成就配置保存成功')
-            }
-            return true
-        } catch (err) {
-            this.error('保存用户成就配置文件失败:', err)
-            return false
-        }
-    }
-
-    /**
-     * 获取所有成就配置数据（默认 + 用户自定义合并）
-     * @returns {Object} 合并后的成就配置对象
-     */
-    getAllAchievementsConfig() {
-        const defaultConfig = this.getDefaultAchievementsConfig()
-        const userAchievements = this.getUserAchievementsConfig()
-        
-        // 合并默认和用户自定义成就
-        return {
-            achievements: {
-                ...(defaultConfig.achievements || {}),
-                ...userAchievements
-            },
-            categories: defaultConfig.categories || {},
-            rarities: defaultConfig.rarities || {}
-        }
-    }
-
-    /**
-     * 获取群专属成就配置数据
-     * @param {string} groupId 群号
-     * @returns {Object} 群专属成就配置对象
-     */
-    getGroupAchievementsConfig(groupId) {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId)
-            const achievements = {}
-
-            // 检查是否存在群专属目录
-            if (fs.existsSync(groupAchievementsDir)) {
-                const files = fs.readdirSync(groupAchievementsDir).filter(file => file.endsWith('.json'))
-                for (const file of files) {
-                    const filePath = path.join(groupAchievementsDir, file)
-                    try {
-                        const fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-                        Object.assign(achievements, fileData)
-                    } catch (err) {
-                        this.error(`加载群专属成就文件失败: ${file}`, err)
-                    }
-                }
-            }
-
-            return achievements
-        } catch (err) {
-            this.error(`读取群专属成就配置失败 (${groupId}):`, err)
-            return {}
-        }
-    }
-
-    /**
-     * 保存群专属成就配置数据
-     * @param {string} groupId 群号
-     * @param {Object} achievements 成就对象
-     * @param {string} fileName 文件名（默认：group.json）
-     * @returns {boolean} 是否成功
-     */
-    setGroupAchievementsConfig(groupId, achievements, fileName = 'group.json') {
-        try {
-            const dataDir = PathResolver.getDataDir()
-            const groupAchievementsDir = path.join(dataDir, 'achievements', 'group', groupId)
-            
-            // 确保目录存在
-            PathResolver.ensureDirectory(groupAchievementsDir)
-            
-            const filePath = path.join(groupAchievementsDir, fileName)
-            const configContent = JSON.stringify(achievements, null, 2)
-            fs.writeFileSync(filePath, configContent)
-            
-            if (this.config?.global?.debugLog) {
-                this.debug(`群专属成就配置保存成功 (${groupId})`)
-            }
-            return true
-        } catch (err) {
-            this.error(`保存群专属成就配置文件失败 (${groupId}):`, err)
-            return false
-        }
-    }
 }
 
 const globalConfig = new ConfigManager()
 export { globalConfig, ConfigManager }
 export default globalConfig
-

@@ -1,6 +1,9 @@
 # 依赖目录
 node_modules/
 
+# Vue Web 源码目录（5.0.0 仅提交构建产物 resources/web）
+/web/
+
 # data 目录下的文件忽略规则（精确控制，而不是忽略整个目录）
 # 忽略配置文件（这些是用户自定义的，不应该提交）
 data/*.json
@@ -15,9 +18,8 @@ data/*.log
 data/temp/
 data/backups/
 data/backgrounds/
-# 成就目录：忽略所有 JSON 文件（用户自定义成就），但保留 README.md 文档
-data/achievements/*.json
-data/achievements/group/**/*.json
+# cache
+data/cache/
 
 # 其他通用忽略规则
 *.db
@@ -39,4 +41,3 @@ data/achievements/group/**/*.json
 # 操作系统文件
 Thumbs.db
 .DS_Store
-

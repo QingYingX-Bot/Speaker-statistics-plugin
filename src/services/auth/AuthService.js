@@ -369,10 +369,11 @@ class AuthService {
                 let username = userId; // 默认使用 userId
                 try {
                     // 查询数据库获取最新的昵称
-                    const userStats = await dataService.dbService.get(
-                        'SELECT nickname FROM user_stats WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1',
-                        userId
-                    )
+                    const dbType = dataService.dbService.getDatabaseType()
+                    const nicknameSql = dbType === 'postgresql'
+                        ? `SELECT COALESCE(stats_json->>'nickname', '') as nickname FROM user_agg_stats WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1`
+                        : `SELECT COALESCE(json_extract(stats_json, '$.nickname'), '') as nickname FROM user_agg_stats WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1`
+                    const userStats = await dataService.dbService.get(nicknameSql, userId)
                     if (userStats && userStats.nickname) {
                         username = userStats.nickname
                     }

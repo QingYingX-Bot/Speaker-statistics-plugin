@@ -1,11 +1,9 @@
 import { DataService } from '../core/DataService.js'
-import { AchievementService } from '../core/AchievementService.js'
 import { globalConfig } from '../core/ConfigManager.js'
 import { CommonUtils } from '../core/utils/CommonUtils.js'
 import { PathResolver } from '../core/utils/PathResolver.js'
 import { CommandWrapper } from '../core/utils/CommandWrapper.js'
 import { TimeUtils } from '../core/utils/TimeUtils.js'
-import { AchievementUtils } from '../core/utils/AchievementUtils.js'
 import { getPermissionManager } from '../core/utils/PermissionManager.js'
 import common from '../../../../lib/common/common.js'
 import fs from 'fs'
@@ -19,7 +17,6 @@ class AdminCommands {
 
     constructor(dataService = null) {
         this.dataService = dataService || new DataService()
-        this.achievementService = new AchievementService(this.dataService)
     }
 
     /**
@@ -43,6 +40,55 @@ class AdminCommands {
     }
 
     /**
+     * 刷新 Bot.gl 群列表（与 #群列表 / #群员统计 保持一致）
+     */
+    async refreshBotGroupList() {
+        try {
+            if (global.Bot && global.Bot.uin && Array.isArray(global.Bot.uin)) {
+                for (const uin of global.Bot.uin) {
+                    if (uin === 'stdin') continue
+                    const bot = global.Bot[uin]
+                    if (bot && typeof bot.reloadGroupList === 'function') {
+                        await bot.reloadGroupList()
+                    }
+                }
+            } else if (global.Bot && typeof global.Bot.reloadGroupList === 'function') {
+                await global.Bot.reloadGroupList()
+            }
+        } catch (err) {
+            globalConfig.warn('[发言统计] 刷新 Bot.gl 失败，使用当前缓存:', err?.message || err)
+        }
+    }
+
+    /**
+     * 获取当前可用于归档判定的群组集合
+     * 优先 Bot.gl，空时回退 DataService 缓存，避免误归档
+     * @param {string} contextLog 日志上下文
+     * @returns {Promise<Set<string>>}
+     */
+    async getCurrentGroupsForArchiveCheck(contextLog = '#水群归档僵尸群') {
+        await this.refreshBotGroupList()
+
+        let currentGroups = new Set()
+        if (global.Bot && global.Bot.gl) {
+            for (const [groupId] of global.Bot.gl) {
+                if (groupId !== 'stdin') {
+                    currentGroups.add(String(groupId))
+                }
+            }
+        }
+
+        if (currentGroups.size === 0 && this.dataService.getCurrentGroupIdsForFilter()) {
+            currentGroups = new Set(this.dataService.getCurrentGroupIdsForFilter())
+            global.logger?.mark?.(`[发言统计] ${contextLog} 当前群列表: 来源=缓存(Bot.gl 为空), 群数=${currentGroups.size}`)
+        } else {
+            global.logger?.mark?.(`[发言统计] ${contextLog} 当前群列表: 来源=Bot.gl, 群数=${currentGroups.size}`)
+        }
+
+        return currentGroups
+    }
+
+    /**
      * 获取命令规则
      */
     static getRules() {
@@ -62,10 +108,6 @@ class AdminCommands {
             {
                 reg: '^#水群(强制)?更新$',
                 fnc: 'updatePlugin'
-            },
-            {
-                reg: '^#刷新(全群)?水群成就$',
-                fnc: 'refreshAchievements'
             },
             {
                 reg: '^#水群归档僵尸群$',
@@ -173,6 +215,29 @@ class AdminCommands {
     async updatePlugin(e) {
         if (!(await CommandWrapper.validateAndReply(e, getPermissionManager().validateAdminPermission(e)))) return
 
+        const buildUpdateErrorMessage = (rawMessage = '', forceMode = false) => {
+            const msg = String(rawMessage || '')
+
+            if (!forceMode && /Not possible to fast-forward|fast-forward/i.test(msg)) {
+                return '❌ 更新失败：当前分支不是 fast-forward 状态。\n请先处理分支分叉，或使用 #水群强制更新 覆盖到远端版本。'
+            }
+
+            if (/couldn.t find remote ref|remote ref does not exist/i.test(msg)) {
+                return '❌ 更新失败：未找到远端分支引用。请检查仓库默认分支或远端配置。'
+            }
+
+            if (/Authentication failed|Permission denied|access denied/i.test(msg)) {
+                return '❌ 更新失败：远端仓库认证失败，请检查 Git 凭据与访问权限。'
+            }
+
+            if (/Could not resolve host|Failed to connect|Connection timed out|network/i.test(msg)) {
+                return '❌ 更新失败：网络连接异常，请检查网络后重试。'
+            }
+
+            const shortMsg = msg.substring(0, 200) || '未知错误'
+            return `❌ 更新失败：${shortMsg}`
+        }
+
         try {
             const isForce = e.msg.includes('强制')
             const pluginDir = PathResolver.getPluginDir()
@@ -193,17 +258,48 @@ class AdminCommands {
 
             if (isForce) {
                 try {
-                    const branchResult = await execAsync('git branch --show-current', {
+                    const branchResult = await execAsync('git rev-parse --abbrev-ref HEAD', {
                         cwd: pluginDir,
                         timeout: 10000
                     })
-                    const currentBranch = branchResult.stdout.trim() || 'main'
-                    
+                    let currentBranch = branchResult.stdout.trim()
+
+                    if (!currentBranch || currentBranch === 'HEAD') {
+                        try {
+                            const remoteHead = await execAsync('git symbolic-ref refs/remotes/origin/HEAD --short', {
+                                cwd: pluginDir,
+                                timeout: 10000
+                            })
+                            currentBranch = remoteHead.stdout.trim().replace(/^origin\//, '')
+                        } catch {
+                            // 忽略，后续走默认分支回退
+                        }
+                    }
+
+                    if (!currentBranch) currentBranch = 'main'
+
                     await execAsync('git fetch origin', {
                         cwd: pluginDir,
                         timeout: 30000
                     })
-                    
+
+                    // 主分支名称容错：若 origin/main 不存在，自动回退 origin/master
+                    const verifyRef = async (branch) => {
+                        try {
+                            await execAsync(`git show-ref --verify --quiet refs/remotes/origin/${branch}`, {
+                                cwd: pluginDir,
+                                timeout: 10000
+                            })
+                            return true
+                        } catch {
+                            return false
+                        }
+                    }
+
+                    if (!(await verifyRef(currentBranch)) && currentBranch === 'main' && (await verifyRef('master'))) {
+                        currentBranch = 'master'
+                    }
+
                     const resetResult = await execAsync(`git reset --hard origin/${currentBranch}`, {
                         cwd: pluginDir,
                         timeout: 10000
@@ -215,7 +311,16 @@ class AdminCommands {
                     throw err
                 }
             } else {
-                const pullResult = await execAsync('git pull', {
+                // 常规更新禁止带本地改动执行，避免产生不可预期冲突
+                const statusResult = await execAsync('git status --porcelain --untracked-files=no', {
+                    cwd: pluginDir,
+                    timeout: 10000
+                })
+                if (statusResult.stdout.trim()) {
+                    return e.reply('❌ 检测到本地已修改文件。请先提交/备份改动，或使用 #水群强制更新 覆盖本地修改。')
+                }
+
+                const pullResult = await execAsync('git pull --ff-only', {
                     cwd: pluginDir,
                     timeout: 60000
                 })
@@ -229,7 +334,7 @@ class AdminCommands {
                 return e.reply('✅ 插件已是最新版本')
             }
 
-            const needInstall = /package\.json/.test(output)
+            const needInstall = /package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock/.test(output)
             let replyMsg = `✅ 插件${isForce ? '强制' : ''}更新成功\n\n更新日志：\n${output.substring(0, 500)}`
             
             if (needInstall) {
@@ -254,395 +359,9 @@ class AdminCommands {
             }
         } catch (err) {
             globalConfig.error('更新插件失败:', err)
-            
-            let errorMsg = '❌ 更新失败：'
-            if (err.message) {
-                errorMsg += err.message.substring(0, 200)
-            } else {
-                errorMsg += '未知错误'
-            }
-            
-            return e.reply(errorMsg)
-        }
-    }
 
-    /**
-     * 刷新所有显示的成就
-     */
-    async refreshAchievements(e) {
-        if (!(await CommandWrapper.validateAndReply(e, getPermissionManager().validateAdminPermission(e)))) return
-        if (!CommandWrapper.validateAndReply(e, CommonUtils.validateGroupMessage(e))) return
-
-        return await CommandWrapper.safeExecute(
-            async () => {
-                const isAllGroups = e.msg.includes('全群')
-                if (isAllGroups) {
-                    return await this.refreshAllGroupsAchievements(e)
-                } else {
-                    return await this.refreshSingleGroupAchievements(e, String(e.group_id))
-                }
-            },
-            '刷新成就失败',
-            () => e.reply('刷新失败，请稍后重试')
-        )
-    }
-
-    /**
-     * 刷新单个群组的成就
-     */
-    async refreshSingleGroupAchievements(e, groupId) {
-        const maskedGroupId = CommonUtils.maskGroupId(groupId)
-        await e.reply(`🔄 开始刷新群组 ${maskedGroupId} 的成就显示...`)
-        
-        const allDisplayAchievements = await this.achievementService.dbService.all(
-            'SELECT * FROM user_display_achievements WHERE group_id = $1',
-            groupId
-        )
-        
-        if (!allDisplayAchievements?.length) {
-            return e.reply(`✅ 群组 ${maskedGroupId} 没有显示中的成就`)
-        }
-        
-        const result = await this.processGroupAchievements(groupId, allDisplayAchievements)
-        
-        const msg = [[
-                `✅ 群组 ${maskedGroupId} 成就刷新完成\n\n📊 统计信息：\n- 已处理用户: ${result.refreshedCount} 个\n- 已卸下成就: ${result.removedCount} 个\n- 已自动佩戴: ${result.autoWornCount} 个`
-        ]]
-        
-        if (result.errors.length > 0) {
-            let errorMsg = `⚠️ 错误: ${result.errors.length} 个\n`
-            if (result.errors.length <= 10) {
-                errorMsg += result.errors.map(err => `  - ${err}`).join('\n')
-            } else {
-                errorMsg += result.errors.slice(0, 10).map(err => `  - ${err}`).join('\n')
-                errorMsg += `\n  ... 还有 ${result.errors.length - 10} 个错误`
-            }
-            msg.push([errorMsg])
-        }
-        
-        return e.reply(common.makeForwardMsg(e, msg, `群组 ${maskedGroupId} 成就刷新完成`))
-    }
-
-    /**
-     * 刷新所有群组的成就
-     */
-    async refreshAllGroupsAchievements(e) {
-        await e.reply('🔄 开始刷新所有群组的成就显示...')
-        
-        const groupRows = await this.achievementService.dbService.all(
-            'SELECT DISTINCT group_id FROM user_display_achievements'
-        )
-        
-        if (!groupRows?.length) {
-            return e.reply('✅ 没有找到任何显示中的成就')
-        }
-        
-        const groupIds = groupRows.map(row => String(row.group_id))
-        
-        let totalRefreshedCount = 0
-        let totalRemovedCount = 0
-        let totalAutoWornCount = 0
-        const allErrors = []
-        const groupResults = []
-        
-        for (const groupId of groupIds) {
-            try {
-                const allDisplayAchievements = await this.achievementService.dbService.all(
-                    'SELECT * FROM user_display_achievements WHERE group_id = $1',
-                    groupId
-                )
-                
-                if (!allDisplayAchievements?.length) {
-                    continue
-                }
-                
-                const result = await this.processGroupAchievements(groupId, allDisplayAchievements)
-                
-                totalRefreshedCount += result.refreshedCount
-                totalRemovedCount += result.removedCount
-                totalAutoWornCount += result.autoWornCount
-                const maskedGroupId = CommonUtils.maskGroupId(groupId)
-                allErrors.push(...result.errors.map(err => `群 ${maskedGroupId}: ${err}`))
-                
-                groupResults.push({
-                    groupId,
-                    refreshedCount: result.refreshedCount,
-                    removedCount: result.removedCount,
-                    autoWornCount: result.autoWornCount,
-                    errorCount: result.errors.length
-                })
-            } catch (err) {
-                const maskedGroupId = CommonUtils.maskGroupId(groupId)
-                globalConfig.error(`刷新群组 ${maskedGroupId} 成就失败:`, err)
-                allErrors.push(`群 ${maskedGroupId}: ${err.message || '未知错误'}`)
-            }
-        }
-        
-        const msg = [[
-                `✅ 所有群组成就刷新完成\n\n📊 总体统计：\n- 已处理群组: ${groupIds.length} 个\n- 已处理用户: ${totalRefreshedCount} 个\n- 已卸下成就: ${totalRemovedCount} 个\n- 已自动佩戴: ${totalAutoWornCount} 个`
-        ]]
-        
-        if (groupResults.length > 0) {
-            const chunkSize = 10
-            for (let i = 0; i < groupResults.length; i += chunkSize) {
-                const chunk = groupResults.slice(i, i + chunkSize)
-                let groupDetailMsg = `📋 群组详情 ${Math.floor(i / chunkSize) + 1}：\n`
-                for (const result of chunk) {
-                    const maskedGroupId = CommonUtils.maskGroupId(result.groupId)
-                    groupDetailMsg += `- 群 ${maskedGroupId}: 用户 ${result.refreshedCount} 个, 卸下 ${result.removedCount} 个, 自动佩戴 ${result.autoWornCount} 个`
-                    if (result.errorCount > 0) {
-                        groupDetailMsg += ` (${result.errorCount} 个错误)`
-                    }
-                    groupDetailMsg += '\n'
-                }
-                if (i + chunkSize < groupResults.length) {
-                    groupDetailMsg += `  ... 还有 ${groupResults.length - i - chunkSize} 个群组\n`
-                }
-                msg.push([groupDetailMsg])
-            }
-        }
-        
-        if (allErrors.length > 0) {
-            const errorChunkSize = 10
-            for (let i = 0; i < allErrors.length; i += errorChunkSize) {
-                const chunk = allErrors.slice(i, i + errorChunkSize)
-                let errorMsg = `⚠️ 错误 ${Math.floor(i / errorChunkSize) + 1} (共 ${allErrors.length} 个)：\n`
-                errorMsg += chunk.map(err => `  - ${err}`).join('\n')
-                if (i + errorChunkSize < allErrors.length) {
-                    errorMsg += `\n  ... 还有 ${allErrors.length - i - errorChunkSize} 个错误`
-                }
-                msg.push([errorMsg])
-            }
-        }
-        
-        return e.reply(common.makeForwardMsg(e, msg, '所有群组成就刷新完成'))
-    }
-
-    /**
-     * 处理单个群组的成就
-     * 新逻辑：先卸下所有自动佩戴的成就，然后重新检查并自动佩戴符合条件的成就
-     */
-    async processGroupAchievements(groupId, allDisplayAchievements) {
-        const allDefinitions = this.achievementService.getAllAchievementDefinitions(groupId)
-        
-        let removedCount = 0
-        let autoWornCount = 0
-        const errors = []
-        
-        if (globalConfig.getConfig('global.debugLog')) {
-            globalConfig.debug(`开始处理群组 ${groupId} 的成就，共 ${allDisplayAchievements.length} 个`)
-        }
-        
-        const userIds = new Set()
-        for (const displayAchievement of allDisplayAchievements) {
-            try {
-                const userId = String(displayAchievement.user_id)
-                userIds.add(userId)
-                
-                const isManual = displayAchievement.is_manual === true || displayAchievement.is_manual === 1
-                
-                if (!isManual) {
-                    await this.achievementService.checkAndRemoveExpiredAutoDisplay(groupId, userId)
-                    
-                    const stillDisplayed = await this.achievementService.dbService.getDisplayAchievement(groupId, userId)
-                    if (!stillDisplayed) {
-                        removedCount++
-                        if (globalConfig.getConfig('global.debugLog')) {
-                            globalConfig.debug(`卸下过期的自动佩戴成就: 用户 ${userId}, 成就 ${displayAchievement.achievement_id}`)
-                        }
-                        continue
-                    }
-                    
-                    await this.achievementService.dbService.run(
-                        'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-                        groupId,
-                        userId
-                    )
-                    
-                    const verifyDeleted = await this.achievementService.dbService.getDisplayAchievement(groupId, userId)
-                    if (verifyDeleted) {
-                        globalConfig.error(`删除显示成就失败: 用户 ${userId}, 群 ${groupId}, 成就 ${displayAchievement.achievement_id}`)
-                    } else {
-                        removedCount++
-                        if (globalConfig.getConfig('global.debugLog')) {
-                            globalConfig.debug(`✅ 成功卸下自动佩戴的成就: 用户 ${userId}, 成就 ${displayAchievement.achievement_id}`)
-                        }
-                    }
-                } else {
-                    const achievementId = displayAchievement.achievement_id
-                    const definition = allDefinitions[achievementId]
-                    
-                    if (!definition) {
-                        await this.achievementService.dbService.run(
-                            'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-                            groupId,
-                            userId
-                        )
-                        removedCount++
-                        if (globalConfig.getConfig('global.debugLog')) {
-                            globalConfig.debug(`卸下不存在的成就: 用户 ${userId}, 成就 ${achievementId}`)
-                        }
-                        continue
-                    }
-                    
-                    const userAchievements = await this.achievementService.dbService.getAllUserAchievements(groupId, userId)
-                    let userAchievement = userAchievements.find(a => a.achievement_id === achievementId)
-                    
-                    if ((!userAchievement || !userAchievement.unlocked) && AchievementUtils.isGlobalAchievement(definition.rarity)) {
-                        const otherGroupAchievement = await this.achievementService.dbService.getAchievementFromAnyGroup(userId, achievementId)
-                        if (otherGroupAchievement && otherGroupAchievement.unlocked) {
-                            userAchievement = { unlocked: true }
-                        }
-                    }
-                    
-                    if (!userAchievement || !userAchievement.unlocked) {
-                        await this.achievementService.dbService.run(
-                            'DELETE FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-                            groupId,
-                            userId
-                        )
-                        removedCount++
-                        if (globalConfig.getConfig('global.debugLog')) {
-                            globalConfig.debug(`卸下未解锁的成就: 用户 ${userId}, 成就 ${achievementId}`)
-                        }
-                    }
-                }
-            } catch (err) {
-                globalConfig.error(`检查成就失败: 用户 ${displayAchievement.user_id}, 成就 ${displayAchievement.achievement_id}`, err)
-                errors.push(`用户 ${displayAchievement.user_id}: ${err.message || '未知错误'}`)
-            }
-        }
-        
-        for (const userId of userIds) {
-            try {
-                const currentDisplay = await this.achievementService.dbService.getDisplayAchievement(groupId, userId)
-                const hasManualDisplay = currentDisplay && (currentDisplay.is_manual === true || currentDisplay.is_manual === 1)
-                
-                if (!hasManualDisplay) {
-                    const userAchievementsData = await this.achievementService.getUserAchievements(groupId, userId)
-                    const achievements = userAchievementsData.achievements || {}
-                    
-                    const now = TimeUtils.getUTC8Date()
-                    const epicOrHigher = Object.entries(achievements)
-                        .filter(([achievementId, achievementData]) => {
-                            if (!achievementData.unlocked) return false
-                            const definition = allDefinitions[achievementId]
-                            if (!definition) return false
-                            if (!AchievementUtils.isRarityOrHigher(definition.rarity, 'epic')) return false
-                            
-                            const unlockedAt = achievementData.unlocked_at
-                            if (!unlockedAt) return false
-                            
-                            let unlockedAtDate
-                            if (unlockedAt instanceof Date) {
-                                unlockedAtDate = unlockedAt
-                            } else if (typeof unlockedAt === 'string') {
-                                if (unlockedAt.includes('T')) {
-                                    unlockedAtDate = new Date(unlockedAt)
-                                    if (unlockedAt.endsWith('Z')) {
-                                        const utc8Offset = 8 * 60 * 60 * 1000
-                                        unlockedAtDate = new Date(unlockedAtDate.getTime() + utc8Offset)
-                                    }
-                                } else {
-                                    const [datePart, timePart] = unlockedAt.split(' ')
-                                    if (datePart && timePart) {
-                                        const [year, month, day] = datePart.split('-').map(Number)
-                                        const [hour, minute, second] = timePart.split(':').map(Number)
-                                        const utc8Offset = 8 * 60 * 60 * 1000
-                                        const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0)
-                                        unlockedAtDate = new Date(utcTimestamp - utc8Offset)
-                                    } else {
-                                        return false
-                                    }
-                                }
-                            } else {
-                                return false
-                            }
-                            
-                            if (!unlockedAtDate || isNaN(unlockedAtDate.getTime())) {
-                                return false
-                            }
-                            
-                            const removeAt = new Date(unlockedAtDate.getTime() + 24 * 60 * 60 * 1000)
-                            
-                            if (now.getTime() >= removeAt.getTime()) {
-                                if (globalConfig.getConfig('global.debugLog')) {
-                                    globalConfig.debug(`成就已过期，不自动佩戴: 用户 ${userId}, 成就 ${achievementId}, 解锁时间 ${unlockedAt}, 卸下时间 ${this.formatDateTime(removeAt)}`)
-                                }
-                                return false
-                            }
-                            
-                            return true
-                        })
-                        .map(([achievementId, achievementData]) => ({
-                            achievement_id: achievementId,
-                            unlocked: achievementData.unlocked,
-                            unlocked_at: achievementData.unlocked_at,
-                            definition: allDefinitions[achievementId]
-                        }))
-                    
-                    if (epicOrHigher.length > 0) {
-                        AchievementUtils.sortUnlockedAchievements(
-                            epicOrHigher,
-                            (item) => item.definition?.rarity || 'common',
-                            (item) => new Date(item.unlocked_at).getTime()
-                        )
-                        
-                        const topAchievement = epicOrHigher[0]
-                        const definition = topAchievement.definition || allDefinitions[topAchievement.achievement_id]
-                        const unlockedAt = topAchievement.unlocked_at || TimeUtils.formatDateTime(TimeUtils.getUTC8Date())
-                        const isGlobal = AchievementUtils.isGlobalAchievement(definition.rarity)
-                        
-                        if (isGlobal) {
-                            const userGroups = await this.achievementService.dbService.getUserGroups(userId)
-                            for (const gId of userGroups) {
-                                const gDisplay = await this.achievementService.dbService.getDisplayAchievement(gId, userId)
-                                const gHasManual = gDisplay && (gDisplay.is_manual === true || gDisplay.is_manual === 1)
-                                
-                                if (!gHasManual) {
-                                    await this.achievementService.setDisplayAchievement(
-                                        gId,
-                                        userId,
-                                        topAchievement.achievement_id,
-                                        definition?.name || topAchievement.achievement_id,
-                                        definition?.rarity || 'common',
-                                        false,
-                                        unlockedAt
-                                    )
-                                    autoWornCount++
-                                    if (globalConfig.getConfig('global.debugLog')) {
-                                        globalConfig.debug(`自动佩戴全局成就: 用户 ${userId}, 群 ${gId}, 成就 ${topAchievement.achievement_id}, 解锁时间 ${unlockedAt}`)
-                                    }
-                                }
-                            }
-                        } else {
-                            await this.achievementService.setDisplayAchievement(
-                                groupId,
-                                userId,
-                                topAchievement.achievement_id,
-                                definition?.name || topAchievement.achievement_id,
-                                definition?.rarity || 'common',
-                                false,
-                                unlockedAt
-                            )
-                            autoWornCount++
-                            if (globalConfig.getConfig('global.debugLog')) {
-                                globalConfig.debug(`自动佩戴成就: 用户 ${userId}, 群 ${groupId}, 成就 ${topAchievement.achievement_id}, 解锁时间 ${unlockedAt}`)
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                globalConfig.error(`自动佩戴成就失败: 用户 ${userId}`, err)
-                errors.push(`用户 ${userId}: ${err.message || '未知错误'}`)
-            }
-        }
-        
-        return {
-            refreshedCount: userIds.size,
-            removedCount,
-            autoWornCount,
-            errors
+            const isForce = e.msg.includes('强制')
+            return e.reply(buildUpdateErrorMessage(err?.message || '', isForce))
         }
     }
 
@@ -650,7 +369,7 @@ class AdminCommands {
      * 归档僵尸群（列出待归档的群组，等待确认）
      * 与 #群列表 一致：当前群 = Bot.gl（排除 stdin）
      * 第一步：已归档的群若当前在 Bot.gl 中则自动恢复（移出归档）。
-     * 第二步：数据库中有统计记录(user_stats)但不在 Bot.gl 中的群 = 僵尸，可确认后归档；归档后不计入统计、不可查询；60 天后自动清理；群重加回来会恢复。
+     * 第二步：数据库中有统计记录(user_agg_stats)但不在 Bot.gl 中的群 = 僵尸，可确认后归档；归档后不计入统计、不可查询；60 天后自动清理；群重加回来会恢复。
      */
     async cleanZombieGroups(e) {
         if (!(await CommandWrapper.validateAndReply(e, getPermissionManager().validateAdminPermission(e)))) return
@@ -659,39 +378,7 @@ class AdminCommands {
             async () => {
                 const userId = String(e.user_id)
                 global.logger?.mark?.('[发言统计] #水群归档僵尸群 开始，先刷新 Bot.gl 以与 #群列表 一致')
-
-                // 与 #群列表 / #群员统计 一致：先尝试刷新 Bot.gl，再以 Bot.gl 为当前群列表
-                try {
-                    if (global.Bot && global.Bot.uin && Array.isArray(global.Bot.uin)) {
-                        for (const uin of global.Bot.uin) {
-                            if (uin === 'stdin') continue
-                            const bot = global.Bot[uin]
-                            if (bot && typeof bot.reloadGroupList === 'function') {
-                                await bot.reloadGroupList()
-                            }
-                        }
-                    } else if (global.Bot && typeof global.Bot.reloadGroupList === 'function') {
-                        await global.Bot.reloadGroupList()
-                    }
-                } catch (err) {
-                    globalConfig.warn('[发言统计] #水群归档僵尸群 刷新 Bot.gl 失败，使用当前 Bot.gl:', err?.message || err)
-                }
-
-                let currentGroups = new Set()
-                if (global.Bot && global.Bot.gl) {
-                    for (const [groupId] of global.Bot.gl) {
-                        if (groupId !== 'stdin') {
-                            currentGroups.add(String(groupId))
-                        }
-                    }
-                }
-                // Bot.gl 为空时用缓存（与全局统计一致），避免误把全部群当僵尸
-                if (currentGroups.size === 0 && this.dataService.getCurrentGroupIdsForFilter()) {
-                    currentGroups = new Set(this.dataService.getCurrentGroupIdsForFilter())
-                    global.logger?.mark?.(`[发言统计] #水群归档僵尸群 当前群列表: 来源=缓存( Bot.gl 为空 ), 群数=${currentGroups.size}`)
-                } else {
-                    global.logger?.mark?.(`[发言统计] #水群归档僵尸群 当前群列表: 来源=Bot.gl, 群数=${currentGroups.size}`)
-                }
+                const currentGroups = await this.getCurrentGroupsForArchiveCheck('#水群归档僵尸群')
                 if (currentGroups.size === 0) {
                     return e.reply('❌ 无法获取当前群列表（Bot.gl 与缓存均无）。请先在任意群内发一条消息或使用 #群列表 后再试 #水群归档僵尸群。')
                 }
@@ -714,10 +401,10 @@ class AdminCommands {
                     global.logger?.mark?.(`[发言统计] #水群归档僵尸群 已恢复 ${restoredCount} 个群（当前在 Bot.gl，已移出归档）`)
                 }
 
-                // 第二步：数据库中不在 Bot.gl 的群 = 僵尸（待归档）；数据来源与统计一致用 user_stats
+                // 第二步：数据库中不在 Bot.gl 的群 = 僵尸（待归档）；数据来源与统计一致用 user_agg_stats
                 const dbGroupsRows = await this.dataService.dbService.all(
                     `SELECT us.group_id, COALESCE(gi.group_name, '') as group_name, gi.updated_at
-                     FROM (SELECT DISTINCT group_id FROM user_stats) us
+                     FROM (SELECT DISTINCT group_id FROM user_agg_stats) us
                      LEFT JOIN group_info gi ON us.group_id = gi.group_id
                      ORDER BY gi.updated_at ASC`
                 ).catch(() => [])
@@ -836,14 +523,36 @@ class AdminCommands {
                     AdminCommands.pendingCleanGroups.delete(userId)
                     return e.reply('❌ 待归档的群组列表为空')
                 }
-                
-                await e.reply(`🔄 开始归档 ${zombieGroups.length} 个僵尸群到暂存表...\n\n💡 提示：如果这些群有用户重新发言，数据将自动恢复\n⏰ 60天后无用户发言，数据将被永久删除`)
+
+                // 二次安全校验：确认前重新获取当前群列表，避免 5 分钟窗口内群状态变化导致误归档
+                const currentGroups = await this.getCurrentGroupsForArchiveCheck('#水群确认归档')
+                if (currentGroups.size === 0) {
+                    return e.reply('❌ 无法获取当前群列表（Bot.gl 与缓存均无），为避免误归档已中止本次确认。请先执行 #群列表 后重试。')
+                }
+
+                const eligibleGroups = []
+                const skippedGroups = []
+                for (const group of zombieGroups) {
+                    const groupId = String(group.groupId)
+                    if (currentGroups.has(groupId)) {
+                        skippedGroups.push(`${group.groupName} (${CommonUtils.maskGroupId(groupId)}): 当前已在群列表中，已跳过`)
+                        continue
+                    }
+                    eligibleGroups.push(group)
+                }
+
+                if (eligibleGroups.length === 0) {
+                    AdminCommands.pendingCleanGroups.delete(userId)
+                    return e.reply('✅ 待归档群组已全部恢复到当前群列表，未执行任何归档操作。')
+                }
+
+                await e.reply(`🔄 开始归档 ${eligibleGroups.length} 个僵尸群到暂存表...\n\n💡 提示：如果这些群有用户重新发言，数据将自动恢复\n⏰ 60天后无用户发言，数据将被永久删除`)
                 
                 let successCount = 0
                 let failCount = 0
                 const errors = []
                 
-                for (const group of zombieGroups) {
+                for (const group of eligibleGroups) {
                     try {
                         const success = await this.dataService.clearGroupStats(group.groupId)
                         if (success) {
@@ -866,8 +575,21 @@ class AdminCommands {
                 AdminCommands.pendingCleanGroups.delete(userId)
                 
                 const msg = [[
-                        `✅ 僵尸群归档完成\n\n📊 统计信息：\n- 成功归档: ${successCount} 个\n- 归档失败: ${failCount} 个\n\n💡 提示：\n- 如果这些群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
+                        `✅ 僵尸群归档完成\n\n📊 统计信息：\n- 待归档总数: ${zombieGroups.length} 个\n- 本次执行: ${eligibleGroups.length} 个\n- 成功归档: ${successCount} 个\n- 归档失败: ${failCount} 个\n- 安全跳过: ${skippedGroups.length} 个\n\n💡 提示：\n- 如果这些群有用户重新发言，数据将自动恢复\n- 60天后无用户发言，数据将被永久删除`
                 ]]
+
+                if (skippedGroups.length > 0) {
+                    const skippedChunkSize = 10
+                    for (let i = 0; i < skippedGroups.length; i += skippedChunkSize) {
+                        const chunk = skippedGroups.slice(i, i + skippedChunkSize)
+                        let skippedMsg = `ℹ️ 安全跳过 ${Math.floor(i / skippedChunkSize) + 1} (共 ${skippedGroups.length} 个)：\n`
+                        skippedMsg += chunk.map(item => `- ${item}`).join('\n')
+                        if (i + skippedChunkSize < skippedGroups.length) {
+                            skippedMsg += `\n... 还有 ${skippedGroups.length - i - skippedChunkSize} 个`
+                        }
+                        msg.push([skippedMsg])
+                    }
+                }
                 
                 if (errors.length > 0) {
                     const errorChunkSize = 10
@@ -973,4 +695,3 @@ class AdminCommands {
 
 export { AdminCommands }
 export default AdminCommands
-

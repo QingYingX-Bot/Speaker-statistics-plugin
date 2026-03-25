@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer'
 import { PathResolver } from '../core/utils/PathResolver.js'
 import { TemplateManager } from './TemplateManager.js'
 import { globalConfig } from '../core/ConfigManager.js'
+import { getFrameworkProxyUrl } from '../core/utils/ProxyUtils.js'
 
 /**
  * 图片生成器
@@ -32,18 +33,25 @@ class ImageGenerator {
             return this.browserInitPromise
         }
 
+        const launchArgs = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ]
+
+        const proxyUrl = getFrameworkProxyUrl()
+        if (proxyUrl) {
+            launchArgs.push(`--proxy-server=${proxyUrl}`)
+        }
+
         this.browserInitPromise = puppeteer.launch({
             headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ],
+            args: launchArgs,
             defaultViewport: {
                 width: 1800,
                 height: 900
@@ -171,7 +179,8 @@ class ImageGenerator {
             )
 
             await page.setContent(html, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
             })
 
             // 等待头像加载
@@ -239,7 +248,8 @@ class ImageGenerator {
             )
 
             await page.setContent(html, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
             })
 
             // 等待头像加载
@@ -308,7 +318,8 @@ class ImageGenerator {
             }
 
             await page.setContent(html, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
             })
 
             // 等待头像加载
@@ -367,7 +378,8 @@ class ImageGenerator {
             }
 
             await page.setContent(html, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
             })
 
             // 获取实际高度并调整视口
@@ -408,14 +420,15 @@ class ImageGenerator {
             })
 
             // 生成HTML
-            const html = this.templateManager.renderGlobalStatsTemplate(globalStats)
+            const html = await this.templateManager.renderGlobalStatsTemplate(globalStats)
 
             if (!html) {
                 throw new Error('渲染全局统计模板失败')
             }
 
             await page.setContent(html, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'domcontentloaded',
+                timeout: 20000
             })
 
             // 获取实际高度并调整视口
@@ -441,163 +454,7 @@ class ImageGenerator {
         }
     }
 
-    /**
-     * 生成成就列表图片
-     * @param {Object} allDefinitions 所有成就定义（默认+自定义+群专属）
-     * @param {Object} userAchievements 用户的成就解锁状态
-     * @param {string} groupId 群ID
-     * @param {string} userId 用户ID
-     * @returns {Promise<string>} base64 图片数据
-     */
-    async generateAchievementListImage(allDefinitions, userAchievements, groupId, userId, displayAchievement = null) {
-        const page = await this.getAvailablePage()
-
-        try {
-            await page.setViewport({
-                width: 2400,
-                height: 1
-            })
-
-            // 获取群名称
-            let groupName = `群${groupId}`
-            try {
-                if (this.templateManager.dataService) {
-                    const dbService = this.templateManager.dataService.dbService
-                    if (dbService && dbService.getGroupInfo) {
-                        const groupInfo = await dbService.getGroupInfo(groupId)
-                        if (groupInfo && groupInfo.group_name) {
-                            groupName = groupInfo.group_name
-                        }
-                    }
-                }
-                if (groupName === `群${groupId}` && typeof Bot !== 'undefined' && Bot.gl) {
-                    const glGroup = Bot.gl.get(groupId)
-                    if (glGroup && glGroup.name) {
-                        groupName = glGroup.name
-                    }
-                }
-            } catch (err) {
-                globalConfig.debug('获取群名称失败，使用默认值:', err)
-            }
-
-            // 使用模板管理器生成HTML
-            const html = this.templateManager.renderAchievementListTemplate(
-                allDefinitions,
-                userAchievements,
-                groupId,
-                groupName,
-                displayAchievement
-            )
-
-            if (!html) {
-                throw new Error('成就列表模板渲染失败')
-            }
-
-            await page.setContent(html, {
-                waitUntil: 'networkidle0'
-            })
-
-            // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
-            await page.setViewport({
-                width: 2400,
-                height: bodyHeight
-            })
-
-            // 生成 base64 图片
-            const base64 = await page.screenshot({
-                encoding: 'base64',
-                fullPage: true,
-                optimizeForSpeed: true
-            })
-
-            return base64
-        } catch (err) {
-            globalConfig.error('生成成就列表图片失败:', err)
-            throw err
-        } finally {
-            await this.releasePage(page)
-        }
-    }
-
-    /**
-     * 生成成就统计图片
-     * @param {Array} globalStats 全局成就统计数组
-     * @param {Array} groupStats 群专属成就统计数组
-     * @param {string} groupId 群ID
-     * @returns {Promise<string>} base64 图片数据
-     */
-    async generateAchievementStatisticsImage(globalStats, groupStats, groupId) {
-        const page = await this.getAvailablePage()
-
-        try {
-            await page.setViewport({
-                width: 2400,
-                height: 1
-            })
-
-            // 获取群名称
-            let groupName = `群${groupId}`
-            try {
-                if (this.templateManager.dataService) {
-                    const dbService = this.templateManager.dataService.dbService
-                    if (dbService && dbService.getGroupInfo) {
-                        const groupInfo = await dbService.getGroupInfo(groupId)
-                        if (groupInfo && groupInfo.group_name) {
-                            groupName = groupInfo.group_name
-                        }
-                    }
-                }
-                if (groupName === `群${groupId}` && typeof Bot !== 'undefined' && Bot.gl) {
-                    const glGroup = Bot.gl.get(groupId)
-                    if (glGroup && glGroup.name) {
-                        groupName = glGroup.name
-                    }
-                }
-            } catch (err) {
-                globalConfig.debug('获取群名称失败，使用默认值:', err)
-            }
-
-            // 使用模板管理器生成HTML
-            const html = this.templateManager.renderAchievementStatisticsTemplate(
-                globalStats,
-                groupStats,
-                groupId,
-                groupName
-            )
-
-            if (!html) {
-                throw new Error('成就统计模板渲染失败')
-            }
-
-            await page.setContent(html, {
-                waitUntil: 'networkidle0'
-            })
-
-            // 获取实际高度并调整视口
-            const bodyHeight = await page.evaluate(() => document.body.scrollHeight)
-            await page.setViewport({
-                width: 2400,
-                height: bodyHeight
-            })
-
-            // 生成 base64 图片
-            const base64 = await page.screenshot({
-                encoding: 'base64',
-                fullPage: true,
-                optimizeForSpeed: true
-            })
-
-            return base64
-        } catch (err) {
-            globalConfig.error('生成成就统计图片失败:', err)
-            throw err
-        } finally {
-            await this.releasePage(page)
-        }
-    }
 }
 
 export { ImageGenerator }
 export default ImageGenerator
-

@@ -238,147 +238,79 @@ export class PostgreSQLAdapter extends BaseAdapter {
      * @returns {Promise<void>}
      */
     async createTables() {
-        // 用户基础统计表
         await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS user_stats (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                nickname VARCHAR(255) DEFAULT '',
-                total_count BIGINT DEFAULT 0,
-                total_words BIGINT DEFAULT 0,
-                active_days INTEGER DEFAULT 0,
-                continuous_days INTEGER DEFAULT 0,
-                last_speaking_time VARCHAR(255),
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CREATE TABLE IF NOT EXISTS message_granular_stats (
+                id BIGSERIAL PRIMARY KEY,
+                group_id VARCHAR(64) NOT NULL,
+                user_id VARCHAR(64) NOT NULL,
+                stat_hour TIMESTAMP NOT NULL,
+                message_count BIGINT DEFAULT 0 CHECK (message_count >= 0),
+                word_count BIGINT DEFAULT 0 CHECK (word_count >= 0),
+                created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
+                updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
+                UNIQUE (group_id, user_id, stat_hour)
+            )
+        `)
+
+        await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS user_agg_stats (
+                group_id VARCHAR(64) NOT NULL,
+                user_id VARCHAR(64) NOT NULL,
+                day_msg BIGINT DEFAULT 0 CHECK (day_msg >= 0),
+                day_word BIGINT DEFAULT 0 CHECK (day_word >= 0),
+                week_msg BIGINT DEFAULT 0 CHECK (week_msg >= 0),
+                week_word BIGINT DEFAULT 0 CHECK (week_word >= 0),
+                month_msg BIGINT DEFAULT 0 CHECK (month_msg >= 0),
+                month_word BIGINT DEFAULT 0 CHECK (month_word >= 0),
+                year_msg BIGINT DEFAULT 0 CHECK (year_msg >= 0),
+                year_word BIGINT DEFAULT 0 CHECK (year_word >= 0),
+                total_msg BIGINT DEFAULT 0 CHECK (total_msg >= 0),
+                total_word BIGINT DEFAULT 0 CHECK (total_word >= 0),
+                stats_json JSONB NOT NULL DEFAULT '{}'::JSONB,
+                continuous_days INTEGER DEFAULT 0 CHECK (continuous_days >= 0),
+                last_speaking_time TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
+                updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
                 PRIMARY KEY (group_id, user_id)
             )
         `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS daily_stats (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                date_key VARCHAR(255) NOT NULL,
-                message_count BIGINT DEFAULT 0,
-                word_count BIGINT DEFAULT 0,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id, date_key)
-            )
-        `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS weekly_stats (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                week_key VARCHAR(255) NOT NULL,
-                message_count BIGINT DEFAULT 0,
-                word_count BIGINT DEFAULT 0,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id, week_key)
-            )
-        `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS monthly_stats (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                month_key VARCHAR(255) NOT NULL,
-                message_count BIGINT DEFAULT 0,
-                word_count BIGINT DEFAULT 0,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id, month_key)
-            )
-        `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS yearly_stats (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                year_key VARCHAR(255) NOT NULL,
-                message_count BIGINT DEFAULT 0,
-                word_count BIGINT DEFAULT 0,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id, year_key)
-            )
-        `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS achievements (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                achievement_id VARCHAR(255) NOT NULL,
-                unlocked BOOLEAN DEFAULT false,
-                unlocked_at TIMESTAMP,
-                progress INTEGER DEFAULT 0,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id, achievement_id)
-            )
-        `)
-
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS user_display_achievements (
-                group_id VARCHAR(255) NOT NULL,
-                user_id VARCHAR(255) NOT NULL,
-                achievement_id VARCHAR(255) NOT NULL,
-                achievement_name VARCHAR(255) NOT NULL,
-                rarity VARCHAR(50) DEFAULT 'common',
-                is_manual BOOLEAN DEFAULT false,
-                auto_display_at TIMESTAMP,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (group_id, user_id)
-            )
-        `)
-
-        try {
-            await this.pool.query(`
-                DO $$ 
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns 
-                        WHERE table_name = 'user_display_achievements' 
-                        AND column_name = 'is_manual'
-                    ) THEN
-                        ALTER TABLE user_display_achievements ADD COLUMN is_manual BOOLEAN DEFAULT false
-                    END IF
-                    
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns 
-                        WHERE table_name = 'user_display_achievements' 
-                        AND column_name = 'auto_display_at'
-                    ) THEN
-                        ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TIMESTAMP
-                    END IF
-                END $$
-            `)
-        } catch (err) {
-            globalConfig.debug('[PostgreSQL适配器] 数据库迁移失败（可能字段已存在）:', err.message)
-        }
 
         await this.pool.query(`
             CREATE TABLE IF NOT EXISTS group_info (
-                group_id VARCHAR(255) PRIMARY KEY,
+                group_id VARCHAR(64) PRIMARY KEY,
                 group_name VARCHAR(255) DEFAULT '',
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
+                updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')
             )
         `)
 
         await this.pool.query(`
             CREATE TABLE IF NOT EXISTS archived_groups (
-                group_id VARCHAR(255) PRIMARY KEY,
+                group_id VARCHAR(64) PRIMARY KEY,
                 group_name VARCHAR(255) DEFAULT '',
-                archived_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                last_activity_at TIMESTAMP,
-                CONSTRAINT fk_archived_group FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
+                archived_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai'),
+                last_activity_at TIMESTAMP
             )
         `)
+
+        // 重构后不再使用旧兼容结构，初始化时清理历史遗留对象（表/视图）
+        const legacyRelations = ['user_stats', 'daily_stats', 'weekly_stats', 'monthly_stats', 'yearly_stats']
+        for (const relationName of legacyRelations) {
+            const relationResult = await this.pool.query(
+                `SELECT table_type
+                 FROM information_schema.tables
+                 WHERE table_schema = 'public' AND table_name = $1
+                 LIMIT 1`,
+                [relationName]
+            )
+
+            const tableType = relationResult.rows?.[0]?.table_type
+            if (tableType === 'VIEW') {
+                await this.pool.query(`DROP VIEW IF EXISTS ${relationName}`)
+            } else if (tableType) {
+                await this.pool.query(`DROP TABLE IF EXISTS ${relationName}`)
+            }
+        }
     }
 
     /**
@@ -386,50 +318,18 @@ export class PostgreSQLAdapter extends BaseAdapter {
      * @returns {Promise<void>}
      */
     async createIndexes() {
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group ON user_stats(group_id)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_user ON user_stats(user_id)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_user ON user_stats(group_id, user_id)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_count ON user_stats(total_count DESC)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_words ON user_stats(total_words DESC)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_active_days ON user_stats(active_days DESC)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_continuous_days ON user_stats(continuous_days DESC)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_user_total_count ON user_stats(user_id, total_count DESC)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_total_count ON user_stats(group_id, total_count DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_mgs_group_hour ON message_granular_stats(group_id, stat_hour)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_mgs_group_user_hour ON message_granular_stats(group_id, user_id, stat_hour)`)
 
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_user_date ON daily_stats(group_id, user_id, date_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_date ON daily_stats(group_id, date_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_id ON daily_stats(user_id)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date_count ON daily_stats(user_id, date_key) WHERE message_count > 0 OR word_count > 0`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date_group_count ON daily_stats(date_key, group_id, message_count DESC)`)
-
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_user_week ON weekly_stats(group_id, user_id, week_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_week ON weekly_stats(week_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_week ON weekly_stats(group_id, week_key)`)
-
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_user_month ON monthly_stats(group_id, user_id, month_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month ON monthly_stats(month_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_month ON monthly_stats(group_id, month_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month_group_count ON monthly_stats(month_key, group_id, message_count DESC)`)
-
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_group_user_year ON yearly_stats(group_id, user_id, year_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_year ON yearly_stats(year_key)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_group_year ON yearly_stats(group_id, year_key)`)
-
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_achievements_group_user ON achievements(group_id, user_id)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_achievements_unlocked ON achievements(group_id, user_id, unlocked)`)
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_achievements_achievement_id ON achievements(achievement_id)`)
-
-        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_display_achievements_group_user ON user_display_achievements(group_id, user_id)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_day ON user_agg_stats(group_id, day_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_week ON user_agg_stats(group_id, week_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_month ON user_agg_stats(group_id, month_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_year ON user_agg_stats(group_id, year_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_total ON user_agg_stats(group_id, total_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_user_total ON user_agg_stats(user_id, total_msg DESC)`)
+        await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_uas_last_speaking ON user_agg_stats(last_speaking_time DESC)`)
 
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_group_info_group_id ON group_info(group_id)`)
-
-        try {
-            await this.pool.query(`DROP INDEX IF EXISTS idx_archived_groups_cleanup`)
-        } catch (err) {
-            globalConfig.debug(`[PostgreSQL适配器] 清理旧索引时出现错误（可忽略）: ${err.message}`)
-        }
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_archived_at ON archived_groups(archived_at)`)
         await this.pool.query(`CREATE INDEX IF NOT EXISTS idx_archived_groups_last_activity ON archived_groups(last_activity_at)`)
     }
@@ -460,4 +360,3 @@ export class PostgreSQLAdapter extends BaseAdapter {
         }
     }
 }
-

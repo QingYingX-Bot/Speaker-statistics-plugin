@@ -118,27 +118,23 @@
           { cmd:'#水群周榜', desc:'查看本周排行' },
           { cmd:'#水群月榜', desc:'查看本月排行' },
           { cmd:'#水群年榜', desc:'查看今年排行' },
-          { cmd:'#水群榜', desc:'查看本月排行榜' }
+          { cmd:'#水群榜', desc:'查看本月排行榜' },
+          { cmd:'#水群趋势 [天数]', desc:'查看最近发言趋势（默认7天）' }
         ]},
         { title: '查询统计', items:[
           { cmd:'#水群查询', desc:'查询个人统计数据（支持 @ 查询他人）' },
           { cmd:'#水群查询群列表', desc:'查看用户所在的所有群聊' },
           { cmd:'#水群统计', desc:'查看当前群聊的统计信息' },
-          { cmd:'#水群总统计', desc:'查看全局统计信息' }
-        ]}
-      ]);
-
-      const achieve = section('成就系统', null, [
-        { items:[
-          { cmd:'#水群成就列表', desc:'查看当前群聊所有可获取的成就' },
-          { cmd:'#水群设置显示成就 [成就名]', desc:'手动设置个人资料页显示的成就' },
-          { cmd:'#水群成就统计', desc:'查看每个成就的获取情况' }
+          { cmd:'#水群信息', desc:'查看当前群聊详细信息' },
+          { cmd:'#水群总统计 [群数|all]', desc:'查看全局统计信息' },
+          { cmd:'#总水群统计 [群数|all]', desc:'查看全局统计信息（别名）' }
         ]}
       ]);
 
       const background = section('背景设置', null, [
         { items:[
           { cmd:'#水群设置背景', desc:'生成背景设置页面链接' },
+          { cmd:'#水群删除背景', desc:'删除已设置的背景图片' },
           { cmd:'#水群背景帮助', desc:'查看背景设置帮助信息' }
         ]}
       ]);
@@ -150,7 +146,7 @@
       ]);
 
       const root = document.getElementById('help-root');
-      [basic, achieve, background, web].forEach(n => root.appendChild(n));
+      [basic, background, web].forEach(n => root.appendChild(n));
 
       if (isMaster) {
         const adminWrap = el('div', { class: 'admin-section section' }, [ el('div', { class: 'section-title' }, [ '管理员命令（仅主人）' ]) ]);
@@ -162,7 +158,9 @@
           el('ul', { class: 'command-list' }, uniqueCommands([
             { cmd:'#水群清除统计', desc:'清除当前群统计数据' },
             { cmd:'#水群归档僵尸群', desc:'列出所有僵尸群' },
-            { cmd:'#水群确认归档', desc:'确认归档列出的僵尸群' }
+            { cmd:'#水群确认归档', desc:'确认归档列出的僵尸群' },
+            { cmd:'#水群查看归档列表', desc:'查看当前归档群组列表' },
+            { cmd:'#水群清理缓存', desc:'清理运行缓存' }
           ]).map(it => el('li', { class: 'command-item' }, [ el('span', { class: 'command' }, it.cmd), el('span', { class: 'command-desc' }, it.desc) ])))
         ]);
 
@@ -174,11 +172,8 @@
             { cmd:'#水群设置开启/关闭图片', desc:'切换图片显示模式' },
             { cmd:'#水群设置开启/关闭记录', desc:'切换消息记录功能' },
             { cmd:'#水群设置开启/关闭日志', desc:'切换调试日志输出' },
-            { cmd:'#水群设置开启/关闭通知', desc:'切换成就解锁通知' },
-            { cmd:'#水群更新', desc:'更新插件到最新版本' },
-            { cmd:'#水群强制更新', desc:'强制更新插件（覆盖本地修改）' },
-            { cmd:'#刷新水群成就', desc:'刷新当前群组的所有显示成就' },
-            { cmd:'#刷新全群水群成就', desc:'刷新所有群组的所有显示成就' }
+            { cmd:'#水群更新', desc:'安全更新插件（仅 fast-forward，要求无本地改动）' },
+            { cmd:'#水群强制更新', desc:'强制更新插件（覆盖本地修改）' }
           ]).map(it => el('li', { class: 'command-item' }, [ el('span', { class: 'command' }, it.cmd), el('span', { class: 'command-desc' }, it.desc) ])))
         ]);
 
@@ -191,5 +186,3 @@
   </script>
 </body>
 </html>
-
-

@@ -19,16 +19,23 @@ export class PageRoutes {
      * 处理token验证并设置cookie
      * @param {string} token Token字符串
      * @param {Object} res Express响应对象
+     * @param {Object} req Express请求对象
      * @returns {Object|null} 验证结果，包含valid和userId
      */
-    handleTokenValidation(token, res) {
-        const validation = this.tokenManager.consumeToken(token)
+    handleTokenValidation(token, res, req = null) {
+        // 仅校验 token，不在页面路由阶段一次性消费。
+        // 否则链接预加载/探测请求可能提前使 token 失效，导致前端“未识别用户”。
+        const validation = this.tokenManager.validateToken(token)
         
         if (validation.valid) {
+            const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase()
+            const isHttps = req?.protocol === 'https' || forwardedProto === 'https'
             res.cookie('userId', validation.userId, {
                 maxAge: 24 * 60 * 60 * 1000,
                 httpOnly: false,
-                sameSite: 'lax'
+                sameSite: 'lax',
+                secure: isHttps,
+                path: '/'
             })
         }
         
@@ -84,8 +91,11 @@ export class PageRoutes {
                 return res.status(404).send('页面未找到')
             }
             
-            // 验证并消耗token
-            this.handleTokenValidation(token, res)
+            // 验证 token 并建立用户会话 cookie
+            const validation = this.handleTokenValidation(token, res, req)
+            if (!validation.valid) {
+                return res.status(401).send('访问链接已失效，请重新获取最新链接')
+            }
             this.sendIndexPage(res)
         })
     }

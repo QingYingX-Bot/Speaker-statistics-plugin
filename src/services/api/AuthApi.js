@@ -6,6 +6,7 @@ import { getDataService } from '../../core/DataService.js'
 import { ApiResponse } from './utils/ApiResponse.js'
 import { AuthMiddleware } from './middleware/AuthMiddleware.js'
 import { WebLinkGenerator } from '../../core/utils/WebLinkGenerator.js'
+import { globalConfig } from '../../core/ConfigManager.js'
 
 /**
  * 认证相关API路由
@@ -29,17 +30,47 @@ export class AuthApi extends BaseApi {
                 // 优先从 cookie 获取，其次从 query 参数，最后尝试从 token 解析
                 let userId = req.cookies?.userId || req.query.userId
                 
-                // 如果没有 userId，尝试从 token 中解析（如果 URL 路径是 token）
+                const extractTokenFromPath = (rawPath = '') => {
+                    if (!rawPath || typeof rawPath !== 'string') return ''
+                    const normalized = rawPath.trim()
+                    const match = normalized.match(/^\/([a-f0-9]{8})(?:\/|$)/i)
+                    return match ? match[1].toLowerCase() : ''
+                }
+
+                // 如果没有 userId，尝试从 token 中解析（优先 query，再从 Referer 回退）
                 if (!userId) {
-                    const pathParts = req.path.split('/').filter(p => p)
-                    if (pathParts.length > 0 && pathParts[0] !== 'api') {
-                        // 可能是 token 路径，尝试解析
+                    let token = String(req.query?.token || '').trim().toLowerCase()
+
+                    if (!token) {
+                        const referer = String(req.headers?.referer || req.headers?.referrer || '').trim()
+                        if (referer) {
+                            try {
+                                const refererUrl = new URL(referer)
+                                token = extractTokenFromPath(refererUrl.pathname)
+                            } catch {
+                                token = extractTokenFromPath(referer)
+                            }
+                        }
+                    }
+
+                    if (token) {
                         try {
-                            const tokenData = this.tokenManager.validateToken(pathParts[0])
+                            const tokenData = this.tokenManager.validateToken(token)
                             if (tokenData && tokenData.valid && tokenData.userId) {
                                 userId = tokenData.userId
+
+                                // 回填 cookie，避免后续请求继续依赖 Referer
+                                const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase()
+                                const isHttps = req.protocol === 'https' || forwardedProto === 'https'
+                                res.cookie('userId', userId, {
+                                    maxAge: 24 * 60 * 60 * 1000,
+                                    httpOnly: false,
+                                    sameSite: 'lax',
+                                    secure: isHttps,
+                                    path: '/'
+                                })
                             }
-                        } catch (error) {
+                        } catch {
                             // token 无效，忽略
                         }
                     }

@@ -100,7 +100,7 @@ class VerificationCodeManager {
                 throw sendError
             }
         } catch (err) {
-            globalConfig.err('发送验证码失败:', err)
+            globalConfig.error('发送验证码失败:', err)
             this.codes.delete(userId)
             return { success: false, message: '发送验证码失败: ' + (err.message || '未知错误') }
         }

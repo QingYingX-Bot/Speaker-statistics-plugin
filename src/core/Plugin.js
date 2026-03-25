@@ -5,7 +5,6 @@ import { RankCommands } from '../commands/RankCommands.js'
 import { UserCommands } from '../commands/UserCommands.js'
 import { AdminCommands } from '../commands/AdminCommands.js'
 import { HelpCommands } from '../commands/HelpCommands.js'
-import { AchievementCommands } from '../commands/AchievementCommands.js'
 import { BackgroundManager } from '../managers/BackgroundManager.js'
 import { globalConfig } from './ConfigManager.js'
 
@@ -23,28 +22,39 @@ class Plugin extends plugin {
                 ...UserCommands.getRules(),
                 ...RankCommands.getRules(),
                 ...AdminCommands.getRules(),
-                ...HelpCommands.getRules(),
-                ...AchievementCommands.getRules(),
-                ...BackgroundManager.getRules()
+                ...BackgroundManager.getRules(),
+                ...HelpCommands.getRules()
             ]
         });
 
-        // 获取单例的数据服务实例和消息记录器实例
-        this.dataService = getDataService()
-        this.messageRecorder = getMessageRecorder(this.dataService)
+        // 共享核心组件，避免框架多次实例化时重复构建
+        if (!Plugin._sharedCore) {
+            const dataService = getDataService()
+            const messageRecorder = getMessageRecorder(dataService)
+            Plugin._sharedCore = {
+                dataService,
+                messageRecorder,
+                rankCommands: new RankCommands(dataService),
+                userCommands: new UserCommands(dataService),
+                adminCommands: new AdminCommands(dataService),
+                helpCommands: new HelpCommands(dataService),
+                backgroundCommands: new BackgroundManager()
+            }
+            globalConfig.debug('插件核心组件初始化完成')
+        }
 
-        this.rankCommands = new RankCommands(this.dataService)
-        this.userCommands = new UserCommands(this.dataService)
-        this.adminCommands = new AdminCommands(this.dataService)
-        this.helpCommands = new HelpCommands(this.dataService)
-        this.achievementCommands = new AchievementCommands(this.dataService)
-        this.backgroundCommands = new BackgroundManager()
-
-        globalConfig.debug('[发言统计] 插件实例创建完成')
+        this.dataService = Plugin._sharedCore.dataService
+        this.messageRecorder = Plugin._sharedCore.messageRecorder
+        this.rankCommands = Plugin._sharedCore.rankCommands
+        this.userCommands = Plugin._sharedCore.userCommands
+        this.adminCommands = Plugin._sharedCore.adminCommands
+        this.helpCommands = Plugin._sharedCore.helpCommands
+        this.backgroundCommands = Plugin._sharedCore.backgroundCommands
     }
 
     static _initialized = false
     static _initializing = false
+    static _sharedCore = null
 
     /**
      * 插件初始化
@@ -52,12 +62,12 @@ class Plugin extends plugin {
      */
     async init() {
         if (Plugin._initialized) {
-            globalConfig.debug('[发言统计] 插件已初始化，跳过重复初始化')
+            globalConfig.debug('插件已初始化，跳过重复初始化')
             return
         }
 
         if (Plugin._initializing) {
-            globalConfig.debug('[发言统计] 插件正在初始化中，请稍候...')
+            globalConfig.debug('插件正在初始化中，请稍候...')
             let waitCount = 0
             while (Plugin._initializing && waitCount < 50) {
                 await new Promise(resolve => setTimeout(resolve, 100))
@@ -108,33 +118,33 @@ class Plugin extends plugin {
                             if (!fs.existsSync(keyFileDir)) fs.mkdirSync(keyFileDir, { recursive: true })
                             fs.writeFileSync(keyFilePath, JSON.stringify(keyData, null, 2), 'utf8')
                             if (cleanedCount > 0) {
-                                global.logger?.mark?.(`[发言统计] key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`) || globalConfig.debug(`[发言统计] key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`)
+                                global.logger?.mark?.(`[发言统计] key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`) || globalConfig.debug(`key.json 优化完成，清理了 ${cleanedCount} 个用户的明文秘钥`)
                             }
                         }
                     }
                 }
             } catch (optimizeErr) {
-                globalConfig.warn('[发言统计] key.json 优化失败:', optimizeErr)
+                globalConfig.warn('key.json 优化失败:', optimizeErr)
             }
 
             const { getWebServer } = await import('../services/WebServer.js')
             const webServer = getWebServer()
             
             if (webServer.isRunning) {
-                globalConfig.debug('[发言统计] Web服务器已在运行')
+                globalConfig.debug('Web服务器已在运行')
                 Plugin._initialized = true
                 Plugin._initializing = false
                 return
             }
             
             await webServer.start()
-            globalConfig.debug('[发言统计] Web服务器启动成功')
+            globalConfig.debug('Web服务器启动成功')
             
             this.startArchivedGroupsCleanupTask()
             
             Plugin._initialized = true
         } catch (err) {
-            globalConfig.error('[发言统计] Web服务器启动失败:', err)
+            globalConfig.error('Web服务器启动失败:', err)
             Plugin._initialized = true
         } finally {
             Plugin._initializing = false
@@ -197,6 +207,10 @@ class Plugin extends plugin {
         return await this.adminCommands.setDisplayCount(e)
     }
 
+    async toggleSetting(e) {
+        return await this.adminCommands.toggleSetting(e)
+    }
+
     async setUseForward(e) {
         return await this.adminCommands.setUseForward(e)
     }
@@ -217,10 +231,6 @@ class Plugin extends plugin {
         return await this.adminCommands.updatePlugin(e)
     }
 
-    async refreshAchievements(e) {
-        return await this.adminCommands.refreshAchievements(e)
-    }
-
     async cleanZombieGroups(e) {
         return await this.adminCommands.cleanZombieGroups(e)
     }
@@ -237,43 +247,28 @@ class Plugin extends plugin {
         return await this.adminCommands.clearCache(e)
     }
 
-    async showUserAchievements(e) {
-        return await this.achievementCommands.showUserAchievements(e)
-    }
-
-    async showUserBadges(e) {
-        return await this.achievementCommands.showUserBadges(e)
-    }
-
-    async setDisplayAchievement(e) {
-        return await this.achievementCommands.setDisplayAchievement(e)
-    }
-
-    async showAchievementStatistics(e) {
-        return await this.achievementCommands.showAchievementStatistics(e)
-    }
-
-    async grantUserAchievement(e) {
-        return await this.achievementCommands.grantUserAchievement(e)
-    }
-
-    async addUserAchievement(e) {
-        return await this.achievementCommands.addUserAchievement(e)
-    }
-
     async showHelp(e) {
         return await this.helpCommands.showHelp(e)
     }
 
     async openBackgroundPage(e) {
+        if (!this.backgroundCommands) {
+            return e.reply('背景功能初始化失败，请稍后重试')
+        }
         return await this.backgroundCommands.openBackgroundPage(e)
     }
 
     async removeBackground(e) {
+        if (!this.backgroundCommands) {
+            return e.reply('背景功能初始化失败，请稍后重试')
+        }
         return await this.backgroundCommands.removeBackground(e)
     }
 
     async showBackgroundHelp(e) {
+        if (!this.backgroundCommands) {
+            return e.reply('背景功能初始化失败，请稍后重试')
+        }
         return await this.backgroundCommands.showBackgroundHelp(e)
     }
 
@@ -362,4 +357,3 @@ Plugin._cleanupTaskStarted = false
 
 export { Plugin }
 export default Plugin
-

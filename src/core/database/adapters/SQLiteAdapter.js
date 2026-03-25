@@ -45,8 +45,11 @@ export class SQLiteAdapter extends BaseAdapter {
                 const nodeMajorVersion = parseInt(nodeVersion.split('.')[0].replace('v', ''))
                 
                 try {
-                    const sqlite3 = await import('sqlite3')
-                    Database = sqlite3.Database
+                    const sqlite3Module = await import('sqlite3')
+                    Database = sqlite3Module?.default?.Database || sqlite3Module.Database
+                    if (typeof Database !== 'function') {
+                        throw new Error('sqlite3.Database 不可用')
+                    }
                     this.useBetterSqlite3 = false
                 } catch {
                     if (isBindingsError) {
@@ -97,12 +100,14 @@ export class SQLiteAdapter extends BaseAdapter {
             let dbPath = dbConfig.path
             
             if (!dbPath) {
+                let dataDir
                 try {
-                    dbPath = path.join(PathResolver.getDataDir(), 'speech_statistics.db')
+                    dataDir = PathResolver.getDataDir()
                 } catch {
                     const pluginDir = PathResolver.getPluginDir()
-                    dbPath = path.join(pluginDir, 'data', 'speech_statistics.db')
+                    dataDir = path.join(pluginDir, 'data')
                 }
+                dbPath = path.join(dataDir, 'speech_statistics_db.db')
             } else {
                 const isAbsolute = path.isAbsolute(dbPath)
                 const hasPathSeparator = dbPath.includes(path.sep) || dbPath.includes('/') || dbPath.includes('\\')
@@ -126,14 +131,59 @@ export class SQLiteAdapter extends BaseAdapter {
             }
 
             if (this.useBetterSqlite3) {
-                this.db = new Database(dbPath)
-                this.db.pragma('journal_mode = WAL')
-                this.db.pragma('synchronous = NORMAL')
-                this.db.pragma('cache_size = -64000')
-                this.db.pragma('temp_store = MEMORY')
-                this.db.pragma('mmap_size = 268435456')
-                this.db.pragma('busy_timeout = 5000')
-                this.db.pragma('foreign_keys = ON')
+                try {
+                    this.db = new Database(dbPath)
+                    this.db.pragma('journal_mode = WAL')
+                    this.db.pragma('synchronous = NORMAL')
+                    this.db.pragma('cache_size = -64000')
+                    this.db.pragma('temp_store = MEMORY')
+                    this.db.pragma('mmap_size = 268435456')
+                    this.db.pragma('busy_timeout = 5000')
+                    this.db.pragma('foreign_keys = ON')
+                } catch (err) {
+                    const isBindingsError = err.message && (
+                        err.message.includes('bindings file') ||
+                        err.message.includes('Could not locate the bindings') ||
+                        err.message.includes('build/Release') ||
+                        err.message.includes('compiled/')
+                    )
+
+                    if (!isBindingsError) {
+                        throw err
+                    }
+
+                    globalConfig.warn(
+                        '[SQLiteAdapter] better-sqlite3 运行时初始化失败，尝试自动回退 sqlite3:',
+                        err.message?.substring(0, 300)
+                    )
+
+                    try {
+                        const sqlite3Module = await import('sqlite3')
+                        const Sqlite3Database = sqlite3Module?.default?.Database || sqlite3Module.Database
+                        if (typeof Sqlite3Database !== 'function') {
+                            throw new Error('sqlite3.Database 不可用')
+                        }
+                        this.useBetterSqlite3 = false
+                        this.db = await new Promise((resolve, reject) => {
+                            const db = new Sqlite3Database(dbPath, (openErr) => {
+                                if (openErr) reject(openErr)
+                                else resolve(db)
+                            })
+                        })
+                    } catch (sqliteErr) {
+                        throw new Error(
+                            `better-sqlite3 初始化失败且回退 sqlite3 也失败: ${sqliteErr.message}`
+                        )
+                    }
+
+                    await this.run('PRAGMA journal_mode = WAL')
+                    await this.run('PRAGMA synchronous = NORMAL')
+                    await this.run('PRAGMA cache_size = -64000')
+                    await this.run('PRAGMA temp_store = MEMORY')
+                    await this.run('PRAGMA mmap_size = 268435456')
+                    await this.run('PRAGMA busy_timeout = 5000')
+                    await this.run('PRAGMA foreign_keys = ON')
+                }
             } else {
                 this.db = await new Promise((resolve, reject) => {
                     const db = new Database(dbPath, (err) => {
@@ -254,6 +304,19 @@ export class SQLiteAdapter extends BaseAdapter {
         if (!this.db) {
             throw new Error('数据库未初始化')
         }
+        // PostgreSQL 风格占位符（$1/$2/...）在 SQLite 下需要展开为按出现顺序的参数数组。
+        // 例如：`VALUES($1,$1,$2)` -> `VALUES(?,?,?)`，参数应为 [p1, p1, p2]。
+        if (typeof sql === 'string' && /\$\d+/.test(sql)) {
+            const convertedParams = []
+            const convertedSql = sql.replace(/\$(\d+)/g, (_, numStr) => {
+                const index = parseInt(numStr, 10) - 1
+                const value = index >= 0 && index < params.length ? params[index] : null
+                convertedParams.push(this.convertParam(value))
+                return '?'
+            })
+            return { convertedSql, convertedParams }
+        }
+
         const convertedSql = this.convertPlaceholders(sql)
         const convertedParams = params.map(param => this.convertParam(param))
         return { convertedSql, convertedParams }
@@ -414,118 +477,41 @@ export class SQLiteAdapter extends BaseAdapter {
      */
     async createTables() {
         await this.exec(`
-            CREATE TABLE IF NOT EXISTS user_stats (
+            CREATE TABLE IF NOT EXISTS message_granular_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 group_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
-                nickname TEXT DEFAULT '',
-                total_count INTEGER DEFAULT 0,
-                total_words INTEGER DEFAULT 0,
-                active_days INTEGER DEFAULT 0,
-                continuous_days INTEGER DEFAULT 0,
+                stat_hour TEXT NOT NULL,
+                message_count INTEGER DEFAULT 0 CHECK (message_count >= 0),
+                word_count INTEGER DEFAULT 0 CHECK (word_count >= 0),
+                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
+                UNIQUE (group_id, user_id, stat_hour)
+            )
+        `)
+
+        await this.exec(`
+            CREATE TABLE IF NOT EXISTS user_agg_stats (
+                group_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                day_msg INTEGER DEFAULT 0 CHECK (day_msg >= 0),
+                day_word INTEGER DEFAULT 0 CHECK (day_word >= 0),
+                week_msg INTEGER DEFAULT 0 CHECK (week_msg >= 0),
+                week_word INTEGER DEFAULT 0 CHECK (week_word >= 0),
+                month_msg INTEGER DEFAULT 0 CHECK (month_msg >= 0),
+                month_word INTEGER DEFAULT 0 CHECK (month_word >= 0),
+                year_msg INTEGER DEFAULT 0 CHECK (year_msg >= 0),
+                year_word INTEGER DEFAULT 0 CHECK (year_word >= 0),
+                total_msg INTEGER DEFAULT 0 CHECK (total_msg >= 0),
+                total_word INTEGER DEFAULT 0 CHECK (total_word >= 0),
+                stats_json TEXT NOT NULL DEFAULT '{}',
+                continuous_days INTEGER DEFAULT 0 CHECK (continuous_days >= 0),
                 last_speaking_time TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
                 PRIMARY KEY (group_id, user_id)
             )
         `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS daily_stats (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                date_key TEXT NOT NULL,
-                message_count INTEGER DEFAULT 0,
-                word_count INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id, date_key)
-            )
-        `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS weekly_stats (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                week_key TEXT NOT NULL,
-                message_count INTEGER DEFAULT 0,
-                word_count INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id, week_key)
-            )
-        `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS monthly_stats (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                month_key TEXT NOT NULL,
-                message_count INTEGER DEFAULT 0,
-                word_count INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id, month_key)
-            )
-        `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS yearly_stats (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                year_key TEXT NOT NULL,
-                message_count INTEGER DEFAULT 0,
-                word_count INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id, year_key)
-            )
-        `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS achievements (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                achievement_id TEXT NOT NULL,
-                unlocked INTEGER DEFAULT 0,
-                unlocked_at TEXT,
-                progress INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id, achievement_id)
-            )
-        `)
-
-        await this.exec(`
-            CREATE TABLE IF NOT EXISTS user_display_achievements (
-                group_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                achievement_id TEXT NOT NULL,
-                achievement_name TEXT NOT NULL,
-                rarity TEXT DEFAULT 'common',
-                is_manual INTEGER DEFAULT 0,
-                auto_display_at TEXT,
-                created_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', '+8 hours')),
-                PRIMARY KEY (group_id, user_id)
-            )
-        `)
-
-        try {
-            const tableInfo = await this.all(`PRAGMA table_info(user_display_achievements)`)
-            const columnNames = tableInfo.map(col => col.name.toLowerCase())
-            
-            if (!columnNames.includes('is_manual')) {
-                try {
-                    await this.run(`ALTER TABLE user_display_achievements ADD COLUMN is_manual INTEGER DEFAULT 0`)
-                } catch {}
-            }
-            
-            if (!columnNames.includes('auto_display_at')) {
-                try {
-                    await this.run(`ALTER TABLE user_display_achievements ADD COLUMN auto_display_at TEXT`)
-                } catch {}
-            }
-        } catch {}
 
         await this.exec(`
             CREATE TABLE IF NOT EXISTS group_info (
@@ -545,6 +531,21 @@ export class SQLiteAdapter extends BaseAdapter {
                 FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
             )
         `)
+
+        // 重构后不再使用旧兼容结构，初始化时清理历史遗留对象（表/视图）
+        const legacyRelations = ['user_stats', 'daily_stats', 'weekly_stats', 'monthly_stats', 'yearly_stats']
+        for (const relationName of legacyRelations) {
+            const relation = await this.get(
+                `SELECT type FROM sqlite_master WHERE name = ? LIMIT 1`,
+                relationName
+            )
+
+            if (relation?.type === 'view') {
+                await this.exec(`DROP VIEW IF EXISTS ${relationName}`)
+            } else if (relation?.type === 'table') {
+                await this.exec(`DROP TABLE IF EXISTS ${relationName}`)
+            }
+        }
     }
 
     /**
@@ -552,41 +553,16 @@ export class SQLiteAdapter extends BaseAdapter {
      * @returns {Promise<void>}
      */
     async createIndexes() {
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_group ON user_stats(group_id)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_user ON user_stats(user_id)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_user ON user_stats(group_id, user_id)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_count ON user_stats(total_count DESC)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_total_words ON user_stats(total_words DESC)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_active_days ON user_stats(active_days DESC)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_continuous_days ON user_stats(continuous_days DESC)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_user_total_count ON user_stats(user_id, total_count DESC)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_user_stats_group_total_count ON user_stats(group_id, total_count DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_mgs_group_hour ON message_granular_stats(group_id, stat_hour)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_mgs_group_user_hour ON message_granular_stats(group_id, user_id, stat_hour)`)
 
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_user_date ON daily_stats(group_id, user_id, date_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_group_date ON daily_stats(group_id, date_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_id ON daily_stats(user_id)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_daily_stats_date_group_count ON daily_stats(date_key, group_id, message_count DESC)`)
-
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_user_week ON weekly_stats(group_id, user_id, week_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_week ON weekly_stats(week_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_weekly_stats_group_week ON weekly_stats(group_id, week_key)`)
-
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_user_month ON monthly_stats(group_id, user_id, month_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month ON monthly_stats(month_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_group_month ON monthly_stats(group_id, month_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_monthly_stats_month_group_count ON monthly_stats(month_key, group_id, message_count DESC)`)
-
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_group_user_year ON yearly_stats(group_id, user_id, year_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_year ON yearly_stats(year_key)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_yearly_stats_group_year ON yearly_stats(group_id, year_key)`)
-
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_achievements_group_user ON achievements(group_id, user_id)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_achievements_unlocked ON achievements(group_id, user_id, unlocked)`)
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_achievements_achievement_id ON achievements(achievement_id)`)
-
-        await this.run(`CREATE INDEX IF NOT EXISTS idx_display_achievements_group_user ON user_display_achievements(group_id, user_id)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_day ON user_agg_stats(group_id, day_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_week ON user_agg_stats(group_id, week_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_month ON user_agg_stats(group_id, month_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_year ON user_agg_stats(group_id, year_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_total ON user_agg_stats(group_id, total_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_user_total ON user_agg_stats(user_id, total_msg DESC)`)
+        await this.run(`CREATE INDEX IF NOT EXISTS idx_uas_last_speaking ON user_agg_stats(last_speaking_time DESC)`)
 
         await this.run(`CREATE INDEX IF NOT EXISTS idx_group_info_group_id ON group_info(group_id)`)
 
@@ -631,4 +607,3 @@ export class SQLiteAdapter extends BaseAdapter {
         }
     }
 }
-

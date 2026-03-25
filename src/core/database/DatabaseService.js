@@ -39,7 +39,7 @@ class DatabaseService {
         for (let i = 0; i < maxRetries; i++) {
             try {
                 const dbConfig = globalConfig.getConfig('database') || {}
-                const dbType = (dbConfig.type || 'sqlite').toLowerCase()
+                const dbType = (dbConfig.type || 'postgresql').toLowerCase()
                 
                 if (dbType === 'sqlite') {
                     this.adapter = new SQLiteAdapter()
@@ -330,6 +330,38 @@ class DatabaseService {
     }
 
     /**
+     * 规范化群 ID
+     * @param {any} groupId 群 ID
+     * @returns {string}
+     */
+    normalizeGroupId(groupId) {
+        const sanitized = this.sanitizeString(groupId)
+        return sanitized ? String(sanitized).trim() : ''
+    }
+
+    /**
+     * 根据群 ID 生成平台感知的默认群名称
+     * @param {any} groupId 群 ID
+     * @returns {string}
+     */
+    getDefaultGroupDisplayName(groupId) {
+        const normalizedGroupId = this.normalizeGroupId(groupId)
+        if (!normalizedGroupId) return '未知群组'
+
+        if (normalizedGroupId.startsWith('dc_')) {
+            const channelId = normalizedGroupId.slice(3) || normalizedGroupId
+            return `Discord频道${channelId}`
+        }
+
+        if (normalizedGroupId.startsWith('tg_')) {
+            const chatId = normalizedGroupId.slice(3) || normalizedGroupId
+            return `Telegram群组${chatId}`
+        }
+
+        return `群${normalizedGroupId}`
+    }
+
+    /**
      * 格式化日期时间为字符串（内部方法）
      * @param {Date|string|null} date 日期对象或字符串
      * @returns {string|null} 格式化后的日期时间字符串
@@ -345,6 +377,329 @@ class DatabaseService {
         return null
     }
 
+    /**
+     * 解析统计扩展字段
+     * @param {string|Object|null} raw 原始 stats_json
+     * @returns {Object}
+     */
+    _parseStatsJson(raw) {
+        if (!raw) return {}
+        if (typeof raw === 'object') return raw
+        if (typeof raw === 'string') {
+            try {
+                const parsed = JSON.parse(raw)
+                return parsed && typeof parsed === 'object' ? parsed : {}
+            } catch {
+                return {}
+            }
+        }
+        return {}
+    }
+
+    /**
+     * 将给定时间转换为 UTC+8 时间对象
+     * @param {Date|string|number|null} messageTime 时间输入
+     * @returns {Date}
+     */
+    _toUTC8Date(messageTime = null) {
+        let sourceDate = null
+
+        if (messageTime instanceof Date) {
+            sourceDate = messageTime
+        } else if (typeof messageTime === 'number') {
+            // 兼容秒级时间戳与毫秒级时间戳
+            sourceDate = new Date(messageTime > 1e12 ? messageTime : messageTime * 1000)
+        } else if (typeof messageTime === 'string' && messageTime.trim() !== '') {
+            const parsed = new Date(messageTime)
+            if (!Number.isNaN(parsed.getTime())) {
+                sourceDate = parsed
+            }
+        }
+
+        if (!sourceDate || Number.isNaN(sourceDate.getTime())) {
+            return TimeUtils.getUTC8Date()
+        }
+
+        const utc8Offset = 8 * 60 * 60 * 1000
+        const utc8Timestamp = sourceDate.getTime() + (sourceDate.getTimezoneOffset() * 60 * 1000) + utc8Offset
+        return new Date(utc8Timestamp)
+    }
+
+    /**
+     * 记录单条消息并实时更新聚合表
+     * @param {string} groupId 群ID
+     * @param {string} userId 用户ID
+     * @param {string} nickname 用户昵称
+     * @param {number} msgAdd 消息增量
+     * @param {number} wordAdd 字数增量
+     * @param {Date|string|number|null} messageTime 消息时间
+     * @returns {Promise<void>}
+     */
+    async recordMessage(groupId, userId, nickname = '', msgAdd = 1, wordAdd = 0, messageTime = null) {
+        const safeGroupId = this.sanitizeString(groupId) || ''
+        const safeUserId = this.sanitizeString(userId) || ''
+        const safeNickname = this.sanitizeString(nickname) || ''
+        const msgIncrement = Math.max(0, parseInt(msgAdd || 0, 10))
+        const wordIncrement = Math.max(0, parseInt(wordAdd || 0, 10))
+        const now = this.getCurrentTime()
+
+        if (!safeGroupId || !safeUserId || msgIncrement <= 0) {
+            return
+        }
+
+        const utc8Date = this._toUTC8Date(messageTime)
+        const dayKey = TimeUtils.formatDate(utc8Date)
+        const weekKey = TimeUtils.getWeekNumber(utc8Date)
+        const monthKey = TimeUtils.getMonthString(utc8Date)
+        const yearKey = utc8Date.getFullYear().toString()
+        const statHour = `${dayKey} ${String(utc8Date.getHours()).padStart(2, '0')}:00:00`
+        const lastSpeakingTime = TimeUtils.formatDateTime(utc8Date)
+
+        // 1) 明细层：小时级聚合写入
+        const existedHour = await this.get(
+            'SELECT message_count, word_count FROM message_granular_stats WHERE group_id = $1 AND user_id = $2 AND stat_hour = $3',
+            safeGroupId,
+            safeUserId,
+            statHour
+        )
+
+        if (existedHour) {
+            await this.run(
+                `UPDATE message_granular_stats
+                 SET message_count = message_count + $1,
+                     word_count = word_count + $2,
+                     updated_at = $3
+                 WHERE group_id = $4 AND user_id = $5 AND stat_hour = $6`,
+                msgIncrement,
+                wordIncrement,
+                now,
+                safeGroupId,
+                safeUserId,
+                statHour
+            )
+        } else {
+            await this.run(
+                `INSERT INTO message_granular_stats (
+                    group_id, user_id, stat_hour, message_count, word_count, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                safeGroupId,
+                safeUserId,
+                statHour,
+                msgIncrement,
+                wordIncrement,
+                now,
+                now
+            )
+        }
+
+        // 2) 聚合层：当前周期 + 总量
+        const currentAgg = await this.get(
+            'SELECT * FROM user_agg_stats WHERE group_id = $1 AND user_id = $2',
+            safeGroupId,
+            safeUserId
+        )
+
+        if (!currentAgg) {
+            const statsJson = {
+                nickname: safeNickname,
+                active_days: 1,
+                day_key: dayKey,
+                week_key: weekKey,
+                month_key: monthKey,
+                year_key: yearKey
+            }
+
+            await this.run(
+                `INSERT INTO user_agg_stats (
+                    group_id, user_id,
+                    day_msg, day_word, week_msg, week_word, month_msg, month_word, year_msg, year_word,
+                    total_msg, total_word, stats_json, continuous_days, last_speaking_time, created_at, updated_at
+                ) VALUES (
+                    $1, $2,
+                    $3, $4, $5, $6, $7, $8, $9, $10,
+                    $11, $12, $13, $14, $15, $16, $17
+                )`,
+                safeGroupId,
+                safeUserId,
+                msgIncrement,
+                wordIncrement,
+                msgIncrement,
+                wordIncrement,
+                msgIncrement,
+                wordIncrement,
+                msgIncrement,
+                wordIncrement,
+                msgIncrement,
+                wordIncrement,
+                JSON.stringify(statsJson),
+                1,
+                lastSpeakingTime,
+                now,
+                now
+            )
+            return
+        }
+
+        const statsJson = this._parseStatsJson(currentAgg.stats_json)
+        const previousDayKey = this.sanitizeString(statsJson.day_key) || null
+        const yesterday = new Date(utc8Date)
+        yesterday.setDate(yesterday.getDate() - 1)
+        const yesterdayKey = TimeUtils.formatDate(yesterday)
+
+        const sameDay = statsJson.day_key === dayKey
+        const sameWeek = statsJson.week_key === weekKey
+        const sameMonth = statsJson.month_key === monthKey
+        const sameYear = statsJson.year_key === yearKey
+
+        const dayMsg = (sameDay ? parseInt(currentAgg.day_msg || 0, 10) : 0) + msgIncrement
+        const dayWord = (sameDay ? parseInt(currentAgg.day_word || 0, 10) : 0) + wordIncrement
+        const weekMsg = (sameWeek ? parseInt(currentAgg.week_msg || 0, 10) : 0) + msgIncrement
+        const weekWord = (sameWeek ? parseInt(currentAgg.week_word || 0, 10) : 0) + wordIncrement
+        const monthMsg = (sameMonth ? parseInt(currentAgg.month_msg || 0, 10) : 0) + msgIncrement
+        const monthWord = (sameMonth ? parseInt(currentAgg.month_word || 0, 10) : 0) + wordIncrement
+        const yearMsg = (sameYear ? parseInt(currentAgg.year_msg || 0, 10) : 0) + msgIncrement
+        const yearWord = (sameYear ? parseInt(currentAgg.year_word || 0, 10) : 0) + wordIncrement
+        const totalMsg = parseInt(currentAgg.total_msg || 0, 10) + msgIncrement
+        const totalWord = parseInt(currentAgg.total_word || 0, 10) + wordIncrement
+
+        let continuousDays = parseInt(currentAgg.continuous_days || 0, 10)
+        let activeDays = parseInt(statsJson.active_days || 0, 10)
+        if (!sameDay) {
+            activeDays += 1
+            continuousDays = previousDayKey === yesterdayKey ? (continuousDays + 1) : 1
+        }
+
+        const mergedStatsJson = {
+            ...statsJson,
+            nickname: safeNickname || statsJson.nickname || '',
+            active_days: Math.max(activeDays, 0),
+            day_key: dayKey,
+            week_key: weekKey,
+            month_key: monthKey,
+            year_key: yearKey
+        }
+
+        await this.run(
+            `UPDATE user_agg_stats
+             SET day_msg = $1,
+                 day_word = $2,
+                 week_msg = $3,
+                 week_word = $4,
+                 month_msg = $5,
+                 month_word = $6,
+                 year_msg = $7,
+                 year_word = $8,
+                 total_msg = $9,
+                 total_word = $10,
+                 stats_json = $11,
+                 continuous_days = $12,
+                 last_speaking_time = $13,
+                 updated_at = $14
+             WHERE group_id = $15 AND user_id = $16`,
+            dayMsg,
+            dayWord,
+            weekMsg,
+            weekWord,
+            monthMsg,
+            monthWord,
+            yearMsg,
+            yearWord,
+            totalMsg,
+            totalWord,
+            JSON.stringify(mergedStatsJson),
+            Math.max(continuousDays, 0),
+            lastSpeakingTime,
+            now,
+            safeGroupId,
+            safeUserId
+        )
+    }
+
+    /**
+     * 获取时间维度 SQL 表达式（兼容 PostgreSQL / SQLite）
+     * @param {'date'|'week'|'month'|'year'} dimension 维度
+     * @param {string} column 时间列名
+     * @returns {string}
+     */
+    _getTimeDimensionExpr(dimension, column = 'stat_hour') {
+        const dbType = this.getDatabaseType()
+        const safeColumn = column
+
+        if (dbType === 'postgresql') {
+            if (dimension === 'date') return `to_char(${safeColumn}, 'YYYY-MM-DD')`
+            if (dimension === 'week') return `to_char(${safeColumn}, 'IYYY-"W"IW')`
+            if (dimension === 'month') return `to_char(${safeColumn}, 'YYYY-MM')`
+            return `to_char(${safeColumn}, 'YYYY')`
+        }
+
+        if (dimension === 'date') return `substr(${safeColumn}, 1, 10)`
+        if (dimension === 'week') {
+            return `printf('%04d-W%02d', CAST(strftime('%Y', ${safeColumn}) AS INTEGER), CAST(strftime('%W', ${safeColumn}) AS INTEGER))`
+        }
+        if (dimension === 'month') return `substr(${safeColumn}, 1, 7)`
+        return `substr(${safeColumn}, 1, 4)`
+    }
+
+    /**
+     * 活跃天数字段表达式（兼容 PostgreSQL / SQLite）
+     * @param {string} tableAlias 表别名
+     * @returns {string}
+     */
+    _getActiveDaysExpr(tableAlias = 'user_agg_stats') {
+        const dbType = this.getDatabaseType()
+        const prefix = tableAlias ? `${tableAlias}.` : ''
+        if (dbType === 'postgresql') {
+            return `GREATEST(COALESCE((${prefix}stats_json->>'active_days')::INTEGER, 0), 0)`
+        }
+        return `COALESCE(CAST(json_extract(${prefix}stats_json, '$.active_days') AS INTEGER), 0)`
+    }
+
+    /**
+     * 昵称字段表达式（兼容 PostgreSQL / SQLite）
+     * @param {string} tableAlias 表别名
+     * @returns {string}
+     */
+    _getNicknameExpr(tableAlias = 'user_agg_stats') {
+        const dbType = this.getDatabaseType()
+        const prefix = tableAlias ? `${tableAlias}.` : ''
+        if (dbType === 'postgresql') {
+            return `COALESCE(${prefix}stats_json->>'nickname', '')`
+        }
+        return `COALESCE(json_extract(${prefix}stats_json, '$.nickname'), '')`
+    }
+
+    /**
+     * 将 user_agg_stats 行转换为旧字段结构（供上层兼容）
+     * @param {Object|null} row 原始行
+     * @returns {Object|null}
+     */
+    _mapUserAggRowToLegacy(row) {
+        if (!row) return null
+
+        const statsJson = this._parseStatsJson(row.stats_json)
+        const nickname = this.sanitizeString(statsJson.nickname) || ''
+        const activeDays = Math.max(parseInt(statsJson.active_days || 0, 10) || 0, 0)
+
+        return {
+            ...row,
+            nickname,
+            total_count: parseInt(row.total_msg || 0, 10),
+            total_words: parseInt(row.total_word || 0, 10),
+            active_days: activeDays
+        }
+    }
+
+    /**
+     * 将旧排序字段映射到新模型字段
+     * @param {string} orderBy 排序字段
+     * @returns {string}
+     */
+    _mapOrderByToAggColumn(orderBy) {
+        if (orderBy === 'total_words') return 'total_word'
+        if (orderBy === 'continuous_days') return 'continuous_days'
+        return 'total_msg'
+    }
+
     // ========== 用户统计相关方法 ==========
 
     /**
@@ -354,7 +709,8 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 用户统计数据
      */
     async getUserStats(groupId, userId) {
-        return this.get('SELECT * FROM user_stats WHERE group_id = $1 AND user_id = $2', groupId, userId)
+        const row = await this.get('SELECT * FROM user_agg_stats WHERE group_id = $1 AND user_id = $2', groupId, userId)
+        return this._mapUserAggRowToLegacy(row)
     }
 
     /**
@@ -378,32 +734,60 @@ class DatabaseService {
         }
         lastSpeakingTime = this.sanitizeString(lastSpeakingTime)
         
-        await this.run(`
-            INSERT INTO user_stats (
-                group_id, user_id, nickname, total_count, total_words,
-                active_days, continuous_days, last_speaking_time, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ON CONFLICT (group_id, user_id) 
-            DO UPDATE SET
-                nickname = EXCLUDED.nickname,
-                total_count = EXCLUDED.total_count,
-                total_words = EXCLUDED.total_words,
-                active_days = EXCLUDED.active_days,
-                continuous_days = EXCLUDED.continuous_days,
-                last_speaking_time = EXCLUDED.last_speaking_time,
-                updated_at = EXCLUDED.updated_at
-        `,
+        const existing = await this.get(
+            'SELECT * FROM user_agg_stats WHERE group_id = $1 AND user_id = $2',
             sanitizedGroupId,
-            sanitizedUserId,
-            sanitizedNickname,
-            stats.total_count || 0,
-            stats.total_words || 0,
-            stats.active_days || 0,
-            stats.continuous_days || 0,
-            lastSpeakingTime,
-            now,
-            now
+            sanitizedUserId
         )
+
+        const currentStatsJson = this._parseStatsJson(existing?.stats_json)
+        const mergedStatsJson = {
+            ...currentStatsJson,
+            nickname: sanitizedNickname || currentStatsJson.nickname || '',
+            active_days: Math.max(parseInt(stats.active_days || currentStatsJson.active_days || 0, 10) || 0, 0)
+        }
+
+        if (existing) {
+            await this.run(
+                `UPDATE user_agg_stats
+                 SET total_msg = $1,
+                     total_word = $2,
+                     continuous_days = $3,
+                     last_speaking_time = $4,
+                     stats_json = $5,
+                     updated_at = $6
+                 WHERE group_id = $7 AND user_id = $8`,
+                parseInt(stats.total_count || existing.total_msg || 0, 10),
+                parseInt(stats.total_words || existing.total_word || 0, 10),
+                parseInt(stats.continuous_days || existing.continuous_days || 0, 10),
+                lastSpeakingTime,
+                JSON.stringify(mergedStatsJson),
+                now,
+                sanitizedGroupId,
+                sanitizedUserId
+            )
+        } else {
+            await this.run(
+                `INSERT INTO user_agg_stats (
+                    group_id, user_id,
+                    day_msg, day_word, week_msg, week_word, month_msg, month_word, year_msg, year_word,
+                    total_msg, total_word, stats_json, continuous_days, last_speaking_time, created_at, updated_at
+                ) VALUES (
+                    $1, $2,
+                    0, 0, 0, 0, 0, 0, 0, 0,
+                    $3, $4, $5, $6, $7, $8, $9
+                )`,
+                sanitizedGroupId,
+                sanitizedUserId,
+                parseInt(stats.total_count || 0, 10),
+                parseInt(stats.total_words || 0, 10),
+                JSON.stringify(mergedStatsJson),
+                parseInt(stats.continuous_days || 0, 10),
+                lastSpeakingTime,
+                now,
+                now
+            )
+        }
 
         return true
     }
@@ -416,29 +800,73 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async updateUserStats(groupId, userId, updates) {
+        if (!updates || Object.keys(updates).length === 0) {
+            return true
+        }
+
+        const current = await this.get('SELECT * FROM user_agg_stats WHERE group_id = $1 AND user_id = $2', groupId, userId)
+        if (!current) {
+            return this.saveUserStats(groupId, userId, updates)
+        }
+
         const now = this.getCurrentTime()
         const setParts = []
         const values = []
         let paramIndex = 1
+        const statsJson = this._parseStatsJson(current.stats_json)
+
+        const columnMap = {
+            total_count: 'total_msg',
+            total_words: 'total_word',
+            continuous_days: 'continuous_days',
+            last_speaking_time: 'last_speaking_time',
+            day_msg: 'day_msg',
+            day_word: 'day_word',
+            week_msg: 'week_msg',
+            week_word: 'week_word',
+            month_msg: 'month_msg',
+            month_word: 'month_word',
+            year_msg: 'year_msg',
+            year_word: 'year_word'
+        }
 
         for (const [key, value] of Object.entries(updates)) {
-            setParts.push(`${key} = $${paramIndex++}`)
+            if (key === 'nickname') {
+                statsJson.nickname = this.sanitizeString(value) || ''
+                continue
+            }
+            if (key === 'active_days') {
+                statsJson.active_days = Math.max(parseInt(value || 0, 10) || 0, 0)
+                continue
+            }
+
+            const targetColumn = columnMap[key]
+            if (!targetColumn) continue
+
             let convertedValue = value
             if (value instanceof Date) {
                 convertedValue = value.toISOString()
             } else if (value === null || value === undefined) {
                 convertedValue = null
+            } else if (typeof value === 'string' && /^[0-9]+$/.test(value)) {
+                convertedValue = parseInt(value, 10)
             }
+
+            setParts.push(`${targetColumn} = $${paramIndex++}`)
             values.push(convertedValue)
         }
 
+        setParts.push(`stats_json = $${paramIndex++}`)
+        values.push(JSON.stringify(statsJson))
+
         setParts.push(`updated_at = $${paramIndex++}`)
         values.push(now)
+
         const whereParam1 = paramIndex++
         const whereParam2 = paramIndex
         values.push(groupId, userId)
 
-        const sql = `UPDATE user_stats SET ${setParts.join(', ')} WHERE group_id = $${whereParam1} AND user_id = $${whereParam2}`
+        const sql = `UPDATE user_agg_stats SET ${setParts.join(', ')} WHERE group_id = $${whereParam1} AND user_id = $${whereParam2}`
         await this.run(sql, ...values)
         return true
     }
@@ -449,11 +877,15 @@ class DatabaseService {
      * @returns {Promise<Array>} 用户统计数组
      */
     async getAllGroupUsers(groupId) {
-        return this.all('SELECT * FROM user_stats WHERE group_id = $1 ORDER BY total_count DESC', groupId)
+        const rows = await this.all(
+            'SELECT * FROM user_agg_stats WHERE group_id = $1 ORDER BY total_msg DESC',
+            groupId
+        )
+        return rows.map(row => this._mapUserAggRowToLegacy(row))
     }
 
     async getAllGroupIds() {
-        const rows = await this.all('SELECT DISTINCT group_id FROM user_stats')
+        const rows = await this.all('SELECT DISTINCT group_id FROM user_agg_stats')
         return rows.map(row => row.group_id)
     }
 
@@ -462,7 +894,7 @@ class DatabaseService {
      * @returns {Promise<Map<string, Array>>} 群ID到用户列表的映射
      */
     async getAllGroupsUsersBatch() {
-        const rows = await this.all('SELECT * FROM user_stats ORDER BY group_id, total_count DESC')
+        const rows = await this.all('SELECT * FROM user_agg_stats ORDER BY group_id, total_msg DESC')
         const groupsMap = new Map()
         
         for (const row of rows) {
@@ -470,7 +902,7 @@ class DatabaseService {
             if (!groupsMap.has(groupId)) {
                 groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row)
+            groupsMap.get(groupId).push(this._mapUserAggRowToLegacy(row))
         }
         
         return groupsMap
@@ -482,13 +914,25 @@ class DatabaseService {
      * @returns {Promise<Map<string, Array>>} 群ID到日统计列表的映射
      */
     async getAllGroupsDailyStatsBatch(dateKey) {
+        const dateExpr = this._getTimeDimensionExpr('date', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
         const rows = await this.all(
-            `SELECT ds.*, us.nickname, us.last_speaking_time 
-             FROM daily_stats ds
-             LEFT JOIN user_stats us ON ds.group_id = us.group_id AND ds.user_id = us.user_id
-             WHERE ds.date_key = $1 
-             AND (ds.message_count > 0 OR ds.word_count > 0)
-             ORDER BY ds.group_id, ds.message_count DESC`,
+            `SELECT 
+                mgs.group_id,
+                mgs.user_id,
+                ${dateExpr} as date_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE ${dateExpr} = $1
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${dateExpr}
+             ORDER BY mgs.group_id, message_count DESC`,
             dateKey
         )
         const groupsMap = new Map()
@@ -498,7 +942,10 @@ class DatabaseService {
             if (!groupsMap.has(groupId)) {
                 groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row)
+            groupsMap.get(groupId).push({
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
+            })
         }
         
         return groupsMap
@@ -510,13 +957,25 @@ class DatabaseService {
      * @returns {Promise<Map<string, Array>>} 群ID到月统计列表的映射
      */
     async getAllGroupsMonthlyStatsBatch(monthKey) {
+        const monthExpr = this._getTimeDimensionExpr('month', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
         const rows = await this.all(
-            `SELECT ms.*, us.nickname, us.last_speaking_time 
-             FROM monthly_stats ms
-             LEFT JOIN user_stats us ON ms.group_id = us.group_id AND ms.user_id = us.user_id
-             WHERE ms.month_key = $1 
-             AND (ms.message_count > 0 OR ms.word_count > 0)
-             ORDER BY ms.group_id, ms.message_count DESC`,
+            `SELECT 
+                mgs.group_id,
+                mgs.user_id,
+                ${monthExpr} as month_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE ${monthExpr} = $1
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${monthExpr}
+             ORDER BY mgs.group_id, message_count DESC`,
             monthKey
         )
         const groupsMap = new Map()
@@ -526,7 +985,10 @@ class DatabaseService {
             if (!groupsMap.has(groupId)) {
                 groupsMap.set(groupId, [])
             }
-            groupsMap.get(groupId).push(row)
+            groupsMap.get(groupId).push({
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
+            })
         }
         
         return groupsMap
@@ -558,14 +1020,15 @@ class DatabaseService {
         try {
             const existing = await this.get('SELECT group_id FROM archived_groups WHERE group_id = $1', groupId)
             const groupInfo = await this.get('SELECT * FROM group_info WHERE group_id = $1', groupId)
-            const groupName = groupInfo?.group_name || ''
-            // PostgreSQL 的 archived_groups 有外键 REFERENCES group_info(group_id)，归档前必须保证 group_info 有该群
+            const groupName = this.sanitizeString(groupInfo?.group_name) || ''
+            const archivedGroupName = groupName || String(groupId)
+            // 归档前保证 group_info 中至少有一条群信息，便于后续展示
             if (!groupInfo) {
-                await this.saveGroupInfo(groupId, groupName || `群${groupId}`)
+                await this.saveGroupInfo(groupId, archivedGroupName)
             }
 
             const lastActivity = await this.get(
-                'SELECT MAX(updated_at) as last_activity FROM user_stats WHERE group_id = $1',
+                'SELECT MAX(updated_at) as last_activity FROM user_agg_stats WHERE group_id = $1',
                 groupId
             )
             const lastActivityAt = this._formatDateTime(lastActivity?.last_activity)
@@ -576,9 +1039,9 @@ class DatabaseService {
                     UPDATE archived_groups 
                     SET archived_at = $1,
                         last_activity_at = COALESCE($2, archived_groups.last_activity_at),
-                        group_name = COALESCE($3, archived_groups.group_name)
+                        group_name = COALESCE(NULLIF($3, ''), archived_groups.group_name)
                     WHERE group_id = $4
-                `, now, lastActivityAt, groupName, groupId)
+                `, now, lastActivityAt, archivedGroupName, groupId)
                 } else {
             await this.run(`
                 INSERT INTO archived_groups (group_id, group_name, archived_at, last_activity_at)
@@ -586,8 +1049,9 @@ class DatabaseService {
                 ON CONFLICT (group_id) 
                 DO UPDATE SET 
                     archived_at = EXCLUDED.archived_at,
-                    last_activity_at = COALESCE(EXCLUDED.last_activity_at, archived_groups.last_activity_at)
-                `, groupId, groupName, now, lastActivityAt)
+                    last_activity_at = COALESCE(EXCLUDED.last_activity_at, archived_groups.last_activity_at),
+                    group_name = COALESCE(NULLIF(EXCLUDED.group_name, ''), archived_groups.group_name)
+                `, groupId, archivedGroupName, now, lastActivityAt)
             }
             
             return true
@@ -637,13 +1101,9 @@ class DatabaseService {
      */
     async deleteGroupData(groupId) {
         try {
-            await this.run('DELETE FROM user_stats WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM daily_stats WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM weekly_stats WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM monthly_stats WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM yearly_stats WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM achievements WHERE group_id = $1', groupId)
-            await this.run('DELETE FROM user_display_achievements WHERE group_id = $1', groupId)
+            // 新架构仅保留真实表，归档删除直接清理各业务表
+            await this.run('DELETE FROM message_granular_stats WHERE group_id = $1', groupId)
+            await this.run('DELETE FROM user_agg_stats WHERE group_id = $1', groupId)
             await this.run('DELETE FROM group_info WHERE group_id = $1', groupId)
             await this.run('DELETE FROM archived_groups WHERE group_id = $1', groupId)
             return true
@@ -660,11 +1120,11 @@ class DatabaseService {
      */
     async cleanupArchivedGroups(retentionDays = 60) {
         try {
-            const dbType = this.getDatabaseType()
-            const now = new Date()
-            const cutoffDate = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000)
-            
-            const cutoffDateStr = cutoffDate.toISOString()
+            const safeRetentionDays = Math.max(parseInt(retentionDays || 60, 10), 1)
+            const cutoffDate = TimeUtils.getUTC8Date()
+            cutoffDate.setDate(cutoffDate.getDate() - safeRetentionDays)
+            cutoffDate.setMilliseconds(0)
+            const cutoffDateStr = TimeUtils.formatDateTime(cutoffDate)
             
             const groupsToDelete = await this.all(
                 `SELECT group_id FROM archived_groups 
@@ -761,11 +1221,18 @@ class DatabaseService {
         if (!allowedColumns.includes(orderBy)) {
             orderBy = 'total_count'
         }
-        return this.all(
-            `SELECT * FROM user_stats WHERE group_id = $1 ORDER BY ${orderBy} DESC LIMIT $2`,
+        const activeDaysExpr = this._getActiveDaysExpr('user_agg_stats')
+        const mappedOrderBy = orderBy === 'active_days'
+            ? activeDaysExpr
+            : this._mapOrderByToAggColumn(orderBy)
+
+        const rows = await this.all(
+            `SELECT * FROM user_agg_stats WHERE group_id = $1 ORDER BY ${mappedOrderBy} DESC LIMIT $2`,
             groupId,
             limit
         )
+
+        return rows.map(row => this._mapUserAggRowToLegacy(row))
     }
 
     /**
@@ -780,28 +1247,52 @@ class DatabaseService {
         if (!allowedColumns.includes(orderBy)) {
             orderBy = 'total_count'
         }
+        const mappedOrderBy = this._mapOrderByToAggColumn(orderBy)
+        const dateExpr = this._getTimeDimensionExpr('date', 'mgs.stat_hour')
+        const dbType = this.getDatabaseType()
+        const nicknameExpr = dbType === 'postgresql'
+            ? `COALESCE(uas.stats_json->>'nickname', '')`
+            : `COALESCE(json_extract(uas.stats_json, '$.nickname'), '')`
         const groupFilter =
             currentGroupIds && currentGroupIds.length > 0
-                ? ` AND group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')})`
+                ? ` AND uas.group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')})`
+                : ''
+        const groupFilterForMgs =
+            currentGroupIds && currentGroupIds.length > 0
+                ? ` AND mgs.group_id IN (${currentGroupIds.map((_, i) => `$${i + 1}`).join(',')})`
                 : ''
         const baseParams = currentGroupIds && currentGroupIds.length > 0 ? currentGroupIds : []
         const limitParamIndex = baseParams.length + 1
         const sql = `WITH user_aggregated AS (
-                SELECT user_id, MAX(nickname) as nickname, SUM(${orderBy}) as ${orderBy}, SUM(total_words) as total_words, MAX(continuous_days) as continuous_days, MAX(last_speaking_time) as last_speaking_time
-                FROM user_stats
-                WHERE group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilter}
-                GROUP BY user_id
+                SELECT
+                    uas.user_id,
+                    MAX(${nicknameExpr}) as nickname,
+                    SUM(uas.total_msg) as total_count,
+                    SUM(uas.total_word) as total_words,
+                    MAX(uas.continuous_days) as continuous_days,
+                    MAX(uas.last_speaking_time) as last_speaking_time
+                FROM user_agg_stats uas
+                WHERE uas.group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilter}
+                GROUP BY uas.user_id
             ),
             active_days_stats AS (
-                SELECT user_id, COUNT(DISTINCT date_key) as active_days
-                FROM daily_stats
-                WHERE (message_count > 0 OR word_count > 0) AND group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilter}
-                GROUP BY user_id
+                SELECT mgs.user_id, COUNT(DISTINCT ${dateExpr}) as active_days
+                FROM message_granular_stats mgs
+                WHERE (mgs.message_count > 0 OR mgs.word_count > 0)
+                  AND mgs.group_id NOT IN (SELECT group_id FROM archived_groups)${groupFilterForMgs}
+                GROUP BY mgs.user_id
             )
-            SELECT ua.user_id, ua.nickname, ua.${orderBy}, ua.total_words, COALESCE(ads.active_days, 0) as active_days, ua.continuous_days, ua.last_speaking_time
+            SELECT
+                ua.user_id,
+                ua.nickname,
+                ua.total_count,
+                ua.total_words,
+                COALESCE(ads.active_days, 0) as active_days,
+                ua.continuous_days,
+                ua.last_speaking_time
             FROM user_aggregated ua
             LEFT JOIN active_days_stats ads ON ua.user_id = ads.user_id
-            ORDER BY ua.${orderBy} DESC
+            ORDER BY ${orderBy === 'active_days' ? 'COALESCE(ads.active_days, 0)' : `ua.${mappedOrderBy === 'total_msg' ? 'total_count' : mappedOrderBy === 'total_word' ? 'total_words' : 'continuous_days'}`} DESC
             LIMIT $${limitParamIndex}`
         return this.all(sql, ...baseParams, limit)
     }
@@ -816,8 +1307,19 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 日统计数据
      */
     async getDailyStats(groupId, userId, dateKey) {
+        const dateExpr = this._getTimeDimensionExpr('date', 'mgs.stat_hour')
         return this.get(
-            'SELECT * FROM daily_stats WHERE group_id = $1 AND user_id = $2 AND date_key = $3',
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${dateExpr} as date_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at
+             FROM message_granular_stats mgs
+             WHERE mgs.group_id = $1 AND mgs.user_id = $2 AND ${dateExpr} = $3
+             GROUP BY mgs.group_id, mgs.user_id, ${dateExpr}`,
             groupId,
             userId,
             dateKey
@@ -834,30 +1336,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveDailyStats(groupId, userId, dateKey, stats) {
-        const now = this.getCurrentTime()
-        
-        const messageCount = parseInt(stats.message_count || 0, 10)
-        const wordCount = parseInt(stats.word_count || 0, 10)
-        
-        await this.run(`
-            INSERT INTO daily_stats (
-                group_id, user_id, date_key, message_count, word_count, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (group_id, user_id, date_key) 
-            DO UPDATE SET
-                message_count = EXCLUDED.message_count,
-                word_count = EXCLUDED.word_count,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            dateKey,
-            messageCount,
-            wordCount,
-            now,
-            now
-        )
-
+        // 重构阶段兼容：旧接口保留但不再直接写入旧周期表/视图
         return true
     }
 
@@ -870,8 +1349,23 @@ class DatabaseService {
      * @returns {Promise<Array>} 日统计数据数组
      */
     async getDailyStatsByDateRange(groupId, userId, startDate, endDate) {
+        const dateExpr = this._getTimeDimensionExpr('date', 'mgs.stat_hour')
         return this.all(
-            'SELECT * FROM daily_stats WHERE group_id = $1 AND user_id = $2 AND date_key >= $3 AND date_key <= $4 ORDER BY date_key',
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${dateExpr} as date_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at
+             FROM message_granular_stats mgs
+             WHERE mgs.group_id = $1
+               AND mgs.user_id = $2
+               AND ${dateExpr} >= $3
+               AND ${dateExpr} <= $4
+             GROUP BY mgs.group_id, mgs.user_id, ${dateExpr}
+             ORDER BY date_key`,
             groupId,
             userId,
             startDate,
@@ -886,16 +1380,36 @@ class DatabaseService {
      * @returns {Promise<Array>} 日统计数据列表（已排序）
      */
     async getDailyStatsByGroupAndDate(groupId, dateKey) {
-        return this.all(
-            `SELECT ds.*, us.nickname, us.last_speaking_time 
-             FROM daily_stats ds
-             LEFT JOIN user_stats us ON ds.group_id = us.group_id AND ds.user_id = us.user_id
-             WHERE ds.group_id = $1 AND ds.date_key = $2 
-             AND (ds.message_count > 0 OR ds.word_count > 0)
-             ORDER BY ds.message_count DESC`,
+        const dateExpr = this._getTimeDimensionExpr('date', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
+        const rows = await this.all(
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${dateExpr} as date_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE mgs.group_id = $1
+               AND ${dateExpr} = $2
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${dateExpr}
+             ORDER BY message_count DESC`,
             groupId,
             dateKey
         )
+
+        return rows.map(row => {
+            return {
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
+            }
+        })
     }
 
     // ========== 周统计相关方法 ==========
@@ -908,8 +1422,19 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 周统计数据
      */
     async getWeeklyStats(groupId, userId, weekKey) {
+        const weekExpr = this._getTimeDimensionExpr('week', 'mgs.stat_hour')
         return this.get(
-            'SELECT * FROM weekly_stats WHERE group_id = $1 AND user_id = $2 AND week_key = $3',
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${weekExpr} as week_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at
+             FROM message_granular_stats mgs
+             WHERE mgs.group_id = $1 AND mgs.user_id = $2 AND ${weekExpr} = $3
+             GROUP BY mgs.group_id, mgs.user_id, ${weekExpr}`,
             groupId,
             userId,
             weekKey
@@ -926,30 +1451,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveWeeklyStats(groupId, userId, weekKey, stats) {
-        const now = this.getCurrentTime()
-        
-        const messageCount = parseInt(stats.message_count || 0, 10)
-        const wordCount = parseInt(stats.word_count || 0, 10)
-        
-        await this.run(`
-            INSERT INTO weekly_stats (
-                group_id, user_id, week_key, message_count, word_count, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (group_id, user_id, week_key) 
-            DO UPDATE SET
-                message_count = EXCLUDED.message_count,
-                word_count = EXCLUDED.word_count,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            weekKey,
-            messageCount,
-            wordCount,
-            now,
-            now
-        )
-
+        // 重构阶段兼容：旧接口保留但不再直接写入旧周期表/视图
         return true
     }
 
@@ -960,16 +1462,36 @@ class DatabaseService {
      * @returns {Promise<Array>} 周统计数据列表（已排序）
      */
     async getWeeklyStatsByGroupAndWeek(groupId, weekKey) {
-        return this.all(
-            `SELECT ws.*, us.nickname, us.last_speaking_time 
-             FROM weekly_stats ws
-             LEFT JOIN user_stats us ON ws.group_id = us.group_id AND ws.user_id = us.user_id
-             WHERE ws.group_id = $1 AND ws.week_key = $2 
-             AND (ws.message_count > 0 OR ws.word_count > 0)
-             ORDER BY ws.message_count DESC`,
+        const weekExpr = this._getTimeDimensionExpr('week', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
+        const rows = await this.all(
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${weekExpr} as week_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE mgs.group_id = $1
+               AND ${weekExpr} = $2
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${weekExpr}
+             ORDER BY message_count DESC`,
             groupId,
             weekKey
         )
+
+        return rows.map(row => {
+            return {
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
+            }
+        })
     }
 
     // ========== 月统计相关方法 ==========
@@ -982,8 +1504,19 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 月统计数据
      */
     async getMonthlyStats(groupId, userId, monthKey) {
+        const monthExpr = this._getTimeDimensionExpr('month', 'mgs.stat_hour')
         return this.get(
-            'SELECT * FROM monthly_stats WHERE group_id = $1 AND user_id = $2 AND month_key = $3',
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${monthExpr} as month_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at
+             FROM message_granular_stats mgs
+             WHERE mgs.group_id = $1 AND mgs.user_id = $2 AND ${monthExpr} = $3
+             GROUP BY mgs.group_id, mgs.user_id, ${monthExpr}`,
             groupId,
             userId,
             monthKey
@@ -1000,34 +1533,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveMonthlyStats(groupId, userId, monthKey, stats) {
-        const now = this.getCurrentTime()
-        
-        const messageCount = parseInt(stats.message_count || 0, 10)
-        const wordCount = parseInt(stats.word_count || 0, 10)
-        
-        if (messageCount > 1000000) {
-            globalConfig.error(`[数据库服务] 检测到异常大的消息数: ${messageCount} (group_id=${groupId}, user_id=${userId}, month_key=${monthKey})`)
-        }
-        
-        await this.run(`
-            INSERT INTO monthly_stats (
-                group_id, user_id, month_key, message_count, word_count, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (group_id, user_id, month_key) 
-            DO UPDATE SET
-                message_count = EXCLUDED.message_count,
-                word_count = EXCLUDED.word_count,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            monthKey,
-            messageCount,
-            wordCount,
-            now,
-            now
-        )
-
+        // 重构阶段兼容：旧接口保留但不再直接写入旧周期表/视图
         return true
     }
 
@@ -1038,16 +1544,36 @@ class DatabaseService {
      * @returns {Promise<Array>} 月统计数据列表（已排序）
      */
     async getMonthlyStatsByGroupAndMonth(groupId, monthKey) {
-        return this.all(
-            `SELECT ms.*, us.nickname, us.last_speaking_time 
-             FROM monthly_stats ms
-             LEFT JOIN user_stats us ON ms.group_id = us.group_id AND ms.user_id = us.user_id
-             WHERE ms.group_id = $1 AND ms.month_key = $2 
-             AND (ms.message_count > 0 OR ms.word_count > 0)
-             ORDER BY ms.message_count DESC`,
+        const monthExpr = this._getTimeDimensionExpr('month', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
+        const rows = await this.all(
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${monthExpr} as month_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE mgs.group_id = $1
+               AND ${monthExpr} = $2
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${monthExpr}
+             ORDER BY message_count DESC`,
             groupId,
             monthKey
         )
+
+        return rows.map(row => {
+            return {
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
+            }
+        })
     }
 
     // ========== 年统计相关方法 ==========
@@ -1060,8 +1586,19 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 年统计数据
      */
     async getYearlyStats(groupId, userId, yearKey) {
+        const yearExpr = this._getTimeDimensionExpr('year', 'mgs.stat_hour')
         return this.get(
-            'SELECT * FROM yearly_stats WHERE group_id = $1 AND user_id = $2 AND year_key = $3',
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${yearExpr} as year_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at
+             FROM message_granular_stats mgs
+             WHERE mgs.group_id = $1 AND mgs.user_id = $2 AND ${yearExpr} = $3
+             GROUP BY mgs.group_id, mgs.user_id, ${yearExpr}`,
             groupId,
             userId,
             yearKey
@@ -1078,30 +1615,7 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveYearlyStats(groupId, userId, yearKey, stats) {
-        const now = this.getCurrentTime()
-        
-        const messageCount = parseInt(stats.message_count || 0, 10)
-        const wordCount = parseInt(stats.word_count || 0, 10)
-        
-        await this.run(`
-            INSERT INTO yearly_stats (
-                group_id, user_id, year_key, message_count, word_count, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (group_id, user_id, year_key) 
-            DO UPDATE SET
-                message_count = EXCLUDED.message_count,
-                word_count = EXCLUDED.word_count,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            yearKey,
-            messageCount,
-            wordCount,
-            now,
-            now
-        )
-
+        // 重构阶段兼容：旧接口保留但不再直接写入旧周期表/视图
         return true
     }
 
@@ -1112,189 +1626,36 @@ class DatabaseService {
      * @returns {Promise<Array>} 年统计数据列表（已排序）
      */
     async getYearlyStatsByGroupAndYear(groupId, yearKey) {
-        return this.all(
-            `SELECT ys.*, us.nickname, us.last_speaking_time 
-             FROM yearly_stats ys
-             LEFT JOIN user_stats us ON ys.group_id = us.group_id AND ys.user_id = us.user_id
-             WHERE ys.group_id = $1 AND ys.year_key = $2 
-             AND (ys.message_count > 0 OR ys.word_count > 0)
-             ORDER BY ys.message_count DESC`,
+        const yearExpr = this._getTimeDimensionExpr('year', 'mgs.stat_hour')
+        const nicknameExpr = this._getNicknameExpr('uas')
+        const rows = await this.all(
+            `SELECT
+                mgs.group_id,
+                mgs.user_id,
+                ${yearExpr} as year_key,
+                SUM(mgs.message_count) as message_count,
+                SUM(mgs.word_count) as word_count,
+                MIN(mgs.created_at) as created_at,
+                MAX(mgs.updated_at) as updated_at,
+                MAX(${nicknameExpr}) as nickname,
+                MAX(uas.last_speaking_time) as last_speaking_time
+             FROM message_granular_stats mgs
+             LEFT JOIN user_agg_stats uas ON mgs.group_id = uas.group_id AND mgs.user_id = uas.user_id
+             WHERE mgs.group_id = $1
+               AND ${yearExpr} = $2
+               AND (mgs.message_count > 0 OR mgs.word_count > 0)
+             GROUP BY mgs.group_id, mgs.user_id, ${yearExpr}
+             ORDER BY message_count DESC`,
             groupId,
             yearKey
         )
-    }
 
-    // ========== 成就相关方法 ==========
-
-    /**
-     * 转换成就数据为数据库格式（内部方法）
-     * @param {Object} achievementData 成就数据
-     * @returns {Object} 转换后的数据 { unlocked, unlockedAt, progress }
-     */
-    _normalizeAchievementData(achievementData) {
-        const unlocked = achievementData.unlocked ? 1 : 0
-        let unlockedAt = achievementData.unlocked_at || null
-        if (unlockedAt instanceof Date) {
-            unlockedAt = unlockedAt.toISOString()
-        } else if (unlockedAt && typeof unlockedAt !== 'string') {
-            unlockedAt = String(unlockedAt)
-        }
-        
-        let progress = achievementData.progress
-        if (progress === null || progress === undefined) {
-            progress = 0
-        } else if (typeof progress === 'object') {
-            globalConfig.error(`[数据库服务] progress 字段是对象/数组，已转换为 0:`, progress)
-            progress = 0
-        } else {
-            progress = parseInt(progress, 10) || 0
-        }
-        
-        return { unlocked, unlockedAt, progress }
-    }
-
-    /**
-     * 获取用户成就
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @param {string} achievementId 成就ID
-     * @returns {Promise<Object|null>} 成就数据
-     */
-    async getUserAchievement(groupId, userId, achievementId) {
-        return this.get(
-            'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2 AND achievement_id = $3',
-            groupId,
-            userId,
-            achievementId
-        )
-    }
-
-    /**
-     * 保存或更新用户成就（使用 UPSERT 避免并发冲突）
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @param {string} achievementId 成就ID
-     * @param {Object} achievementData 成就数据
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async saveUserAchievement(groupId, userId, achievementId, achievementData) {
-        const now = this.getCurrentTime()
-        const { unlocked, unlockedAt, progress } = this._normalizeAchievementData(achievementData)
-        
-        await this.run(`
-            INSERT INTO achievements (
-                group_id, user_id, achievement_id, unlocked, unlocked_at, progress, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (group_id, user_id, achievement_id) 
-            DO UPDATE SET
-                unlocked = EXCLUDED.unlocked,
-                unlocked_at = EXCLUDED.unlocked_at,
-                progress = EXCLUDED.progress,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            achievementId,
-            unlocked,
-            unlockedAt,
-            progress,
-            now,
-            now
-        )
-
-        return true
-    }
-
-    async getAllUserAchievements(groupId, userId) {
-        return this.all(
-            'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2',
-            groupId,
-            userId
-        )
-    }
-
-    /**
-     * 批量获取用户成就（优化性能，避免 N+1 查询）
-     * @param {string} groupId 群号
-     * @param {Array<string>} userIds 用户ID数组
-     * @returns {Promise<Array>} 成就数组
-     */
-    async getAllUserAchievementsBatch(groupId, userIds) {
-        if (!userIds || userIds.length === 0) {
-            return []
-        }
-
-        const placeholders = userIds.map((_, i) => `$${i + 2}`).join(',')
-        const params = [groupId, ...userIds]
-        
-        const sql = `
-            SELECT * FROM achievements 
-            WHERE group_id = $1 AND user_id IN (${placeholders})
-        `
-        
-        return this.all(sql, ...params)
-    }
-
-    /**
-     * 批量保存用户成就（使用事务）
-     * @param {Array<Object>} achievements 成就数组，每个对象包含 {groupId, userId, achievementId, achievementData}
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async saveUserAchievementsBatch(achievements) {
-        if (!achievements || achievements.length === 0) {
-            return true
-        }
-
-        return this.transaction(async () => {
-            for (const achievement of achievements) {
-                const { groupId, userId, achievementId, achievementData } = achievement
-                await this.saveUserAchievement(groupId, userId, achievementId, achievementData)
+        return rows.map(row => {
+            return {
+                ...row,
+                nickname: this.sanitizeString(row.nickname) || ''
             }
-            return true
         })
-    }
-
-    /**
-     * 获取已解锁的成就
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @returns {Promise<Array>} 已解锁成就数组
-     */
-    async getUnlockedAchievements(groupId, userId) {
-        return this.all(
-            'SELECT * FROM achievements WHERE group_id = $1 AND user_id = $2 AND unlocked = true',
-            groupId,
-            userId
-        )
-    }
-
-    /**
-     * 检查用户是否在任何群中已解锁某个成就（用于节日成就）
-     * @param {string} userId 用户ID
-     * @param {string} achievementId 成就ID
-     * @returns {Promise<boolean>} 是否已解锁
-     */
-    async hasAchievementInAnyGroup(userId, achievementId) {
-        const result = await this.get(
-            'SELECT 1 FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true LIMIT 1',
-            userId,
-            achievementId
-        )
-        return result !== null
-    }
-
-    /**
-     * 获取用户在任意群中解锁某个成就的详细信息（用于节日成就）
-     * @param {string} userId 用户ID
-     * @param {string} achievementId 成就ID
-     * @returns {Promise<Object|null>} 成就信息（包含 unlocked_at 和 progress）
-     */
-    async getAchievementFromAnyGroup(userId, achievementId) {
-        return this.get(
-            'SELECT * FROM achievements WHERE user_id = $1 AND achievement_id = $2 AND unlocked = true ORDER BY unlocked_at ASC LIMIT 1',
-            userId,
-            achievementId
-        )
     }
 
     /**
@@ -1303,140 +1664,14 @@ class DatabaseService {
      * @returns {Promise<Array<string>>} 群ID数组
      */
     async getUserGroups(userId) {
-        const rows = await this.all('SELECT DISTINCT group_id FROM user_stats WHERE user_id = $1', userId)
-        return rows.map(row => row.group_id)
-    }
-
-    /**
-     * 统计成就获取情况（全局成就统计所有群，群专属只统计当前群）
-     * @param {string} achievementId 成就ID
-     * @param {string} groupId 群号（用于群专属成就，全局成就传null）
-     * @param {boolean} isGlobal 是否为全局成就（特殊成就或节日成就）
-     * @returns {Promise<number>} 获取人数
-     */
-    async getAchievementUnlockCount(achievementId, groupId = null, isGlobal = false) {
-        if (isGlobal) {
-            const result = await this.get(
-                'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE achievement_id = $1 AND unlocked = true',
-                achievementId
-            )
-            return result ? parseInt(result.count, 10) : 0
-        } else {
-            if (!groupId) return 0
-            const result = await this.get(
-                'SELECT COUNT(DISTINCT user_id) as count FROM achievements WHERE group_id = $1 AND achievement_id = $2 AND unlocked = true',
-                groupId,
-                achievementId
-            )
-            return result ? parseInt(result.count, 10) : 0
-        }
-    }
-
-    /**
-     * 批量保存节日成就到用户所在的所有群
-     * @param {string} userId 用户ID
-     * @param {string} achievementId 成就ID
-     * @param {Object} achievementData 成就数据
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async saveFestivalAchievementToAllGroups(userId, achievementId, achievementData) {
-        const now = this.getCurrentTime()
-        const groups = await this.getUserGroups(userId)
-        
-        if (groups.length === 0) {
-            return false
-        }
-
-        const { unlocked, unlockedAt, progress } = this._normalizeAchievementData(achievementData)
-
-        for (const groupId of groups) {
-            await this.run(`
-                INSERT INTO achievements (
-                    group_id, user_id, achievement_id, unlocked, unlocked_at, progress, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                ON CONFLICT (group_id, user_id, achievement_id) 
-                DO UPDATE SET
-                    unlocked = EXCLUDED.unlocked,
-                    unlocked_at = EXCLUDED.unlocked_at,
-                    progress = EXCLUDED.progress,
-                    updated_at = EXCLUDED.updated_at
-            `,
-                groupId,
-                userId,
-                achievementId,
-                unlocked,
-                unlockedAt,
-                progress,
-                now,
-                now
-            )
-        }
-
-        return true
-    }
-
-    /**
-     * 设置用户显示成就（使用 UPSERT 避免并发冲突）
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @param {Object} achievementData 成就数据
-     * @returns {Promise<boolean>} 是否成功
-     */
-    async setDisplayAchievement(groupId, userId, achievementData) {
-        const now = this.getCurrentTime()
-        const isManual = achievementData.isManual !== undefined ? achievementData.isManual : false
-        const isManualInt = isManual ? 1 : 0
-        
-        let autoDisplayAt = achievementData.autoDisplayAt
-        if (isManual) {
-            autoDisplayAt = null
-        } else if (!autoDisplayAt) {
-            autoDisplayAt = now
-        } else if (autoDisplayAt instanceof Date) {
-            autoDisplayAt = autoDisplayAt.toISOString()
-        } else if (autoDisplayAt && typeof autoDisplayAt !== 'string') {
-            autoDisplayAt = String(autoDisplayAt)
-        }
-        
-        await this.run(`
-            INSERT INTO user_display_achievements (
-                group_id, user_id, achievement_id, achievement_name, rarity, is_manual, auto_display_at, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (group_id, user_id) 
-            DO UPDATE SET
-                achievement_id = EXCLUDED.achievement_id,
-                achievement_name = EXCLUDED.achievement_name,
-                rarity = EXCLUDED.rarity,
-                is_manual = EXCLUDED.is_manual,
-                auto_display_at = EXCLUDED.auto_display_at,
-                updated_at = EXCLUDED.updated_at
-        `,
-            groupId,
-            userId,
-            achievementData.id,
-            achievementData.name,
-            achievementData.rarity || 'common',
-            isManualInt,
-            autoDisplayAt,
-            now,
-            now
-        )
-
-        return true
-    }
-
-    /**
-     * 获取用户显示成就
-     * @param {string} groupId 群号
-     * @param {string} userId 用户ID
-     * @returns {Promise<Object|null>} 显示成就数据
-     */
-    async getDisplayAchievement(groupId, userId) {
-        return this.get(
-            'SELECT * FROM user_display_achievements WHERE group_id = $1 AND user_id = $2',
-            groupId,
+        const rows = await this.all(
+            `SELECT DISTINCT group_id
+             FROM user_agg_stats
+             WHERE user_id = $1
+               AND group_id NOT IN (SELECT group_id FROM archived_groups)`,
             userId
         )
+        return rows.map(row => row.group_id)
     }
 
     // ========== 群组信息相关方法 ==========
@@ -1447,9 +1682,11 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 群组信息
      */
     async getGroupInfo(groupId) {
+        const normalizedGroupId = this.normalizeGroupId(groupId)
+        if (!normalizedGroupId) return null
         return this.get(
             'SELECT * FROM group_info WHERE group_id = $1',
-            groupId
+            normalizedGroupId
         )
     }
 
@@ -1459,11 +1696,13 @@ class DatabaseService {
      * @returns {Promise<string>} 群名称
      */
     async getFormattedGroupName(groupId) {
+        const normalizedGroupId = this.normalizeGroupId(groupId)
         try {
-            const groupInfo = await this.getGroupInfo(groupId)
-            return groupInfo?.group_name || `群${groupId}`
+            const groupInfo = await this.getGroupInfo(normalizedGroupId)
+            const groupName = this.sanitizeString(groupInfo?.group_name)?.trim() || ''
+            return groupName || this.getDefaultGroupDisplayName(normalizedGroupId)
         } catch {
-            return `群${groupId}`
+            return this.getDefaultGroupDisplayName(normalizedGroupId)
         }
     }
 
@@ -1474,7 +1713,11 @@ class DatabaseService {
      * @returns {Promise<boolean>} 是否成功
      */
     async saveGroupInfo(groupId, groupName) {
+        const normalizedGroupId = this.normalizeGroupId(groupId)
+        if (!normalizedGroupId) return false
+
         const now = this.getCurrentTime()
+        const normalizedGroupName = this.sanitizeString(groupName)?.trim() || ''
         
         await this.run(`
             INSERT INTO group_info (
@@ -1482,11 +1725,11 @@ class DatabaseService {
             ) VALUES ($1, $2, $3, $4)
             ON CONFLICT (group_id) 
             DO UPDATE SET
-                group_name = EXCLUDED.group_name,
+                group_name = COALESCE(NULLIF(EXCLUDED.group_name, ''), group_info.group_name),
                 updated_at = EXCLUDED.updated_at
         `,
-            groupId,
-            groupName || '',
+            normalizedGroupId,
+            normalizedGroupName,
             now,
             now
         )
@@ -1500,7 +1743,7 @@ class DatabaseService {
      * @returns {Promise<string|null>} 最早创建时间
      */
     async getGroupEarliestTime(groupId) {
-        const result = await this.get('SELECT MIN(created_at) as earliest_time FROM user_stats WHERE group_id = $1', groupId)
+        const result = await this.get('SELECT MIN(created_at) as earliest_time FROM user_agg_stats WHERE group_id = $1', groupId)
         return result?.earliest_time || null
     }
 
@@ -1510,23 +1753,29 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 用户统计数据总和
      */
     async getUserStatsAllGroups(userId) {
+        const dbType = this.getDatabaseType()
+        const nicknameExpr = dbType === 'postgresql'
+            ? `COALESCE(stats_json->>'nickname', '')`
+            : `COALESCE(json_extract(stats_json, '$.nickname'), '')`
+        const dateExpr = this._getTimeDimensionExpr('date', 'stat_hour')
+
         const baseStats = await this.get(`
             SELECT
                 user_id,
-                MAX(nickname) as nickname,
-                SUM(total_count) as total_count,
-                SUM(total_words) as total_words,
+                MAX(${nicknameExpr}) as nickname,
+                SUM(total_msg) as total_count,
+                SUM(total_word) as total_words,
                 MAX(continuous_days) as continuous_days,
                 MAX(last_speaking_time) as last_speaking_time
-            FROM user_stats
+            FROM user_agg_stats
             WHERE user_id = $1
             GROUP BY user_id
         `, userId)
         
         const activeDaysResult = await this.get(`
-            SELECT COUNT(DISTINCT date_key) as active_days
-            FROM daily_stats
-            WHERE user_id = $1
+            SELECT COUNT(DISTINCT ${dateExpr}) as active_days
+            FROM message_granular_stats
+            WHERE user_id = $1 AND (message_count > 0 OR word_count > 0)
         `, userId)
         
         const activeDays = activeDaysResult?.active_days || 0
@@ -1538,7 +1787,7 @@ class DatabaseService {
                         SUM(message_count) as total_count,
                         SUM(word_count) as total_words,
                         MAX(updated_at) as last_speaking_time
-                    FROM daily_stats
+                    FROM message_granular_stats
                     WHERE user_id = $1
                 `, userId)
                 
@@ -1572,13 +1821,14 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 日统计数据总和
      */
     async getUserDailyStatsAllGroups(userId, dateKey) {
+        const dateExpr = this._getTimeDimensionExpr('date', 'stat_hour')
         return this.get(`
             SELECT
                 user_id,
                 SUM(message_count) as message_count,
                 SUM(word_count) as word_count
-            FROM daily_stats
-            WHERE user_id = $1 AND date_key = $2
+            FROM message_granular_stats
+            WHERE user_id = $1 AND ${dateExpr} = $2
             GROUP BY user_id
         `, userId, dateKey)
     }
@@ -1590,13 +1840,14 @@ class DatabaseService {
      * @returns {Promise<Object|null>} 月统计数据总和
      */
     async getUserMonthlyStatsAllGroups(userId, monthKey) {
+        const monthExpr = this._getTimeDimensionExpr('month', 'stat_hour')
         return this.get(`
             SELECT
                 user_id,
                 SUM(message_count) as message_count,
                 SUM(word_count) as word_count
-            FROM monthly_stats
-            WHERE user_id = $1 AND month_key = $2
+            FROM message_granular_stats
+            WHERE user_id = $1 AND ${monthExpr} = $2
             GROUP BY user_id
         `, userId, monthKey)
     }

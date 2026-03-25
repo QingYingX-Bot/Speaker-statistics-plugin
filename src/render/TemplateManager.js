@@ -3,10 +3,8 @@ import path from 'path'
 import { PathResolver } from '../core/utils/PathResolver.js'
 import { getDatabaseService } from '../core/database/DatabaseService.js'
 import { globalConfig } from '../core/ConfigManager.js'
-import { AchievementService } from '../core/AchievementService.js'
 import { CommonUtils } from '../core/utils/CommonUtils.js'
 import { TimeUtils } from '../core/utils/TimeUtils.js'
-import { AchievementUtils } from '../core/utils/AchievementUtils.js'
 
 /**
  * 模板管理器
@@ -22,7 +20,6 @@ class TemplateManager {
         this.cacheTimestamp = new Map()
         this.cacheTTL = 30 * 60 * 1000; // 30分钟缓存
         this.dataService = dataService
-        this.achievementService = dataService ? new AchievementService(dataService) : null
     }
 
     /**
@@ -37,6 +34,113 @@ class TemplateManager {
             globalConfig.error('读取版本号失败:', err)
             return '3.0.0'
         }
+    }
+
+    /**
+     * 获取平台感知的默认群名称
+     * @param {string} groupId 群 ID
+     * @returns {string}
+     */
+    getDefaultGroupName(groupId) {
+        const normalizedGroupId = String(groupId || '').trim()
+        if (!normalizedGroupId) return '未知群组'
+        if (normalizedGroupId.startsWith('dc_')) {
+            return `Discord频道${normalizedGroupId.slice(3) || normalizedGroupId}`
+        }
+        if (normalizedGroupId.startsWith('tg_')) {
+            return `Telegram群组${normalizedGroupId.slice(3) || normalizedGroupId}`
+        }
+        return `群${normalizedGroupId}`
+    }
+
+    /**
+     * 规范化ID
+     * @param {any} id 原始ID
+     * @returns {string}
+     */
+    normalizeId(id) {
+        if (id === null || id === undefined) return ''
+        return String(id).trim()
+    }
+
+    /**
+     * 根据群ID判断平台
+     * @param {string} groupId 群ID
+     * @returns {'qq'|'discord'|'telegram'}
+     */
+    detectGroupPlatform(groupId = '') {
+        const normalizedId = this.normalizeId(groupId).toLowerCase()
+        if (normalizedId.startsWith('dc_')) return 'discord'
+        if (normalizedId.startsWith('tg_')) return 'telegram'
+        return 'qq'
+    }
+
+    /**
+     * 获取用户头像URL（平台感知）
+     * @param {string} userId 用户ID
+     * @param {string|null} groupId 群ID
+     * @returns {Promise<string>}
+     */
+    async getUserAvatarUrl(userId, groupId = null) {
+        const normalizedUserId = this.normalizeId(userId)
+        if (!normalizedUserId) return ''
+
+        let resolvedGroupId = groupId
+        // 全局榜等场景 groupId 为空时，按 userId 前缀识别平台
+        if (!this.normalizeId(resolvedGroupId)) {
+            const userPlatform = this.detectGroupPlatform(normalizedUserId)
+            if (userPlatform === 'discord') {
+                resolvedGroupId = normalizedUserId.startsWith('dc_') ? normalizedUserId : `dc_${normalizedUserId}`
+            } else if (userPlatform === 'telegram') {
+                resolvedGroupId = normalizedUserId.startsWith('tg_') ? normalizedUserId : `tg_${normalizedUserId}`
+            }
+        }
+
+        if (this.dataService?.getUserAvatarUrl) {
+            const avatarUrl = await this.dataService.getUserAvatarUrl(normalizedUserId, resolvedGroupId).catch(() => '')
+            if (avatarUrl) return avatarUrl
+        }
+
+        const platform = this.detectGroupPlatform(resolvedGroupId || normalizedUserId)
+        if (platform === 'discord') {
+            return 'https://cdn.discordapp.com/embed/avatars/0.png'
+        }
+        return `https://q1.qlogo.cn/g?b=qq&s=100&nk=${normalizedUserId}`
+    }
+
+    /**
+     * 获取群头像URL（平台感知）
+     * @param {Object} group 群统计项
+     * @returns {Promise<string>}
+     */
+    async getGroupAvatarUrl(group) {
+        if (!group || typeof group !== 'object') return ''
+
+        if (this.dataService?.getGroupAvatarUrl) {
+            const avatarUrl = await this.dataService.getGroupAvatarUrl(group).catch(() => '')
+            if (avatarUrl) return avatarUrl
+        }
+
+        const groupId = this.normalizeId(group.groupId || group.group_id)
+        if (!groupId) return ''
+        return `http://p.qlogo.cn/gh/${groupId}/${groupId}/100/`
+    }
+
+    /**
+     * 获取群ID展示文本（Discord 合并条目优先显示服务器ID）
+     * @param {Object} group 群统计项
+     * @returns {string}
+     */
+    getGroupDisplayId(group) {
+        const groupId = this.normalizeId(group?.groupId || group?.group_id)
+        if (!groupId) return ''
+
+        const platform = group?.platform || this.detectGroupPlatform(groupId)
+        if (platform === 'discord' && group?.isDcMerged && group?.dcGuildId) {
+            return `dc_guild_${this.normalizeId(group.dcGuildId)}`
+        }
+
+        return groupId
     }
 
     /**
@@ -179,44 +283,35 @@ class TemplateManager {
     }
 
     /**
-     * 获取用户显示成就
-     * @param {string} groupId 群号
+     * 获取用户优先显示名（Discord 优先显示 global_name，其次 username）
      * @param {string} userId 用户ID
-     * @returns {Object|null} 显示成就数据
+     * @param {string|null} groupId 群ID
+     * @param {string} nickname 兜底昵称
+     * @returns {Promise<string>}
      */
-    async getUserDisplayAchievement(groupId, userId) {
-        try {
-            if (!this.achievementService) {
-                return null
-            }
+    async getPreferredUserDisplayName(userId, groupId, nickname) {
+        const baseDisplayName = this.getUserDisplayName(userId, groupId, nickname)
+        const normalizedUserId = this.normalizeId(userId)
+        const groupPlatform = this.detectGroupPlatform(groupId || '')
+        const platform = groupPlatform === 'qq'
+            ? this.detectGroupPlatform(normalizedUserId)
+            : groupPlatform
 
-            const achievementData = await this.achievementService.getUserAchievements(groupId, userId)
-            return achievementData.displayAchievement
-        } catch (err) {
-            globalConfig.error(`获取用户显示成就失败: ${groupId}/${userId}`, err)
-            return null
+        if (platform !== 'discord' || !this.dataService?.getDiscordUserInfo) {
+            return baseDisplayName || userId
         }
-    }
 
-    /**
-     * 生成昵称和成就显示
-     */
-    generateNicknameWithAchievement(nickname, achievement) {
-        if (achievement) {
-            const rarityEmoji = {
-                common: '🥉',
-                uncommon: '🥈',
-                rare: '🥇',
-                epic: '💎',
-                legendary: '👑',
-                mythic: '🔥',
-                festival: '🎊',
-                special: '✨'
-        }
-            const emoji = rarityEmoji[achievement.rarity] || ''
-            return `${nickname}<span class="achievement-inline achievement-${achievement.rarity}">${emoji} ${achievement.name}</span>`
-        }
-        return nickname
+        const normalizedDiscordUserId = normalizedUserId.replace(/^dc_/i, '')
+        if (!normalizedDiscordUserId) return baseDisplayName || userId
+
+        const discordUserInfo = await this.dataService.getDiscordUserInfo(normalizedDiscordUserId).catch(() => null)
+        const globalName = this.normalizeId(discordUserInfo?.globalName || '')
+        if (globalName) return globalName
+
+        const username = this.normalizeId(discordUserInfo?.username || '')
+        if (username) return username
+
+        return this.normalizeId(userId) || baseDisplayName || userId
     }
 
     /**
@@ -299,15 +394,15 @@ class TemplateManager {
             const percentage = totalCount > 0 ? ((count / totalCount) * 100).toFixed(1) : 0
             const rankDisplay = this.generateRankDisplay(index)
             const backgroundInfo = this.getRankingItemBackgroundStyle(item.user_id)
-            const displayAchievement = groupId ? await this.getUserDisplayAchievement(groupId, item.user_id) : null
-            const displayName = this.getUserDisplayName(item.user_id, groupId, item.nickname)
+            const displayName = await this.getPreferredUserDisplayName(item.user_id, groupId, item.nickname)
+            const avatarUrl = await this.getUserAvatarUrl(item.user_id, groupId)
 
             const itemHtml = `
         <div class="rank-item ${backgroundInfo.hasBackground ? 'has-background' : ''}" style="${backgroundInfo.style || ''}">
           <div class="rank-number">${rankDisplay}</div>
-          <img class="avatar" src="https://q1.qlogo.cn/g?b=qq&s=100&nk=${item.user_id}" alt="avatar" onerror="this.style.display='none'">
+          <img class="avatar" src="${avatarUrl}" alt="avatar" onerror="this.style.display='none'">
           <div class="user-info">
-            <div class="nickname">${this.generateNicknameWithAchievement(displayName, displayAchievement)}</div>
+            <div class="nickname">${displayName}</div>
             <div class="last-active">最后发言: ${this.formatDate(item.last_speaking_time)}</div>
             ${this.generateExtraStats(item, showExtraStats)}
           </div>
@@ -334,8 +429,8 @@ class TemplateManager {
      */
     async generateUserCard(userInfo, totalCount = 0, showExtraStats = false, groupId = null) {
         const backgroundInfo = this.getRankingItemBackgroundStyle(userInfo.data.user_id)
-        const displayAchievement = groupId ? await this.getUserDisplayAchievement(groupId, userInfo.data.user_id) : null
-        const displayName = this.getUserDisplayName(userInfo.data.user_id, groupId, userInfo.data.nickname)
+        const displayName = await this.getPreferredUserDisplayName(userInfo.data.user_id, groupId, userInfo.data.nickname)
+        const avatarUrl = await this.getUserAvatarUrl(userInfo.data.user_id, groupId)
         
         // 计算百分比（与主排行榜条目保持一致）
         const count = userInfo.data.count || 0
@@ -345,9 +440,9 @@ class TemplateManager {
       <div class="user-card">
         <div class="rank-item ${backgroundInfo.hasBackground ? 'has-background' : ''}" style="${backgroundInfo.style || ''}">
           <div class="rank-number">#${userInfo.rank}</div>
-          <img class="avatar" src="https://q1.qlogo.cn/g?b=qq&s=100&nk=${userInfo.data.user_id}" alt="avatar" onerror="this.style.display='none'">
+          <img class="avatar" src="${avatarUrl}" alt="avatar" onerror="this.style.display='none'">
           <div class="user-info">
-            <div class="nickname">${this.generateNicknameWithAchievement(displayName, displayAchievement)}</div>
+            <div class="nickname">${displayName}</div>
             <div class="last-active">最后发言: ${this.formatDate(userInfo.data.last_speaking_time)}</div>
             ${this.generateExtraStats(userInfo.data, showExtraStats)}
           </div>
@@ -387,10 +482,8 @@ class TemplateManager {
         const template = this.loadTemplate('userStatsTemplate.html')
         if (!template) return ''
 
-        const displayName = this.getUserDisplayName(userId, groupId, nickname)
+        const displayName = await this.getPreferredUserDisplayName(userId, groupId, nickname)
         const backgroundStyle = this.getUserStatsBackgroundStyle(userId)
-        // 如果 groupId 为 null（全局统计），不获取成就（成就按群聊存储）
-        const displayAchievement = groupId ? await this.getUserDisplayAchievement(groupId, userId) : null
 
         // 计算统计数据（确保所有值都是数字类型）
         const totalCount = parseInt(userData.total || userData.total_count || 0, 10)
@@ -416,14 +509,15 @@ class TemplateManager {
         if (groupCount > 0) {
             globalInfo = `所在群数 ${groupCount} 个 · ${globalInfo}`
         }
+        const avatarUrl = await this.getUserAvatarUrl(userId, groupId)
         
         // 生成用户信息区域HTML
         const userProfileHtml = `
-				<div class="user-profile">
-					<img class="avatar" src="http://q.qlogo.cn/headimg_dl?dst_uin=${userId}&spec=640&img_type=jpg" />
-					<div class="user-info">
-						<div class="nickname">${this.generateNicknameWithAchievement(displayName, displayAchievement)}</div>
-						<div class="info-container">
+					<div class="user-profile">
+						<img class="avatar" src="${avatarUrl}" onerror="this.style.display='none'" />
+						<div class="user-info">
+							<div class="nickname">${displayName}</div>
+							<div class="info-container">
 							<div class="info-item">
 								<div class="info-icon clock-icon"></div>
 								<span class="info-label">最后发言时间：</span>
@@ -583,7 +677,8 @@ class TemplateManager {
             const user = topUsers[i]
             const rank = i + 1
             const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : 'rank-3'
-            const displayName = this.getUserDisplayName(user.user_id, groupId, user.nickname || '未知用户')
+            const displayName = await this.getPreferredUserDisplayName(user.user_id, groupId, user.nickname || '未知用户')
+            const avatarUrl = await this.getUserAvatarUrl(user.user_id, groupId)
             const count = user.total_count || user.count || 0
             const words = user.total_words || 0
             const activeDays = user.active_days || 0
@@ -592,7 +687,7 @@ class TemplateManager {
             const userHtml = `
                 <div class="user-card">
                     <div class="rank-badge ${rankClass}">${rank}</div>
-                    <img class="user-avatar" src="https://q1.qlogo.cn/g?b=qq&s=100&nk=${user.user_id}" alt="avatar" onerror="this.style.display='none'">
+                    <img class="user-avatar" src="${avatarUrl}" alt="avatar" onerror="this.style.display='none'">
                     <div class="user-name">${displayName}</div>
                     <div class="user-stats">
                         <div class="user-stat-item">
@@ -649,7 +744,7 @@ class TemplateManager {
      * @param {Object} globalStats 全局统计数据
      * @returns {string} 渲染后的HTML
      */
-    renderGlobalStatsTemplate(globalStats) {
+    async renderGlobalStatsTemplate(globalStats) {
         const template = this.loadTemplate('globalStatsTemplate.html')
         if (!template) return ''
 
@@ -692,7 +787,7 @@ class TemplateManager {
 
         // 生成群聊统计列表HTML（使用当前页的群列表，与 pageSize 一致，不截断）
         const groups = globalStats.groups || []
-        const groupsHtml = this.generateGroupsStatsHtml(groups)
+        const groupsHtml = await this.generateGroupsStatsHtml(groups)
 
         // 处理无群组情况
         const noGroupsHtml = globalStats.groups && globalStats.groups.length === 0 
@@ -719,20 +814,21 @@ class TemplateManager {
      * @param {Array} groups 群组统计数组
      * @returns {string} 群聊统计列表HTML
      */
-    generateGroupsStatsHtml(groups) {
+    async generateGroupsStatsHtml(groups) {
         if (!groups || groups.length === 0) {
             return ''
         }
 
-        const items = groups.map((group, index) => {
-            // 显示真实的群名称，如果groupName就是默认值就不使用
-            const displayName = group.groupName && !group.groupName.startsWith('群') 
-                ? group.groupName 
-                : `群${group.groupId}`
+        const items = await Promise.all(groups.map(async (group, index) => {
+            const baseName = String(group.groupName || '').trim() || this.getDefaultGroupName(group.groupId)
+            const channelCount = parseInt(group.channelCount || 1, 10)
+            const dcSuffix = group.platform === 'discord' && channelCount > 1 ? ` [DC/${channelCount}频道]` : ''
+            const displayName = `${baseName}${dcSuffix}`
             // 隐藏群号中间部分
-            const maskedGroupId = CommonUtils.maskGroupId(group.groupId)
+            const groupDisplayId = this.getGroupDisplayId(group)
+            const maskedGroupId = CommonUtils.maskGroupId(groupDisplayId)
             // 生成群聊头像URL
-            const avatarUrl = `http://p.qlogo.cn/gh/${group.groupId}/${group.groupId}/100/`
+            const avatarUrl = await this.getGroupAvatarUrl(group)
             // 计算序号（考虑分页）
             const rank = index + 1
             
@@ -766,324 +862,12 @@ class TemplateManager {
                     </div>
                 </div>
             `
-        })
+        }))
 
         return items.join('\n\t\t\t\t')
     }
 
-    /**
-     * 渲染成就列表模板
-     * @param {Object} allDefinitions 所有成就定义（默认+自定义+群专属）
-     * @param {Object} userAchievements 用户的成就解锁状态
-     * @param {string} groupId 群ID
-     * @param {string} groupName 群名称
-     * @returns {string} 渲染后的HTML
-     */
-    renderAchievementListTemplate(allDefinitions, userAchievements, groupId, groupName, displayAchievement = null) {
-        const template = this.loadTemplate('achievementListTemplate.html')
-        if (!template) return ''
-
-        const timestamp = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/')
-        const version = this.version
-
-        // 计算已解锁数量
-        let unlockedCount = 0
-        for (const [id, _] of Object.entries(allDefinitions)) {
-            if (userAchievements[id]?.unlocked) {
-                unlockedCount++
-            }
-        }
-
-        // 分离已解锁和未解锁的成就
-        const unlockedAchievements = []
-        const lockedAchievements = []
-
-        for (const [id, definition] of Object.entries(allDefinitions)) {
-            const isUnlocked = userAchievements[id]?.unlocked || false
-            const unlockTime = userAchievements[id]?.unlocked_at 
-                ? new Date(userAchievements[id].unlocked_at).getTime() 
-                : 0
-
-            if (isUnlocked) {
-                unlockedAchievements.push({ id, definition, unlockTime })
-            } else {
-                lockedAchievements.push({ id, definition, unlockTime: 0 })
-            }
-        }
-
-        // 已解锁成就排序：先按稀有度，再按解锁时间倒序（最新的在前）
-        AchievementUtils.sortUnlockedAchievements(
-            unlockedAchievements,
-            (item) => item.definition.rarity,
-            (item) => item.unlockTime
-        )
-
-        // 未解锁成就排序：按稀有度，稀有度相同时按名称
-        AchievementUtils.sortLockedAchievements(
-            lockedAchievements,
-            (item) => item.definition.rarity,
-            (item) => item.definition.name
-        )
-
-        // 合并列表：已解锁在前，未解锁在后
-        const sortedAchievements = [...unlockedAchievements, ...lockedAchievements]
-
-        // 生成成就列表HTML
-        let lastWasUnlocked = null
-        const achievementsHtml = sortedAchievements.map((item, index) => {
-            const { id, definition } = item
-            const isUnlocked = userAchievements[id]?.unlocked || false
-            const unlockTime = userAchievements[id]?.unlocked_at 
-                ? this.formatDate(userAchievements[id].unlocked_at) 
-                : null
-            
-            // 检查是否是当前佩戴的成就
-            const isDisplayed = displayAchievement && displayAchievement.id === id
-            let displayStatusHtml = ''
-            if (isDisplayed) {
-                if (displayAchievement.isManual) {
-                    // 手动设置，无时限
-                    displayStatusHtml = '<span class="display-status manual">✅ 已佩戴（手动设置）</span>'
-                } else if (displayAchievement.autoDisplayAt) {
-                    // 自动佩戴，计算剩余时间
-                    // 解析 autoDisplayAt 为 UTC+8 时区的 Date 对象
-                    // autoDisplayAt 可能是字符串（SQLite）或 Date 对象（PostgreSQL）
-                    let autoDisplayAt
-                    const autoDisplayAtValue = displayAchievement.autoDisplayAt
-                    
-                    if (autoDisplayAtValue instanceof Date) {
-                        // PostgreSQL 返回的是 Date 对象
-                        autoDisplayAt = autoDisplayAtValue
-                    } else if (typeof autoDisplayAtValue === 'string') {
-                        // 可能是 ISO 8601 格式（PostgreSQL JSON序列化）或普通格式（SQLite）
-                        if (autoDisplayAtValue.includes('T')) {
-                            // ISO 8601 格式：可能是 "2025-11-14T15:52:22.000Z" 或 "2025-11-14T15:52:22"
-                            autoDisplayAt = new Date(autoDisplayAtValue)
-                            if (isNaN(autoDisplayAt.getTime())) {
-                                // 解析失败，跳过时间显示
-                                displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>'
-                            } else {
-                                // 如果带 Z，说明是 UTC 时间，需要加8小时转换为 UTC+8
-                                if (autoDisplayAtValue.endsWith('Z')) {
-                                    const utc8Offset = 8 * 60 * 60 * 1000
-                                    autoDisplayAt = new Date(autoDisplayAt.getTime() + utc8Offset)
-                                }
-                            }
-                        } else {
-                            // 普通格式：YYYY-MM-DD HH:mm:ss（UTC+8 时区）
-                            const [datePart, timePart] = autoDisplayAtValue.split(' ')
-                            if (!datePart || !timePart) {
-                                // 格式不正确，跳过时间显示
-                                displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>'
-                            } else {
-                                const [year, month, day] = datePart.split('-').map(Number)
-                                const [hour, minute, second] = timePart.split(':').map(Number)
-                                
-                                // 创建 UTC+8 时区的 Date 对象
-                                const utc8Offset = 8 * 60 * 60 * 1000
-                                const utcTimestamp = Date.UTC(year, month - 1, day, hour, minute, second || 0)
-                                autoDisplayAt = new Date(utcTimestamp - utc8Offset)
-                            }
-                        }
-                    } else {
-                        // 未知类型，跳过时间显示
-                        displayStatusHtml = '<span class="display-status auto">✅ 已佩戴（自动）</span>'
-                    }
-                    
-                    // 如果成功解析了日期，计算剩余时间
-                    if (displayStatusHtml === '' && autoDisplayAt && !isNaN(autoDisplayAt.getTime())) {
-                        // 计算卸下时间：解锁时间（auto_display_at）+ 24小时
-                        const removeAt = new Date(autoDisplayAt.getTime() + 24 * 60 * 60 * 1000)
-                        
-                        // 获取当前 UTC+8 时区的时间
-                        const now = TimeUtils.getUTC8Date()
-                        
-                        const diffMs = removeAt.getTime() - now.getTime()
-                    const diffHours = diffMs / (1000 * 60 * 60)
-                        const remainingHours = Math.max(0, diffHours)
-                    const remainingMinutes = Math.floor((remainingHours % 1) * 60)
-                    
-                    if (remainingHours > 0) {
-                        const hours = Math.floor(remainingHours)
-                        displayStatusHtml = `<span class="display-status auto">✅ 已佩戴（自动佩戴剩余 ${hours}小时${remainingMinutes > 0 ? remainingMinutes + '分钟' : ''}）</span>`
-                    } else {
-                        displayStatusHtml = '<span class="display-status expired">⏰ 已过期（将自动卸下）</span>'
-                        }
-                    }
-                } else {
-                    displayStatusHtml = '<span class="display-status manual">✅ 已佩戴</span>'
-                }
-            }
-            
-            const rarityEmoji = {
-                common: '🥉',
-                uncommon: '🥈',
-                rare: '🥇',
-                epic: '💎',
-                legendary: '👑',
-                mythic: '🔥',
-                festival: '🎊',
-                special: '✨'
-            }
-            const emoji = rarityEmoji[definition.rarity] || '🏆'
-
-            const statusClass = isUnlocked ? 'unlocked' : 'locked'
-            const statusIcon = isUnlocked ? '✅' : '🔒'
-
-            // 在已解锁和未解锁之间添加分隔条
-            let separatorHtml = ''
-            if (index === 0) {
-                // 第一个成就，根据状态显示对应的分隔条
-                if (isUnlocked) {
-                    separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">已解锁成就</div><div class="separator-line"></div></div>'
-                } else {
-                    separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">未解锁成就</div><div class="separator-line"></div></div>'
-                }
-            } else if (lastWasUnlocked === true && !isUnlocked) {
-                // 从已解锁切换到未解锁
-                separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">未解锁成就</div><div class="separator-line"></div></div>'
-            }
-
-            lastWasUnlocked = isUnlocked
-
-            const itemHtml = `<div class="achievement-item ${statusClass}">
-					<div class="achievement-header">
-						<div class="achievement-status ${statusClass}">${statusIcon}</div>
-						<div class="achievement-badge">
-							<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
-						</div>
-					</div>
-					<div class="achievement-info">
-						${displayStatusHtml ? `<div class="achievement-name-row">
-							<div class="achievement-display-status">${displayStatusHtml}</div>
-						</div>` : ''}
-						<div class="achievement-description-row">
-							<div class="achievement-description">${definition.description || '暂无描述'}</div>
-							${unlockTime ? `<div class="achievement-meta-row">
-								<div class="achievement-unlock-time">解锁于：${unlockTime}</div>
-							</div>` : ''}
-						</div>
-					</div>
-				</div>`
-
-            return separatorHtml + itemHtml
-        }).join('\n\t\t\t\t')
-
-        // 生成头部信息HTML
-        const headerHtml = `
-			<div class="title">成就列表</div>
-			<div class="achievement-count">解锁进度：<span>${unlockedCount}</span> / <span>${Object.keys(allDefinitions).length}</span></div>
-			<div class="group-info">${groupName || `群${groupId}`} (${CommonUtils.maskGroupId(groupId)})</div>
-        `
-
-        return template
-            .replace(/\{\{HEADER\}\}/g, headerHtml)
-            .replace(/\{\{ACHIEVEMENT_ITEMS\}\}/g, achievementsHtml)
-            .replace(/\{\{GENERATE_TIME\}\}/g, timestamp)
-            .replace(/\{\{VERSION\}\}/g, version)
-    }
-
-    /**
-     * 渲染成就统计模板（复用 achievementListTemplate.html，但显示获取人数）
-     * @param {Array} globalStats 全局成就统计数组
-     * @param {Array} groupStats 群专属成就统计数组
-     * @param {string} groupId 群ID
-     * @param {string} groupName 群名称
-     * @returns {string} 渲染后的HTML
-     */
-    renderAchievementStatisticsTemplate(globalStats, groupStats, groupId, groupName) {
-        const template = this.loadTemplate('achievementListTemplate.html')
-        if (!template) return ''
-
-        const timestamp = TimeUtils.formatDateTime(TimeUtils.getUTC8Date()).replace(/-/g, '/')
-        const version = this.version
-
-        // 合并所有成就统计
-        const allStats = [...globalStats, ...groupStats]
-        const totalAchievements = allStats.length
-
-        // 按获取人数排序（降序），然后按稀有度排序
-        allStats.sort((a, b) => {
-            if (b.unlockCount !== a.unlockCount) {
-                return b.unlockCount - a.unlockCount
-            }
-            return AchievementUtils.compareRarity(b.definition.rarity, a.definition.rarity)
-        })
-
-        // 生成群专属成就ID集合（用于快速判断）
-        const groupOnlyIds = new Set(groupStats.map(stat => stat.id))
-
-        // 生成成就统计HTML
-        const achievementsHtml = allStats.map((stat, index) => {
-            const { definition, unlockCount, isGlobal } = stat
-            const isGroupOnly = groupOnlyIds.has(stat.id)
-            
-            const rarityEmoji = {
-                common: '🥉',
-                uncommon: '🥈',
-                rare: '🥇',
-                epic: '💎',
-                legendary: '👑',
-                mythic: '🔥',
-                festival: '🎊',
-                special: '✨'
-            }[definition.rarity] || '🏆'
-            const emoji = rarityEmoji
-
-            const statusClass = 'unlocked'; // 统计页面所有成就都显示为已解锁样式
-
-            // 添加分隔条（全局成就和群专属成就之间）
-            let separatorHtml = ''
-            if (index === globalStats.length && groupStats.length > 0) {
-                separatorHtml = '<div class="achievement-separator"><div class="separator-line"></div><div class="separator-text">群专属成就</div><div class="separator-line"></div></div>'
-            }
-
-            // 生成作用域标签
-            let scopeLabel = ''
-            if (isGroupOnly) {
-                scopeLabel = '<span class="display-status manual">（群专属）</span>'
-            } else if (isGlobal) {
-                scopeLabel = '<span class="display-status auto">（全局）</span>'
-            }
-
-            const itemHtml = `<div class="achievement-item ${statusClass}">
-					<div class="achievement-header">
-						<div class="achievement-status ${statusClass}">📊</div>
-						<div class="achievement-badge">
-							<span class="achievement-inline achievement-${definition.rarity}">${emoji} ${definition.name}</span>
-						</div>
-					</div>
-					<div class="achievement-info">
-						${scopeLabel ? `<div class="achievement-name-row">
-							<div class="achievement-display-status">${scopeLabel}</div>
-						</div>` : ''}
-						<div class="achievement-description-row">
-							<div class="achievement-description">${definition.description || '暂无描述'}</div>
-							<div class="achievement-meta-row">
-								<div class="achievement-unlock-time">获取人数: ${unlockCount} 人</div>
-							</div>
-						</div>
-					</div>
-				</div>`
-
-            return separatorHtml + itemHtml
-        }).join('\n\t\t\t\t')
-
-        // 生成头部信息HTML
-        const headerHtml = `
-			<div class="title">成就统计</div>
-			<div class="achievement-count">成就总数: <span>${totalAchievements}</span> 个</div>
-			<div class="group-info">${groupName || `群${groupId}`} (${CommonUtils.maskGroupId(groupId)})</div>
-        `
-
-        return template
-            .replace(/\{\{HEADER\}\}/g, headerHtml)
-            .replace(/\{\{ACHIEVEMENT_ITEMS\}\}/g, achievementsHtml)
-            .replace(/\{\{GENERATE_TIME\}\}/g, timestamp)
-            .replace(/\{\{VERSION\}\}/g, version)
-    }
 }
 
 export { TemplateManager }
 export default TemplateManager
-
