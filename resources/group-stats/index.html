@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+{{INLINE_STYLE}}
+</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<div class="title">群统计信息</div>
+				<div class="group-id">{{GROUP_ID}}</div>
+			</div>
+
+			<div class="stats-section">
+				<div class="stats-grid">
+					<div class="stat-card">
+						<div class="stat-value">{{USER_COUNT}}</div>
+						<div class="stat-label">统计用户总数</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-value">{{TOTAL_MESSAGES}}</div>
+						<div class="stat-label">消息总量</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-value">{{TODAY_ACTIVE}}</div>
+						<div class="stat-label">今日活跃人数</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-value">{{MONTH_ACTIVE}}</div>
+						<div class="stat-label">本月活跃人数</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="top-users-section">
+				<div class="section-title">发言前三用户</div>
+				<div class="top-users-grid">
+					{{TOP_USERS}}
+				</div>
+			</div>
+
+			<div class="footer">
+				生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}
+			</div>
+		</div>
+	</body>
+</html>

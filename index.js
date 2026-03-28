@@ -1,68 +1,104 @@
-import { Plugin } from './src/core/Plugin.js'
-import { PathResolver } from './src/core/utils/PathResolver.js'
-import { getWebServer } from './src/services/WebServer.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'url'
-import path from 'path'
+import { getDatabaseService } from './core/database/DatabaseService.js'
+import {
+  Config as analysisConfig,
+  getMessageCollector,
+  reinitializeServices,
+  stopAllServices
+} from './core/services/index.js'
 
-// 获取插件目录和package.json
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const packageJsonPath = path.join(__dirname, 'package.json');
+// 获取插件目录和 package.json
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const packageJsonPath = path.join(__dirname, 'package.json')
 
-let packageJson;
+let packageJson
 try {
-    packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+  packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 } catch (err) {
-    global.logger.error('[发言统计] 读取package.json失败:', err)
-    packageJson = { version: '5.0.0' }
+  global.logger.error('[发言统计] 读取 package.json 失败:', err)
+  packageJson = { version: '5.0.0' }
 }
 
-const version = packageJson.version;
+const version = packageJson.version
 
-// 全局服务器实例（使用WebServer单例）
-// 注意：服务器启动由 Plugin.init() 方法负责，这里只获取实例
-let globalWebServer = null;
-
-// 初始化数据库
-import { getDatabaseService } from './src/core/database/DatabaseService.js';
-const dbService = getDatabaseService();
+// 1) 初始化数据库（主插件强依赖）
+const dbService = getDatabaseService()
 try {
-    await dbService.initialize();
+  await dbService.initialize()
 } catch (err) {
-    // 只输出错误消息，抛出简化的错误字符串以避免显示完整错误对象
-    const errorMsg = err.message || '数据库初始化失败'
-    global.logger.error('[发言统计] ' + errorMsg)
-    // 抛出字符串而不是错误对象，插件加载器会将其显示为简单文本
-    throw errorMsg
+  const errorMsg = err.message || '数据库初始化失败'
+  global.logger.error('[发言统计] ' + errorMsg)
+  throw errorMsg
+}
+
+// 2) 启动水群分析配置与服务生命周期
+try {
+  await analysisConfig.load()
+  analysisConfig.watch()
+  analysisConfig.onChange(async (newConfig) => {
+    await reinitializeServices(newConfig)
+    global.logger.mark('[发言统计] 水群分析配置变更，服务已重载')
+  })
+
+  const gi = analysisConfig.get() || {}
+  if (gi.enabled !== false && gi.messageCollection?.enabled !== false) {
+    await getMessageCollector()
+  }
+} catch (err) {
+  global.logger.error('[发言统计] 水群分析初始化失败:', err)
 }
 
 try {
-    // 获取数据库类型用于日志显示
-    const { globalConfig } = await import('./src/core/ConfigManager.js');
-    const dbConfig = globalConfig.getConfig('database') || {};
-    const dbType = (dbConfig.type || 'postgresql').toLowerCase();
-    const dbTypeName = dbType === 'sqlite' ? 'SQLite' : 'PostgreSQL';
-    
-    global.logger.info('[发言统计] ---------^_^---------')
-    global.logger.info(`[发言统计] 发言统计插件 v${version} 初始化成功~`)
-    global.logger.info(`[发言统计] 使用${dbTypeName}数据库存储`)
-    global.logger.info('[发言统计] 支持功能：总榜、日榜、周榜、月榜、个人统计、背景自定义、僵尸群清理')
-    global.logger.info('[发言统计] Web服务器将在插件初始化时自动启动')
+  const { globalConfig } = await import('./core/ConfigManager.js')
+  const dbConfig = globalConfig.getConfig('database') || {}
+  const dbType = (dbConfig.type || 'postgresql').toLowerCase()
+  const dbTypeName = dbType === 'sqlite' ? 'SQLite' : 'PostgreSQL'
 
-    // 获取WebServer实例（服务器启动由 Plugin.init() 方法负责）
-    globalWebServer = getWebServer()
-
-    global.logger.info('[发言统计] ---------^_^---------')
+  global.logger.info('[发言统计] ---------^_^---------')
+  global.logger.info(`[发言统计] 发言统计插件 v${version} 初始化成功~`)
+  global.logger.info(`[发言统计] 使用${dbTypeName}数据库存储`)
+  global.logger.info('[发言统计] 支持功能：总榜、日榜、周榜、月榜、个人统计、僵尸群清理、水群分析、水群词云')
+  global.logger.info('[发言统计] ---------^_^---------')
 } catch (err) {
-    global.logger.error('[发言统计] 插件初始化失败:', err)
+  global.logger.error('[发言统计] 插件初始化失败:', err)
 }
 
-// 导出全局服务器实例（兼容性导出）
-export {
-    globalWebServer as globalBackgroundServer,
-    globalWebServer
+// 3) apps 风格加载（参考 endfield 风格）
+const appsDir = path.join(__dirname, 'apps')
+const files = fs.readdirSync(appsDir).filter((file) => file.endsWith('.js'))
+const modules = await Promise.allSettled(
+  files.map((file) => import(pathToFileURL(path.join(appsDir, file)).href))
+)
+
+const apps = {}
+for (let i = 0; i < files.length; i++) {
+  const file = files[i]
+  const loaded = modules[i]
+
+  if (loaded.status !== 'fulfilled') {
+    global.logger.error(`[发言统计] 载入应用失败: ${file}`)
+    global.logger.error(loaded.reason)
+    continue
+  }
+
+  const exportsMap = loaded.value || {}
+  const classExport = Object.entries(exportsMap).find(([, value]) => typeof value === 'function' && value.prototype)
+  if (!classExport) {
+    global.logger.warn(`[发言统计] 应用文件未导出类，已跳过: ${file}`)
+    continue
+  }
+
+  const appName = file.replace(/\.js$/, '')
+  apps[appName] = classExport[1]
 }
 
-export default Plugin
+process.on('exit', () => {
+  stopAllServices()
+  analysisConfig.stop()
+})
 
+export { apps }

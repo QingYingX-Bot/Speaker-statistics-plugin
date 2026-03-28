@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>水群词云</title>
+  <link rel="stylesheet" href="{{pluResPath}}wordcloud/style.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <header class="hero">
+        <div class="hero-top">
+          {{if isPersonal}}
+          <h1 class="title">{{userName}} 的水群词云</h1>
+          {{else}}
+          <h1 class="title">水群词云</h1>
+          {{/if}}
+          <p class="subtitle">Speaker-statistics-plugin</p>
+        </div>
+        <div class="meta">
+          <span class="chip chip-group">{{groupName}}</span>
+          <span class="chip">{{timeRange}}</span>
+          <span class="chip">消息 {{messageCount}} 条</span>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="wordcloud-wrap">
+          <canvas id="wordcloud"></canvas>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>生成时间：{{createTime}}</span>
+        <span class="divider">|</span>
+        <span>水群词云</span>
+      </footer>
+    </div>
+  </div>
+
+  <script src="{{pluResPath}}wordcloud/wordcloud2.js"></script>
+  <script>
+    const wordList = {{@wordListJson}};
+    const canvas = document.getElementById('wordcloud');
+
+    canvas.width = {{width}};
+    canvas.height = {{height}};
+
+    const wordCount = wordList.length;
+
+    let gridSize;
+    let baseFontSize;
+    let minSize;
+
+    if (wordCount < 20) {
+      gridSize = 12;
+      baseFontSize = canvas.width / 25;
+      minSize = Math.max(24, canvas.width / 30);
+    } else if (wordCount < 50) {
+      gridSize = 10;
+      baseFontSize = canvas.width / 30;
+      minSize = Math.max(20, canvas.width / 35);
+    } else if (wordCount < 100) {
+      gridSize = 4;
+      baseFontSize = canvas.width / 45;
+      minSize = Math.max(16, canvas.width / 60);
+    } else {
+      gridSize = 2;
+      baseFontSize = canvas.width / 65;
+      minSize = Math.max(12, canvas.width / 80);
+    }
+
+    WordCloud(canvas, {
+      list: wordList,
+      gridSize,
+      weightFactor(normalizedWeight) {
+        return baseFontSize * normalizedWeight;
+      },
+      fontFamily: 'PingFang SC, Hiragino Sans GB, Microsoft YaHei, Segoe UI, sans-serif',
+      fontWeight: '700',
+      color() {
+        const colors = [
+          '#58A4B0', '#373F51', '#6B7EA4', '#457B9D', '#2A9D8F',
+          '#5C6B8A', '#5B8FB9', '#7E9CB8', '#4C6A92', '#3B5B7E'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+      },
+      rotateRatio: 0.18,
+      rotationSteps: 2,
+      backgroundColor: '{{backgroundColor}}',
+      minSize,
+      drawOutOfBound: false,
+      shrinkToFit: true,
+      clearCanvas: true
+    });
+  </script>
+</body>
+</html>

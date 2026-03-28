@@ -1,6 +1,6 @@
 {
   "name": "speaker-statistics-plugin",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "群聊水群统计插件 for Yunzai-Bot",
   "type": "module",
   "main": "index.js",
@@ -19,11 +19,18 @@
   "homepage": "https://gitee.com/qingyingxbot/Speaker-statistics-plugin#readme",
   "dependencies": {
     "better-sqlite3": "^12.4.1",
-    "express": "^5.1.0",
+    "chalk": "^5.6.2",
     "handlebars": "^4.7.8",
-    "multer": "^2.0.2",
+    "jieba-wasm": "^2.2.0",
+    "jsonrepair": "^3.13.1",
+    "moment": "^2.30.1",
     "node-fetch": "^3.3.2",
-    "pg": "^8.11.3"
+    "openai": "^6.9.1",
+    "pg": "^8.11.3",
+    "yaml": "^2.8.1"
+  },
+  "imports": {
+    "#lib": "./core/ConfigManager.js"
   },
   "author": "QingYingX",
   "license": "MIT",

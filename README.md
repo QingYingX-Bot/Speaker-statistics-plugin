@@ -4,24 +4,31 @@
 
 **✨ Yunzai-Bot 专业的群聊发言统计系统**
 
-> 插件 by QingYing & AI  
+> 插件 by QingYing & AI
 
 ---
 
 ## 📦 简介
 
-发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况。支持 PostgreSQL 和 SQLite 双数据库，可根据部署需求灵活选择。插件还提供完整的 Web 管理界面，支持通过浏览器查看统计和设置背景等功能。
+发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况，并提供群聊分析、词云、归档清理和锅巴配置能力。
+
+- 文档版本：`5.0.1`
+- 发布日期：`2026-03-28`
 
 ### 核心特性
 
-- 📊 **多维度统计**：总榜、日榜、周榜、月榜、年榜全方位统计
-- 🎨 **灵活展示**：文字、转发、图片三种模式，自定义背景
-- 🌐 **Web管理界面**：完整的 Web 界面，支持查看统计和背景设置
-- ⚙️ **可视化配置**：支持通过 Guoba-Plugin 进行图形化配置
-- 🔒 **数据管理**：僵尸群归档、数据备份、权限控制、自动恢复机制
-- 🗄️ **双数据库支持**：支持 PostgreSQL（生产环境）和 SQLite（小型部署）
-- ⚡ **高性能**：PostgreSQL 连接池优化查询，SQLite WAL 模式提高并发
-- 📱 **移动端适配**：所有Web页面完全适配移动端设备
+- 📊 **多维度统计**：总榜、日榜、周榜、月榜、年榜、趋势全覆盖
+- 👤 **个人查询**：支持个人统计、跨群列表、@ 查询他人
+- 🤖 **群聊分析**：支持基础总结、活跃图表、AI 话题分析、金句和称号
+- ☁️ **词云能力**：支持群词云和个人词云
+- ⚙️ **可视化配置**：支持通过 Guoba-Plugin 图形化管理配置
+- 🔒 **数据治理**：僵尸群归档、自动恢复、定时清理
+- 🗄️ **双数据库支持**：支持 PostgreSQL 和 SQLite
+- ♻️ **当前架构**：已切换到 `apps/` + `core/` + `guoba/` + `resources/` 目录结构
+
+> 💡 **版本说明**：
+> - 当前版本已移除旧版 Web 管理端与背景功能。
+> - 当前版本已移除旧 `src/*` 路径，二开请基于 `apps/*` 与 `core/*`。
 
 ---
 
@@ -29,11 +36,11 @@
 
 ### 前置要求
 
-- Node.js 16+ 
-- 数据库（二选一）：
-  - PostgreSQL 12+（需要单独安装 PostgreSQL 服务器）
-  - SQLite 3+（无需安装，插件自带支持）
+- Node.js 16+
 - Yunzai-Bot
+- 数据库二选一：
+  - PostgreSQL 12+（推荐生产环境）
+  - SQLite 3+（推荐轻量部署）
 
 ### 安装步骤
 
@@ -58,70 +65,50 @@ pnpm install --filter=Speaker-statistics-plugin
 ```
 
 > 💡 **提示**：
-> - `better-sqlite3` 已包含在依赖中，`pnpm install` 会自动安装
-> - 如果 `better-sqlite3` 安装失败（如 bindings 文件缺失），插件会自动回退到 `sqlite3`
-> - 如果只使用 PostgreSQL，可以忽略 SQLite 相关的安装错误
+> - `pnpm install` 会安装插件运行所需依赖。
+> - 如果只使用 PostgreSQL，可忽略 SQLite 相关依赖的安装提示。
 
 3. **配置数据库**
 
-快速配置步骤：
+编辑 `plugins/Speaker-statistics-plugin/data/config/database.json`
 
-**方式一：使用 SQLite（推荐新手，无需安装数据库）**
-
-编辑 `data/global.json` 配置 SQLite：
+**方式一：使用 SQLite（推荐新手）**
 
 ```json
 {
-  "database": {
-    "type": "sqlite",
-    "path": "speech_statistics_db.db"
-  }
+  "type": "sqlite",
+  "path": "speech_statistics_db.db"
 }
 ```
 
-> 💡 **提示**：
-> - 如果只写文件名（如 `"speech_statistics_db.db"`），会自动放在插件 `data` 目录下
-> - 如果写相对路径（如 `"data/my.db"`），会相对于插件目录
-> - 如果写绝对路径，则使用该路径
-> - 如果不指定 `path`，默认使用 `speech_statistics_db.db`（在插件 `data` 目录下）
+> 💡 **路径说明**：
+> - 只写文件名：默认放在插件 `data` 目录下
+> - 相对路径：相对于插件目录
+> - 绝对路径：直接使用该路径
 
-**方式二：使用 PostgreSQL（适合生产环境）**
-
-创建 PostgreSQL 数据库：
-
-```sql
-CREATE DATABASE speech_statistics;
-CREATE USER speech_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
-```
-
-编辑 `data/global.json` 配置 PostgreSQL：
+**方式二：使用 PostgreSQL（推荐生产环境）**
 
 ```json
 {
-  "database": {
-    "type": "postgresql",
-    "host": "localhost",
-    "port": 5432,
-    "database": "speech_statistics",
-    "user": "speech_user",
-    "password": "your_secure_password",
-    "pool": {
-      "max": 20,
-      "min": 5,
-      "idleTimeoutMillis": 30000
-    }
-  }
+  "type": "postgresql",
+  "host": "127.0.0.1",
+  "port": 5432,
+  "database": "speech_statistics_db",
+  "user": "speech_statistics_db",
+  "password": "your_password",
+  "pool": {
+    "max": 20,
+    "min": 5,
+    "idleTimeoutMillis": 30000,
+    "connectionTimeoutMillis": 2000
+  },
+  "ssl": false
 }
 ```
-
-> 💡 **提示**：如果不指定 `type`，默认使用 PostgreSQL（向后兼容）。
 
 4. **启动插件**
 
-重启 Yunzai-Bot，插件会自动初始化数据库表结构并启动Web服务器。
-
-> 💡 **Web服务器**：插件会自动启动Web服务器（默认端口39999），提供Web管理界面。可通过 `data/global.json` 中的 `webServer` 配置项修改端口等设置。
+重启 Yunzai-Bot，插件会自动初始化数据库表结构与相关服务。
 
 ---
 
@@ -134,226 +121,209 @@ GRANT ALL PRIVILEGES ON DATABASE speech_statistics TO speech_user;
 | 总榜 | `#水群总榜` | 查看历史累计发言排行 |
 | 日榜 | `#水群日榜` | 查看今日发言排行 |
 | 周榜 | `#水群周榜` | 查看本周发言排行 |
-| 月榜 | `#水群月榜` | 查看本月发言排行 |
+| 月榜 | `#水群月榜` / `#水群榜` | 查看本月发言排行 |
 | 年榜 | `#水群年榜` | 查看今年发言排行 |
-| 发言趋势 | `#水群趋势` | 查看最近7天的发言趋势（默认7天） |
-| 自定义趋势 | `#水群趋势 30` | 查看最近N天的发言趋势（1-90天） |
+| 群统计 | `#水群统计` | 查看当前群聊统计信息 |
+| 群信息 | `#水群信息` | 查看当前群聊详细信息 |
+| 全局统计 | `#水群总统计 [群数\|all]` | 查看全局统计数据 |
+| 总统计别名 | `#总水群统计 [群数\|all]` | 全局统计别名命令 |
+| 发言趋势 | `#水群趋势` | 查看最近趋势（默认参数由命令逻辑决定） |
+| 自定义趋势 | `#水群趋势 30` | 查看最近 N 天发言趋势 |
 
 ### 个人查询功能
 
 | 功能 | 命令 | 说明 |
 |------|------|------|
-| 个人统计 | `#水群查询` | 查看个人发言统计和排名（支持 @ 查询他人） |
-| 查询他人 | `#水群查询 @用户` | 查看指定用户的发言统计和排名 |
-| 群列表 | `#水群查询群列表` | 查看用户所在的所有群聊（支持 @ 查询他人） |
-| 查询他人群列表 | `#水群查询群列表 @用户` | 查看指定用户所在的所有群聊 |
-| 群统计 | `#水群统计` | 查看当前群聊的统计信息 |
-| 群信息 | `#水群信息` | 查看当前群聊的详细信息 |
+| 个人统计 | `#水群查询` | 查看自己的发言统计 |
+| 查询他人 | `#水群查询 @用户` | 查看指定用户统计 |
+| 群列表 | `#水群查询群列表` | 查看自己活跃过的群列表 |
+| 查询他人群列表 | `#水群查询群列表 @用户` | 查看指定用户群列表 |
 
-### 背景功能
+### 水群分析功能
 
 | 功能 | 命令 | 说明 |
 |------|------|------|
-| 背景设置 | `#水群设置背景` | 生成背景设置页面链接（Token访问） |
-| 背景帮助 | `#水群背景帮助` | 查看背景设置帮助信息 |
+| 群聊分析 | `#水群分析` | 生成当前群聊分析报告 |
+| 指定日期分析 | `#水群分析 今天` | 支持今天、昨天、前天、`YYYY-MM-DD` |
+| 指定群分析 | `#水群分析 <群号> <日期>` | 手动分析指定群和日期 |
+| 强制分析 | `#水群强制分析 <群号> <日期>` | 主人权限，忽略常规限制 |
 
-### 网页功能
+> 💡 **说明**：
+> - 未配置 AI Key 时，仍可生成基础统计报告。
+> - 配置 OpenAI 兼容接口后，可启用话题分析、金句提取、用户称号等增强能力。
+
+### 词云功能
 
 | 功能 | 命令 | 说明 |
 |------|------|------|
-| 打开网页 | `#水群网页` | 生成个人统计页面链接（Token访问） |
+| 群词云 | `#水群词云` | 生成当天群词云 |
+| 群词云（三天） | `#水群词云 三天` | 生成最近三天群词云 |
+| 群词云（七天） | `#水群词云 七天` | 生成最近七天群词云 |
+| 个人词云 | `#我的词云` | 生成自己的当天词云 |
+| 个人词云（三天） | `#我的词云 三天` | 生成自己的最近三天词云 |
+| 个人词云（七天） | `#我的词云 七天` | 生成自己的最近七天词云 |
 
-> 💡 **Token访问**：通过QQ命令生成的链接包含Token，自动验证身份，安全便捷
+> 💡 **说明**：
+> - 词云功能不依赖 AI Key。
+> - 词云和分析能力均受 `group-analysis.json` 总开关控制。
 
-> 💡 **全部群聊统计**：首页选择"全部群聊"时，自动聚合所有群聊的统计数据，显示总和
-
-### Web界面功能
-
-插件提供完整的Web管理界面，包括：
-
-- 📊 **个人统计页面**：查看个人发言统计、排名、详细信息
-  - 支持选择单个群聊或"全部群聊"（自动聚合所有群聊数据）
-  - 显示今日发言、总发言、总字数、活跃天数、连续天数、排名等
-- 🏆 **排行榜页面**：查看群聊排名，支持总榜/日榜/周榜/月榜/年榜
-- 🎨 **背景设置页面**：上传和设置个人背景图片（支持图片编辑）
-- ⚙️ **设置页面**：用户设置、秘钥管理、数据管理
-- 🔧 **管理页面**（管理员）：
-  - **系统概览**：总群数、总用户数、总消息数、今日消息数、活跃群数、今日新增用户、平均消息/群、平均消息/用户
-  - **数据图表**：
-    - 消息趋势图（近7天）
-    - 群组活跃度分布（Top 10）
-    - 消息密度散点图（所有群组，X轴=用户数，Y轴=消息数）
-    - 群组增长趋势图（近7天新增群组数）
-  - **数据统计**：日期范围筛选、消息趋势图、用户活跃度图、详细数据表格、数据导出
-  - **群管理**：群详情、群内用户排名、刷新/清除统计数据
-  - **用户管理**：用户详情、所在群聊列表、修改用户权限、清除用户数据
-
-> 💡 **访问方式**：通过 `#水群网页` 命令获取个人链接，或直接访问管理页面（需管理员权限）
-
-> 💡 **权限管理**：管理员可在网页界面修改用户权限（普通用户 ↔ 管理员），权限变化实时生效
-
-### 管理功能（仅管理员）
+### 管理功能（仅主人）
 
 > 💡 **权限说明**：
-> - **key.json 中的 admin 角色**：可在 Web 界面设置为管理员，拥有所有管理权限
+> - 当前管理命令统一使用 `permission: 'master'` 判断权限。
 
 | 功能 | 命令 | 说明 |
 |------|------|------|
-| 清除统计 | `#水群清除统计` | 清除当前群的统计数据 |
+| 清除统计 | `#水群清除统计` | 清除当前群统计数据 |
 | 设置显示人数 | `#水群设置人数+<数字>` | 设置排行榜显示人数 |
-| 切换转发 | `#水群设置开启/关闭转发` | 切换转发消息模式 |
-| 切换图片 | `#水群设置开启/关闭图片` | 切换图片显示模式 |
-| 切换记录 | `#水群设置开启/关闭记录` | 切换消息记录功能 |
-| 切换日志 | `#水群设置开启/关闭日志` | 切换调试日志输出 |
-| 更新插件 | `#水群更新` | 更新插件到最新版本 |
-| 强制更新 | `#水群强制更新` | 强制更新插件（覆盖本地修改） |
-| 归档僵尸群 | `#水群归档僵尸群` | 列出所有僵尸群（数据库中存在但机器人已不在群中），等待确认归档 |
-| 确认归档 | `#水群确认归档` | 确认归档列出的僵尸群，数据移到暂存表（需先使用 `#水群归档僵尸群` 查看列表，5分钟内有效） |
+| 切换转发 | `#水群设置开启/关闭转发` | 切换转发模式 |
+| 切换图片 | `#水群设置开启/关闭图片` | 切换图片模式 |
+| 切换记录 | `#水群设置开启/关闭记录` | 切换消息记录 |
+| 切换日志 | `#水群设置开启/关闭日志` | 切换调试日志 |
+| 更新插件 | `#水群更新` | 常规更新插件 |
+| 强制更新 | `#水群强制更新` | 覆盖本地改动并更新 |
+| 归档僵尸群 | `#水群归档僵尸群` | 检查可归档群 |
+| 确认归档 | `#水群确认归档` | 确认执行归档 |
+| 查看归档 | `#水群查看归档列表` | 查看已归档群列表 |
+| 清理缓存 | `#水群清理缓存` | 清理插件缓存 |
+| 帮助 | `#水群帮助` | 查看帮助面板 |
 
 > 💡 **统计与归档说明**：
-> - **统计范围**：所有统计（总榜、全局统计、数据概览等）仅包含 **当前群列表（Bot.gl）** 中的群，与机器人管理插件的 `#群列表` / `#群员统计` 一致；归档群不计入且不可查询。
-> - **归档**：僵尸群 = 数据库中存在但不在 Bot.gl 中的群；归档后数据移到暂存表，不计入统计、不可查询。
-> - **恢复**：若归档的群有用户重新发言（群重加回来），数据会自动移出归档并恢复。
-> - **清理**：60 天后无用户发言的归档群组会被定时任务永久删除；可通过配置文件自定义清理时间、间隔和保留天数。
+> - 统计范围只包含当前有效群，不包含已归档群。
+> - 僵尸群是“数据库中存在，但机器人当前已不在群中的群”。
+> - 归档群若重新有消息，会自动恢复。
+> - 超过保留天数的归档群会被定时任务永久清理。
+
+---
 
 ## ⚙️ 配置说明
 
-### 数据库配置
-
-插件支持两种数据库，可在 `data/global.json` 中配置：
-
-**SQLite 配置（推荐新手）：**
-```json
-{
-  "database": {
-    "type": "sqlite",
-    "path": "speech_statistics_db.db"  // 可选，可直接写文件名，会自动放在插件 data 目录下
-  }
-}
-```
-
-> 💡 **路径说明**：
-> - 只写文件名（如 `"speech_statistics_db.db"`）：自动放在插件 `data` 目录下
-> - 相对路径（如 `"data/my.db"`）：相对于插件目录
-> - 绝对路径（如 `"/var/db/speech.db"`）：直接使用该路径
-> - 不指定 `path`：默认使用 `speech_statistics_db.db`（在插件 `data` 目录下）
-
-**PostgreSQL 配置（推荐生产环境）：**
-```json
-{
-  "database": {
-    "type": "postgresql",  // 可选，默认就是 postgresql
-    "host": "localhost",
-    "port": 5432,
-    "database": "speech_statistics",
-    "user": "speech_user",
-    "password": "your_secure_password",
-    "pool": {
-      "max": 20,
-      "min": 5,
-      "idleTimeoutMillis": 30000
-    }
-  }
-}
-```
-
-> 💡 **提示**：
-> - 如果不指定 `type`，默认使用 PostgreSQL（向后兼容）
-> - SQLite 适合小型部署，无需安装数据库服务器
-> - PostgreSQL 适合生产环境，性能更好，支持高并发
-
-### Web服务器配置
-
-**Umami 追踪脚本配置（可选）：**
-```json
-{
-  "webServer": {
-    "umami": {
-      "enabled": true,
-      "scriptUrl": "https://your-umami-instance.com/script.js",
-      "websiteId": "your-website-id"
-    }
-  }
-}
-```
-
-> 💡 **说明**：
-> - `enabled`: 是否启用 Umami 追踪（默认：`false`）
-> - `scriptUrl`: Umami 脚本 URL，例如：`https://cloud.umami.is/script.js`
-> - `websiteId`: Umami 网站 ID，在 Umami 后台创建网站后获取
-> - 启用后，脚本会自动注入到所有 Web 页面的 `<head>` 标签中
-> - 未启用或配置不完整时，不会注入任何脚本
-
 ### 配置文件结构
 
-```
+```text
 config/
-└── configTemplate.js         # 配置模板（包含所有可配置项）
+├── configTemplate.js         # 聚合配置模板
+└── templates/                # 各分组模板
 
 data/
-├── global.json               # 全局配置（数据库、显示、Web服务器等）
-└── key.json                  # 用户秘钥和权限配置（管理员角色，秘钥以 hash+salt 形式存储，不存储明文）
+├── config/
+│   ├── global.json           # 全局开关
+│   ├── display.json          # 显示配置
+│   ├── message.json          # 消息统计策略
+│   ├── database.json         # 数据库配置
+│   ├── storage.json          # 数据存储策略
+│   ├── archived-groups.json  # 归档群清理策略
+│   └── group-analysis.json   # 水群分析 / 词云 / AI / 消息采集
 ```
 
 ### 配置管理
 
-#### 方式一：通过 Guoba-Plugin 网页界面配置（推荐）
+#### 方式一：通过 Guoba-Plugin 图形界面配置（推荐）
 
-访问 Guoba-Plugin 控制台 → 插件配置 → 发言统计插件，可进行以下配置：
+访问 Guoba-Plugin 控制台 → 插件配置 → 发言统计插件，可管理：
 
-- ✅ 全局设置（调试日志等）
-- ✅ 显示设置（转发、图片、显示人数等）
-- ✅ 数据库配置（PostgreSQL/SQLite）
-- ✅ Web服务器配置（Umami 追踪脚本）
+- ✅ 全局设置
+- ✅ 显示设置
+- ✅ 消息统计设置
+- ✅ 数据库配置
+- ✅ 归档清理配置
+- ✅ 水群分析与词云配置
 
 #### 方式二：直接编辑配置文件
 
-- **全局配置**：编辑 `data/global.json`
+- **全局配置**：`data/config/global.json`
+- **显示配置**：`data/config/display.json`
+- **消息统计配置**：`data/config/message.json`
+- **数据库配置**：`data/config/database.json`
+- **归档清理配置**：`data/config/archived-groups.json`
+- **水群分析配置**：`data/config/group-analysis.json`
+
+### 重点配置说明
+
+#### `global.json`
+
+- 控制统计总开关、消息记录、调试日志等
+
+#### `display.json`
+
+- 控制显示人数、图片模式、转发模式
+
+#### `message.json`
+
+- 控制是否只统计文本消息
+- 控制是否统计机器人消息
+- 控制是否每条消息后立即刷新排行榜缓存
+
+#### `database.json`
+
+- 控制数据库类型与连接参数
+
+#### `archived-groups.json`
+
+- 控制定时清理是否启用
+- 控制清理时间、间隔和保留天数
+
+#### `group-analysis.json`
+
+- 控制消息采集、词云、AI、定时报告和分析开关
 
 ---
 
 ## 🗂️ 数据存储
 
-> 💡 **说明**：数据库安装与配置说明已整合到本文“安装方法/配置说明”章节。
+### 数据表结构
 
-### 数据库表结构
-
-插件自动创建以下表：
+插件当前核心表：
 
 | 表名 | 说明 |
 |------|------|
-| `user_stats` | 用户基础统计表 |
-| `daily_stats` | 日统计表 |
-| `weekly_stats` | 周统计表 |
-| `monthly_stats` | 月统计表 |
-| `yearly_stats` | 年统计表 |
-| `group_info` | 群组信息表 |
-| `archived_groups` | 归档群组表（暂存表，用于存储已归档的群组信息） |
+| `message_granular_stats` | 小时粒度消息统计 |
+| `user_agg_stats` | 用户聚合统计 |
+| `group_info` | 群信息表 |
+| `archived_groups` | 已归档群表 |
 
-### 备份与恢复
+> 💡 **说明**：
+> - 旧版统计表结构不再作为当前主结构。
+> - 插件启动时会自动初始化当前版本所需表结构。
 
-备份目录：`data/backups/`
+---
 
-使用 PostgreSQL 原生工具进行备份：
+## 🧱 项目结构
 
-```bash
-# 备份
-pg_dump -U your_username -d speech_statistics > data/backups/backup_$(date +%Y%m%d).sql
-
-# 恢复
-psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
+```text
+Speaker-statistics-plugin/
+├── apps/                 # 应用入口
+│   └── commands/         # 命令处理
+├── core/                 # 核心能力
+│   ├── database/         # 数据库服务与适配器
+│   ├── render/           # 渲染与模板管理
+│   ├── services/         # 分析、词云、AI 等服务
+│   └── utils/            # 工具模块
+├── config/               # 配置模板
+├── data/config/          # 运行期配置
+├── guoba/                # Guoba 支持
+├── resources/            # 页面模板与静态资源
+├── index.js              # 插件入口
+└── guoba.support.js      # Guoba 接入入口
 ```
+
+---
+
+## 🔄 兼容性说明
+
+- 本版本已移除 Web 管理端与背景相关功能。
+- 本版本已移除旧 `src/*` 路径。
+- 当前版本以 `data/config/*.json` 为唯一主配置入口。
 
 ---
 
 ## 💬 问题反馈
 
-如有任何问题或建议，欢迎：
+如有问题或建议，欢迎：
 
-- 🐛 [提交 Issue](https://gitee.com/qingyingxbot/Speaker-statistics-plugin/issues) | [GitHub Issues](https://github.com/QingYingX-Bot/Speaker-statistics-plugin/issues)
-- 💬 在 Gitee 讨论区反馈
-- 📝 [提交 Pull Request](https://gitee.com/qingyingxbot/Speaker-statistics-plugin/pulls) | [GitHub Pull Requests](https://github.com/QingYingX-Bot/Speaker-statistics-plugin/pulls)
-- 📧 联系开发者
+- 🐛 Gitee Issues: <https://gitee.com/qingyingxbot/Speaker-statistics-plugin/issues>
+- 🐛 GitHub Issues: <https://github.com/QingYingX-Bot/Speaker-statistics-plugin/issues>
+- 📝 提交 Pull Request
 
 ---
 
@@ -366,6 +336,7 @@ psql -U your_username -d speech_statistics < data/backups/backup_20241219.sql
 ## 🙏 致谢
 
 - QingYingX & AI
+- [group-insight](https://github.com/KBVsent/group-insight)
 - [Trss-Yunzai](https://gitee.com/TimeRainStarSky/Yunzai)
-- [Guoba-Plugin](https://gitee.com/guoba-yunzai/guoba-plugin) 作者
+- [Guoba-Plugin](https://gitee.com/guoba-yunzai/guoba-plugin)
 - 所有贡献者和测试用户

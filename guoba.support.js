@@ -1,7 +1,7 @@
-import { getPluginInfo } from './src/guoba/pluginInfo.js';
-import { getConfigSchemas } from './src/guoba/configSchemas.js';
-import { getConfigData } from './src/guoba/getConfigData.js';
-import { setConfigData } from './src/guoba/setConfigData.js';
+import { getPluginInfo } from './guoba/pluginInfo.js';
+import { getConfigSchemas } from './guoba/configSchemas.js';
+import { getConfigData } from './guoba/getConfigData.js';
+import { setConfigData } from './guoba/setConfigData.js';
 
 // 支持锅巴
 export function supportGuoba() {

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+{{INLINE_STYLE}}
+</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<div class="title">{{TITLE}}</div>
+				<div class="total-count">发言总数：<span>{{TOTAL_COUNT}}</span></div>
+				<div class="group-info">{{GROUP_NAME}} ({{GROUP_ID}})</div>
+			</div>
+			<div class="ranking-list">
+				{{RANKING_ITEMS}}
+				{{USER_CARD}}
+			</div>
+			<div class="footer">
+				<p>生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}</p>
+			</div>
+		</div>
+	</body>
+</html>

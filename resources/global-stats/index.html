@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+{{INLINE_STYLE}}
+</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<div class="title">全局统计</div>
+				<div class="subtitle">所有群聊的综合统计信息</div>
+			</div>
+
+			<div class="overview-stats">
+				<div class="overview-card">
+					<div class="overview-number">{{TOTAL_GROUPS}}</div>
+					<div class="overview-label">统计群数</div>
+				</div>
+				<div class="overview-card">
+					<div class="overview-number">{{TOTAL_USERS}}</div>
+					<div class="overview-label">统计用户总数</div>
+				</div>
+				<div class="overview-card">
+					<div class="overview-number">{{TOTAL_MESSAGES}}</div>
+					<div class="overview-label">消息总量</div>
+				</div>
+				<div class="overview-card">
+					<div class="overview-number">{{TODAY_ACTIVE}}</div>
+					<div class="overview-label">今日活跃人数</div>
+				</div>
+				<div class="overview-card">
+					<div class="overview-number">{{MONTH_ACTIVE}}</div>
+					<div class="overview-label">本月活跃人数</div>
+				</div>
+				<div class="overview-card">
+					<div class="overview-number">{{STATS_DURATION_HOURS}}</div>
+					<div class="overview-label">统计时长（小时）</div>
+				</div>
+			</div>
+
+			<div class="groups-section">
+				<div class="section-title">群聊详细统计</div>
+
+				<div class="groups-list" id="groups-container">
+					{{GROUPS_LIST}}
+				</div>
+
+				<div class="no-groups" id="no-groups" style="{{NO_GROUPS_STYLE}}">
+					<div class="text">暂无群聊统计数据</div>
+				</div>
+			</div>
+
+			<div class="footer">
+				<div class="timestamp">生成时间：{{GENERATE_TIME}}</div>
+				<div class="pagination-info">第 {{CURRENT_PAGE}} 页，共 {{TOTAL_PAGES}} 页（显示 {{DISPLAY_GROUPS_COUNT}} 个群聊）</div>
+				<div class="version">Speaker-statistics-plugin v{{VERSION}}</div>
+			</div>
+		</div>
+	</body>
+</html>

@@ -7,6 +7,7 @@ node_modules/
 # data 目录下的文件忽略规则（精确控制，而不是忽略整个目录）
 # 忽略配置文件（这些是用户自定义的，不应该提交）
 data/*.json
+data/config/*.json
 # 忽略数据库文件
 data/*.db
 data/*.db-journal
