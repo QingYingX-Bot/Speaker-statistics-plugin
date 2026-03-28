@@ -199,6 +199,10 @@ class Plugin extends plugin {
         return await this.reportCommands.forceGenerateReport(e)
     }
 
+    async generateFriendReport(e) {
+        return await this.reportCommands.generateFriendReport(e)
+    }
+
     async generateWordCloud(e) {
         return await this.wordCloudCommands.generateWordCloud(e)
     }

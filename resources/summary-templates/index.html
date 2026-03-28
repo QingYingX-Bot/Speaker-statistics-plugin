@@ -22,6 +22,9 @@
             <div class="title-sticker">
                 <div class="tape"></div>
                 <h1>五彩斑斓的一天,来看看群里发生了什么吧! </h1>
+                {{if focusName}}
+                <div class="focus-badge">本页主角：{{focusName}}</div>
+                {{/if}}
                 <div class="date-badge">{{dateRange}}</div>
             </div>
         </div>

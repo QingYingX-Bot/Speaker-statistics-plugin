@@ -18,9 +18,14 @@ export class UserParser {
         if (allowMention && e.message) {
             for (const item of e.message) {
                 if (item.type === 'at' && item.qq) {
+                    const nickname = item.text
+                        || item.name
+                        || item.data?.name
+                        || `用户${item.qq}`
+
                     return {
                         userId: String(item.qq),
-                        nickname: item.text || `用户${item.qq}`,
+                        nickname,
                         isMentioned: true
                     }
                 }
@@ -28,6 +33,15 @@ export class UserParser {
         }
         
         if (allowMention) {
+            const cqMatch = e.msg?.match(/\[CQ:at,qq=(\d+)(?:,name=([^,\]]+))?[^\]]*\]/)
+            if (cqMatch) {
+                return {
+                    userId: cqMatch[1],
+                    nickname: cqMatch[2] || `用户${cqMatch[1]}`,
+                    isMentioned: true
+                }
+            }
+
             const match = e.msg?.match(/@(\d+)/)
             if (match) {
                 return {
@@ -50,4 +64,3 @@ export class UserParser {
     }
 
 }
-

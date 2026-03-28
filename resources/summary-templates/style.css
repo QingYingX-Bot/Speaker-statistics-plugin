@@ -75,6 +75,7 @@ body {
 .title-sticker {
     display: inline-block;
     background: #fff;
+    width: min(100%, 920px);
     padding: 20px 60px;
     border: 3px dashed var(--ink-primary);
     border-radius: 15px;
@@ -85,10 +86,26 @@ body {
 
 .title-sticker h1 {
     font-family: var(--font-title);
-    font-size: 3.2rem;
+    font-size: clamp(2.1rem, 4vw, 2.9rem);
+    line-height: 1.15;
+    white-space: nowrap;
     color: var(--accent-orange);
     margin: 0;
     -webkit-text-stroke: 1px var(--ink-primary);
+}
+
+.focus-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 12px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid #d7ccc8;
+    background: linear-gradient(180deg, #fffdf5 0%, #fff7d6 100%);
+    font-family: var(--font-hand);
+    font-size: 1.05rem;
+    color: var(--ink-secondary);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .date-badge {
@@ -508,17 +525,17 @@ body {
 }
 
 .masonry-grid {
-    column-count: 2;
-    column-gap: 25px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 25px;
+    align-items: start;
 }
 
 .user-card {
-    break-inside: avoid;
     background: #fff;
     border: 2px solid #e0e0e0;
     border-radius: 12px;
     padding: 20px;
-    margin-bottom: 25px;
     box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.05);
     position: relative;
     display: flex;
@@ -795,7 +812,7 @@ body {
     }
 
     .masonry-grid {
-        column-count: 1;
+        grid-template-columns: 1fr;
     }
 
     .stamp {

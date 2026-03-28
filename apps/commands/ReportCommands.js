@@ -16,6 +16,7 @@ import {
   getUserTitleAnalyzer
 } from '../../core/services/index.js'
 import { PathResolver } from '../../core/utils/PathResolver.js'
+import { UserParser } from '../../core/utils/UserParser.js'
 import { logger } from '#lib'
 
 class ReportCommands {
@@ -29,13 +30,17 @@ class ReportCommands {
   static getRules() {
     return [
       {
-        reg: '^#水群分析\\s*(\\d{5,12})?\\s*(今天|昨天|前天|\\d{4}-\\d{2}-\\d{2})?$',
+        reg: '^#水群分析(?:\\s+(\\d{5,12}))?$',
         fnc: 'generateReport'
       },
       {
-        reg: '^#水群强制分析\\s*(\\d{5,12})?\\s*(今天|昨天|前天|\\d{4}-\\d{2}-\\d{2})?$',
+        reg: '^#水群强制分析(?:\\s+(\\d{5,12}))?$',
         fnc: 'forceGenerateReport',
         permission: 'master'
+      },
+      {
+        reg: '^#水友分析(?:\\s+.+)?$',
+        fnc: 'generateFriendReport'
       }
     ]
   }
@@ -73,7 +78,12 @@ class ReportCommands {
     })
 
     if (waitingCount > 0) {
-      const commandLabel = methodName === 'forceGenerateReport' ? '水群强制分析' : '水群分析'
+      const commandLabelMap = {
+        generateReport: '水群分析',
+        forceGenerateReport: '水群强制分析',
+        generateFriendReport: '水友分析'
+      }
+      const commandLabel = commandLabelMap[methodName] || '分析'
       const targetLabel = e?.isGroup ? '本群' : '当前会话'
       await e.reply(
         `当前有其他${commandLabel}任务正在执行，已加入队列。\n前方还有 ${waitingCount} 个任务，当前任务完成后会自动开始，并将结果发送到${targetLabel}。`,
@@ -126,6 +136,10 @@ class ReportCommands {
 
   async forceGenerateReport(e) {
     return this.enqueueReportTask('forceGenerateReport', e)
+  }
+
+  async generateFriendReport(e) {
+    return this.enqueueReportTask('generateFriendReport', e)
   }
 }
 
@@ -685,7 +699,7 @@ export class ReportPlugin {
   }
 
   /**
-   * 解析报告命令参数（群号、日期、权限）
+   * 解析报告命令参数（群号、权限）
    * @param {Object} e - 消息事件对象
    * @param {RegExp} regex - 匹配正则
    * @returns {Object|null} 解析结果，权限不足或参数错误时已自动回复并返回 null
@@ -694,20 +708,13 @@ export class ReportPlugin {
     const match = e.msg.match(regex)
     const isPrivate = !e.isGroup
 
-    // 提取群号参数
     let specifiedGroupId = null
-    let dateStr = null
 
     if (match) {
-      // match groups: [full, 总结|报告, groupId?, dateStr?]
-      // For generateReport regex: groups are at index 2 (groupId) and 3 (date)
-      // For forceGenerateReport regex: groups are at index 1 (groupId) and 2 (date)
       for (let i = 1; i < match.length; i++) {
         if (!match[i]) continue
         if (/^\d{5,12}$/.test(match[i])) {
           specifiedGroupId = Number(match[i])
-        } else if (/^(今天|昨天|前天|\d{4}-\d{2}-\d{2})$/.test(match[i])) {
-          dateStr = match[i]
         }
       }
     }
@@ -739,34 +746,7 @@ export class ReportPlugin {
       return null
     }
 
-    let queryDate = moment().format('YYYY-MM-DD')
-    let dateLabel = '今天'
-    let isToday = true
-
-    if (dateStr) {
-      if (dateStr === '昨天') {
-        queryDate = moment().subtract(1, 'days').format('YYYY-MM-DD')
-        dateLabel = '昨天'
-        isToday = false
-      } else if (dateStr === '前天') {
-        queryDate = moment().subtract(2, 'days').format('YYYY-MM-DD')
-        dateLabel = '前天'
-        isToday = false
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const date = moment(dateStr, 'YYYY-MM-DD', true)
-        if (date.isValid()) {
-          queryDate = date.format('YYYY-MM-DD')
-          dateLabel = moment(queryDate).format('YYYY年MM月DD日')
-          isToday = queryDate === moment().format('YYYY-MM-DD')
-        } else {
-          await this.reply('日期格式错误，请使用：YYYY-MM-DD（如 2024-11-01）', true)
-          return null
-        }
-      } else if (dateStr === '今天') {
-        dateLabel = '今天'
-        isToday = true
-      }
-    }
+    const queryDate = moment().format('YYYY-MM-DD')
 
     let groupName = `群${targetGroupId}`
     try {
@@ -775,7 +755,7 @@ export class ReportPlugin {
     } catch (err) {
     }
 
-    return { targetGroupId, queryDate, dateLabel, isToday, isRemote, groupName, group }
+    return { targetGroupId, queryDate, isRemote, groupName, group }
   }
 
   /**
@@ -794,157 +774,42 @@ export class ReportPlugin {
     }
 
     try {
-      // 解析查询参数（群号、日期、权限校验）
-      const params = await this.parseReportParams(e, /水群分析\s*(\d{5,12})?\s*(今天|昨天|前天|\d{4}-\d{2}-\d{2})?/)
+      // 解析查询参数（群号、权限校验）
+      const params = await this.parseReportParams(e, /^#水群分析(?:\s+(\d{5,12}))?$/)
       if (!params) return
 
-      const { targetGroupId, queryDate, dateLabel, isToday, isRemote, groupName } = params
+      const { targetGroupId, queryDate, isRemote, groupName } = params
       const groupHint = isRemote ? ` [${groupName}]` : ''
 
       // 从 Redis 获取指定日期的报告
       let report = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
 
-      // ===== 当天报告逻辑 =====
-      // 当天的报告：即使有缓存，不在冷却期也要重新生成（可能有新消息）
-      if (isToday) {
-        const cooldown = await this.checkCooldown(targetGroupId, false)
+      const cooldown = await this.checkCooldown(targetGroupId, false)
 
-        // 在冷却期内且有缓存 → 直接返回缓存
-        if (cooldown.inCooldown && report) {
-          const elapsedMinutes = cooldown.lastGenerated?.elapsedMinutes || 0
-          logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的今天报告（冷却中，${elapsedMinutes}分钟前已生成）`)
+      // 在冷却期内且有缓存 → 直接返回缓存
+      if (cooldown.inCooldown && report) {
+        const elapsedMinutes = cooldown.lastGenerated?.elapsedMinutes || 0
+        logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的今天报告（冷却中，${elapsedMinutes}分钟前已生成）`)
 
-          const img = await this.renderReport(report, {
-            groupName,
-            model: aiService?.model || '',
-            tokenUsage: report.tokenUsage,
-            date: queryDate
-          })
+        const img = await this.renderReport(report, {
+          groupName,
+          model: aiService?.model || '',
+          tokenUsage: report.tokenUsage,
+          date: queryDate
+        })
 
-          if (img) {
-            return this.reply(img)
-          } else {
-            return this.reply('渲染失败', true)
-          }
+        if (img) {
+          return this.reply(img)
         }
 
-        // 不在冷却期（或无缓存）→ 触发生成
-        const messages = await messageCollector.getMessages(targetGroupId, 1, queryDate)
-
-        if (messages.length === 0) {
-          return this.reply('今天还没有消息，无法生成报告', true)
-        }
-
-        // 尝试获取生成锁
-        if (!await this.acquireGeneratingLock(targetGroupId, queryDate)) {
-          return this.reply('报告正在生成中，请稍后再试', true)
-        }
-
-        try {
-          await this.reply(`正在生成今天的水群分析${groupHint}（${messages.length}条消息），请稍候...`)
-
-          logger.info(`[报告] 用户 ${e.user_id} 触发生成群 ${targetGroupId} (${groupName}) 的今天报告 (消息数: ${messages.length})`)
-
-          const analysisResults = await this.performAnalysis(messages, 1, targetGroupId, queryDate)
-
-          if (!analysisResults) {
-            return this.reply('分析失败，请查看日志', true)
-          }
-
-          await messageCollector.redisHelper.saveReport(targetGroupId, queryDate, {
-            stats: analysisResults.stats,
-            topics: analysisResults.topics,
-            goldenQuotes: analysisResults.goldenQuotes,
-            userTitles: analysisResults.userTitles,
-            messageCount: messages.length,
-            tokenUsage: analysisResults.tokenUsage
-          })
-
-          await this.setCooldown(targetGroupId, 'user', messages.length)
-
-          logger.mark(`[报告] 用户触发今天报告生成成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
-
-          const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
-          const img = await this.renderReport(savedReport || analysisResults, {
-            groupName,
-            model: aiService?.model || '',
-            tokenUsage: (savedReport || analysisResults).tokenUsage,
-            date: queryDate
-          })
-
-          if (img) {
-            return this.reply(img)
-          } else {
-            return this.reply('报告已生成并保存，但渲染失败', true)
-          }
-        } finally {
-          // 无论成功失败都释放锁
-          await this.releaseGeneratingLock(targetGroupId, queryDate)
-        }
+        return this.reply('渲染失败', true)
       }
-
-      // ===== 历史报告逻辑 =====
-      // 保留期内：消息还在，可以比较差异、按需重新生成
-      // 保留期外：消息已过期，只能查询已缓存的报告
 
       const messages = await messageCollector.getMessages(targetGroupId, 1, queryDate)
-      const config = Config.get()
-      const retentionDays = config?.retentionDays || 7
-      const daysSinceQuery = moment().startOf('day').diff(moment(queryDate, 'YYYY-MM-DD').startOf('day'), 'days')
-      const isWithinRetention = daysSinceQuery < retentionDays
 
       if (messages.length === 0) {
-        // 消息已过期或未收集，检查是否有已缓存的报告
-        if (report) {
-          logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告（消息已过期，返回缓存报告）`)
-
-          const img = await this.renderReport(report, {
-            groupName,
-            model: aiService?.model || '',
-            tokenUsage: report.tokenUsage,
-            date: queryDate
-          })
-
-          if (img) {
-            return this.reply(img)
-          } else {
-            return this.sendTextSummary(report, dateLabel, queryDate)
-          }
-        }
-
-        return this.reply(`${dateLabel}没有消息记录${isWithinRetention ? '（未收集到消息）' : '（消息已过期且无缓存报告）'}`, true)
+        return this.reply('今天还没有消息，无法生成报告', true)
       }
-
-      // 消息存在（保留期内），检查缓存差异决定是否重新生成
-      if (report) {
-        const cachedMessageCount = report.messageCount || 0
-        const currentMessageCount = messages.length
-        const messageDiff = Math.abs(currentMessageCount - cachedMessageCount)
-
-        // 消息数差异 <= 50 条 → 使用缓存（历史已定型）
-        if (messageDiff <= 50) {
-          logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告（缓存有效，消息差异: ${messageDiff}条）`)
-
-          const img = await this.renderReport(report, {
-            groupName,
-            model: aiService?.model || '',
-            tokenUsage: report.tokenUsage,
-            date: queryDate
-          })
-
-          if (img) {
-            return this.reply(img)
-          } else {
-            return this.sendTextSummary(report, dateLabel, queryDate)
-          }
-        }
-
-        // 消息数差异 > 50 条 → 无视冷却，重新生成
-        logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告 - 消息数差异过大 (缓存: ${cachedMessageCount}, 当前: ${currentMessageCount}, 差异: ${messageDiff})，将重新生成`)
-      }
-
-      // 无缓存或差异过大 → 生成报告
-      // 历史日期不检查冷却，因为生成后即为定型报告，再次触发会直接使用缓存
 
       // 尝试获取生成锁
       if (!await this.acquireGeneratingLock(targetGroupId, queryDate)) {
@@ -952,9 +817,9 @@ export class ReportPlugin {
       }
 
       try {
-        await this.reply(`正在生成${dateLabel}的水群分析${groupHint}（${messages.length}条消息），请稍候...`)
+        await this.reply(`正在生成今天的水群分析${groupHint}（${messages.length}条消息），请稍候...`)
 
-        logger.info(`[报告] 用户 ${e.user_id} 触发生成群 ${targetGroupId} (${groupName}) 的${dateLabel}报告 (消息数: ${messages.length})`)
+        logger.info(`[报告] 用户 ${e.user_id} 触发生成群 ${targetGroupId} (${groupName}) 的今天报告 (消息数: ${messages.length})`)
 
         const analysisResults = await this.performAnalysis(messages, 1, targetGroupId, queryDate)
 
@@ -971,9 +836,9 @@ export class ReportPlugin {
           tokenUsage: analysisResults.tokenUsage
         })
 
-        // 历史日期不设置冷却，生成后即为定型报告，再次触发会直接使用缓存
+        await this.setCooldown(targetGroupId, 'user', messages.length)
 
-        logger.mark(`[报告] 用户触发${dateLabel}报告生成成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
+        logger.mark(`[报告] 用户触发今天报告生成成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
 
         const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
         const img = await this.renderReport(savedReport || analysisResults, {
@@ -995,6 +860,117 @@ export class ReportPlugin {
     } catch (err) {
       logger.error(`[报告] 查询报告错误: ${err}`)
       return this.reply(`查询报告失败: ${err.message}`, true)
+    }
+  }
+
+  async parseFriendReportParams(e) {
+    if (!e?.isGroup || !e?.group_id) {
+      await this.reply('`#水友分析` 仅支持在群聊中使用', true)
+      return null
+    }
+
+    const userInfo = UserParser.parseUser(e, { allowMention: true, defaultToSelf: true })
+    if (!userInfo?.userId) {
+      await this.reply('无法识别要分析的用户', true)
+      return null
+    }
+
+    const targetGroupId = e.group_id
+    const queryDate = moment().format('YYYY-MM-DD')
+    let groupName = `群${targetGroupId}`
+
+    try {
+      const group = Bot.pickGroup?.(targetGroupId)
+      const groupInfo = await group?.getInfo?.()
+      groupName = groupInfo?.group_name || groupInfo?.name || groupName
+    } catch {}
+
+    return {
+      targetGroupId,
+      queryDate,
+      groupName,
+      userInfo
+    }
+  }
+
+  async generateFriendReport(e) {
+    if (!this.isEnabled()) {
+      return this.reply('水群分析功能已关闭，请在锅巴配置中开启水群分析', true)
+    }
+
+    const messageCollector = await getMessageCollector()
+    const aiService = await getAIService()
+
+    if (!messageCollector) {
+      return this.reply('报告功能未就绪', true)
+    }
+
+    try {
+      const params = await this.parseFriendReportParams(e)
+      if (!params) return
+
+      const {
+        targetGroupId,
+        queryDate,
+        groupName,
+        userInfo
+      } = params
+
+      const targetUserId = String(userInfo.userId)
+      const targetNickname = userInfo.nickname || `用户${targetUserId}`
+      const allMessages = await messageCollector.getMessages(targetGroupId, 1, queryDate)
+      const messages = allMessages.filter(msg => String(msg.user_id) === targetUserId)
+      const lockScope = `user:${targetGroupId}:${targetUserId}`
+
+      if (messages.length === 0) {
+        return this.reply(
+          userInfo.isMentioned
+            ? `${targetNickname} 今天在本群还没有消息，无法生成分析`
+            : '你今天在本群还没有消息，无法生成分析',
+          true
+        )
+      }
+
+      if (!await this.acquireGeneratingLock(lockScope, queryDate)) {
+        return this.reply('该水友分析正在生成中，请稍后再试', true)
+      }
+
+      try {
+        await this.reply(
+          userInfo.isMentioned
+            ? `正在生成 ${targetNickname} 的水友分析（${messages.length}条消息），请稍候...`
+            : `正在生成你的水友分析（${messages.length}条消息），请稍候...`
+        )
+
+        logger.info(
+          `[报告] 用户 ${e.user_id} 触发群 ${targetGroupId} (${groupName}) 的水友分析，目标用户 ${targetUserId} (${targetNickname})，消息数: ${messages.length}`
+        )
+
+        const analysisResults = await this.performAnalysis(messages, 1, targetGroupId, queryDate)
+
+        if (!analysisResults) {
+          return this.reply('分析失败，请查看日志', true)
+        }
+
+        const img = await this.renderReport(analysisResults, {
+          groupName: `${groupName} · 水友分析`,
+          focusName: targetNickname,
+          model: aiService?.model || '',
+          tokenUsage: analysisResults.tokenUsage,
+          date: queryDate
+        })
+
+        if (img) {
+          return this.reply(img)
+        }
+
+        return this.reply('水友分析已生成，但渲染失败', true)
+      } finally {
+        await this.releaseGeneratingLock(lockScope, queryDate)
+      }
+    } catch (err) {
+      logger.error(`[报告] 水友分析错误: ${err}`)
+      return this.reply(`水友分析失败: ${err.message}`, true)
     }
   }
 
@@ -1052,29 +1028,29 @@ export class ReportPlugin {
     }
 
     try {
-      // 解析参数（群号、日期、权限校验）
-      const params = await this.parseReportParams(e, /水群强制分析\s*(\d{5,12})?\s*(今天|昨天|前天|\d{4}-\d{2}-\d{2})?/)
+      // 解析参数（群号、权限校验）
+      const params = await this.parseReportParams(e, /^#水群强制分析(?:\s+(\d{5,12}))?$/)
       if (!params) return // Permission denied or invalid params, already replied
 
-      const { targetGroupId, queryDate: targetDate, dateLabel, isRemote, groupName } = params
+      const { targetGroupId, queryDate: targetDate, isRemote, groupName } = params
       const groupHint = isRemote ? ` [${groupName}]` : ''
 
-      await this.reply(`正在强制生成${dateLabel}的水群分析${groupHint}，请稍候...`)
+      await this.reply(`正在强制生成今天的水群分析${groupHint}，请稍候...`)
 
       // 获取指定日期的消息（直接传入目标日期）
       const messages = await messageCollector.getMessages(targetGroupId, 1, targetDate)
 
       if (messages.length === 0) {
-        return this.reply(`${dateLabel}还没有消息，无法生成报告`, true)
+        return this.reply('今天还没有消息，无法生成报告', true)
       }
 
       // 尝试获取生成锁（即使主人也需等待当前生成完成）
       if (!await this.acquireGeneratingLock(targetGroupId, targetDate)) {
-        return this.reply('该日期的报告正在生成中，请稍后再试', true)
+          return this.reply('今天的报告正在生成中，请稍后再试', true)
       }
 
       try {
-        logger.info(`[报告] 主人 ${e.user_id} 强制生成群 ${targetGroupId} (${groupName}) 的${dateLabel}报告 (消息数: ${messages.length})`)
+        logger.info(`[报告] 主人 ${e.user_id} 强制生成群 ${targetGroupId} (${groupName}) 的今天报告 (消息数: ${messages.length})`)
 
         // 执行分析（强制重新生成，不使用批次缓存）
         const analysisResults = await this.performAnalysis(messages, 1, targetGroupId, targetDate, { forceRegenerate: true })
@@ -1096,7 +1072,7 @@ export class ReportPlugin {
         // 设置冷却标记（主人下次触发依然会无视冷却）
         await this.setCooldown(targetGroupId, 'master', messages.length)
 
-        logger.mark(`[报告] 主人强制生成${dateLabel}报告成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
+        logger.mark(`[报告] 主人强制生成今天报告成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
 
         // 渲染并发送报告
         const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, targetDate)
@@ -1471,6 +1447,7 @@ export class ReportPlugin {
         version: this.version,
         model: options.model || '',
         groupName: options.groupName || '未知群聊',
+        focusName: options.focusName || '',
 
         // 基础统计
         totalMessages: stats.basic.totalMessages,
