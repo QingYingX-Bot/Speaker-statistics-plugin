@@ -1,40 +1,87 @@
 <!DOCTYPE html>
-<html>
-	<head>
-		<style>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
 {{INLINE_STYLE}}
-</style>
-	</head>
-	<body>
-		<div class="container">
-			<div class="header" style="{{BACKGROUND_STYLE}}">
-				<div class="title">{{TITLE}}</div>
-				<div class="user-profile">
-					<img class="avatar" src="{{AVATAR_URL}}" onerror="this.style.display='none'" />
-					<div class="user-info">
-						<div class="nickname">{{DISPLAY_NAME}}</div>
-						<div class="info-container">
-							<div class="info-item">
-								<div class="info-icon clock-icon"></div>
-								<span class="info-label">最后发言时间：</span>
-								<span class="info-value">{{LAST_SPEAKING_TIME}}</span>
-							</div>
-							<div class="info-item">
-								<div class="info-icon globe-icon"></div>
-								<span class="info-value">{{GLOBAL_INFO}}</span>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="stats-section">
-				<div class="stats-grid">
-					{{STATS_GRID}}
-				</div>
-			</div>
-			<div class="footer">
-				生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}
-			</div>
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header" style="{{BACKGROUND_STYLE}}">
+      <div class="title">{{TITLE}}</div>
+      <div class="user-profile">
+        <img class="avatar" src="{{AVATAR_URL}}" onerror="this.style.display='none'" />
+        <div class="user-info">
+          <div class="nickname">{{DISPLAY_NAME}}</div>
+          <div class="info-container">
+            <div class="info-item">
+              <div class="info-icon clock-icon"></div>
+              <span class="info-label">最后发言：</span>
+              <span class="info-value">{{LAST_SPEAKING_TIME}}</span>
+            </div>
+            <div class="info-item">
+              <div class="info-icon globe-icon"></div>
+              <span class="info-value">{{GLOBAL_INFO}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="overview-section">
+		<div class="section-title">基础概览</div>
+		<div class="overview-grid">
+		  {{OVERVIEW_CARDS}}
 		</div>
-	</body>
+	</section>
+
+    <section class="period-section">
+      <div class="section-title">周期统计</div>
+      <div class="table-wrap">
+        <table class="period-table">
+          <thead>
+            <tr>
+              <th scope="col">维度</th>
+              {{PERIOD_HEADERS}}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">消息数</th>
+              {{PERIOD_COUNT_CELLS}}
+            </tr>
+            <tr>
+              <th scope="row">字数</th>
+              {{PERIOD_WORD_CELLS}}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="message-types-section">
+      <div class="section-title">消息类型统计</div>
+      <div class="table-wrap">
+        <table class="message-type-table">
+          <thead>
+            <tr>
+              <th scope="col">类型</th>
+              {{MESSAGE_TYPE_HEADERS}}
+            </tr>
+          </thead>
+          <tbody>
+            {{MESSAGE_TYPE_ROWS}}
+          </tbody>
+        </table>
+      </div>
+      <div class="message-types-note">{{MESSAGE_TYPES_NOTE}}</div>
+    </section>
+
+    <footer class="footer">
+      生成时间：{{GENERATE_TIME}} | Speaker-statistics-plugin v{{VERSION}}
+    </footer>
+  </div>
+</body>
 </html>

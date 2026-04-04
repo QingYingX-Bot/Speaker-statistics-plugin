@@ -56,6 +56,27 @@ export default class BaseAnalyzer {
   }
 
   /**
+   * 渲染提示词模板
+   * 支持 {{variable}} 占位符替换
+   * @param {string} template - 模板字符串
+   * @param {Object} variables - 变量映射
+   * @returns {string} 渲染后的提示词
+   */
+  renderPromptTemplate(template, variables = {}) {
+    if (!template || typeof template !== 'string') {
+      return ''
+    }
+
+    return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => {
+      const value = variables[key]
+      if (value === null || value === undefined) {
+        return ''
+      }
+      return String(value)
+    })
+  }
+
+  /**
    * 从 AI 响应中解析 JSON
    * @param {string} content - AI 返回的文本
    * @returns {Object|Array|null} 解析后的 JSON 或 null

@@ -9,7 +9,7 @@ import { logger } from '#lib'
 export default class TopicAnalyzer extends BaseAnalyzer {
   constructor(aiService, config = {}) {
     super(aiService, config)
-    // 移除话题数量限制，让AI根据实际情况返回所有话题
+    this.promptTemplate = typeof config.promptTemplate === 'string' ? config.promptTemplate : ''
   }
 
   /**
@@ -98,6 +98,17 @@ export default class TopicAnalyzer extends BaseAnalyzer {
    * @param {string} formattedMessages - 格式化后的消息
    */
   buildPrompt(formattedMessages) {
+    const template = this.promptTemplate.trim() || this.getDefaultPromptTemplate()
+
+    return this.renderPromptTemplate(template, {
+      formattedMessages
+    })
+  }
+
+  /**
+   * 获取默认提示词模板
+   */
+  getDefaultPromptTemplate() {
     return `你是一个帮我进行群聊信息总结的助手,生成总结内容时,你需要严格遵守下面的几个准则:
 
 请分析接下来提供的群聊记录,提取出所有主要话题。不要限制话题数量，但要保持有必要才作为一个话题。根据实际聊天内容提取所有最有意义的话题。
@@ -120,7 +131,7 @@ export default class TopicAnalyzer extends BaseAnalyzer {
 群聊记录格式: [HH:MM] [用户ID]: 消息内容
 
 群聊记录:
-${formattedMessages}
+{{formattedMessages}}
 
 ---
 

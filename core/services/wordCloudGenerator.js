@@ -25,6 +25,7 @@ export default class WordCloudGenerator {
       groupId = 'Unknown',
       groupName = '未知群聊',
       days = 1,
+      timeRangeText = '',
       userName = null,  // Personal word cloud user name
       maxWords = this.config.maxWords || 100,
       minLength = this.config.minLength || 2,
@@ -97,7 +98,7 @@ export default class WordCloudGenerator {
       // 准备模板数据
       const templateData = {
         groupName,
-        timeRange: this.getTimeRangeText(days),
+        timeRange: timeRangeText || this.getTimeRangeText(days),
         messageCount: messages.length,
         createTime: moment().format('YYYY-MM-DD HH:mm:ss'),
         wordListJson: JSON.stringify(wordList),

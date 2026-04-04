@@ -475,19 +475,15 @@ class TemplateManager {
         const activeDays = parseInt(userData.active_days || 0, 10)
         const continuousDays = parseInt(userData.continuous_days || 0, 10)
         const lastSpeakingTime = this.formatDate(userData.last_speaking_time)
-        
+
         // 计算平均每日发言数
         const averageDaily = activeDays > 0 ? Math.round(totalCount / activeDays) : 0
-        
+
         // 获取排名和占比信息
         const globalRank = userData.global_rank || null
         const messagePercentage = userData.message_percentage || '0.00'
-        const todayCount = parseInt(userData.today_count || 0, 10)
-        const todayWords = parseInt(userData.today_words || 0, 10)
-        const monthCount = parseInt(userData.month_count || 0, 10)
-        const monthWords = parseInt(userData.month_words || 0, 10)
         const groupCount = parseInt(userData.group_count || 0, 10)
-        
+
         // 生成全局信息（群个数、总字数和总发言数）
         let globalInfo = `累计发言 ${CommonUtils.formatNumber(totalCount)} 条 · 累计字数 ${CommonUtils.formatNumber(totalWords)} 字`
         if (groupCount > 0) {
@@ -495,75 +491,108 @@ class TemplateManager {
         }
         const avatarUrl = await this.getUserAvatarUrl(userId, groupId)
 
-        const statCards = []
-        
-        // 今日数据（跨两列）
-        statCards.push(`
-					<div class="stat-card span-2">
-						<div class="stat-label">今日发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(todayCount)}</div>
-						${todayWords > 0 ? `<div class="stat-subvalue">${CommonUtils.formatNumber(todayWords)} 字</div>` : ''}
-					</div>
-        `)
-        
-        // 本月数据（跨两列）
-        if (monthCount !== totalCount && monthCount > 0) {
-            statCards.push(`
-                    <div class="stat-card span-2">
-						<div class="stat-label">本月发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(monthCount)}</div>
-						${monthWords > 0 ? `<div class="stat-subvalue">${CommonUtils.formatNumber(monthWords)} 字</div>` : ''}
-                    </div>
-            `)
+        const periodOrder = [
+            { key: 'hour', label: '时' },
+            { key: 'day', label: '日' },
+            { key: 'week', label: '周' },
+            { key: 'month', label: '月' },
+            { key: 'year', label: '年' },
+            { key: 'total', label: '总' }
+        ]
+
+        const parsePeriodBucket = (raw = {}) => ({
+            count: Math.max(0, parseInt(raw.count || 0, 10) || 0),
+            words: Math.max(0, parseInt(raw.words || 0, 10) || 0)
+        })
+
+        const rawPeriodStats = userData.period_stats || {}
+        const periodStats = {
+            hour: parsePeriodBucket(rawPeriodStats.hour || {}),
+            day: parsePeriodBucket(rawPeriodStats.day || { count: userData.today_count, words: userData.today_words }),
+            week: parsePeriodBucket(rawPeriodStats.week || {}),
+            month: parsePeriodBucket(rawPeriodStats.month || { count: userData.month_count, words: userData.month_words }),
+            year: parsePeriodBucket(rawPeriodStats.year || {}),
+            total: parsePeriodBucket(rawPeriodStats.total || { count: totalCount, words: totalWords })
         }
-        
-        // 总数据
-        statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">总发言数</div>
-						<div class="stat-value">${CommonUtils.formatNumber(totalCount)}</div>
-					</div>
-        `)
-        
-        statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">总字数</div>
-						<div class="stat-value">${CommonUtils.formatNumber(totalWords)}</div>
-					</div>
-        `)
-        
-        // 天数相关
-        statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">连续发言天数</div>
-						<div class="stat-value">${CommonUtils.formatNumber(continuousDays)}</div>
-					</div>
-        `)
-        
-        statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">总发言天数</div>
-						<div class="stat-value">${CommonUtils.formatNumber(activeDays)}</div>
-					</div>
-        `)
-        
-        // 平均和占比
+
+        const periodHeaderCellsHtml = periodOrder
+            .map(period => `<th scope="col">${period.label}</th>`)
+            .join('')
+        const periodCountCellsHtml = periodOrder
+            .map(period => `<td>${CommonUtils.formatNumber(periodStats[period.key]?.count || 0)}</td>`)
+            .join('')
+        const periodWordCellsHtml = periodOrder
+            .map(period => `<td>${CommonUtils.formatNumber(periodStats[period.key]?.words || 0)}</td>`)
+            .join('')
+
+        const overviewCards = [
+            { label: '连续发言', value: `${CommonUtils.formatNumber(continuousDays)} 天` },
+            { label: '活跃天数', value: `${CommonUtils.formatNumber(activeDays)} 天` },
+            { label: '日均发言', value: `${CommonUtils.formatNumber(averageDaily)} 条` },
+            { label: '全局排名', value: globalRank ? `#${CommonUtils.formatNumber(globalRank)}` : '暂无' }
+        ]
+
         if (messagePercentage !== '0.00' && messagePercentage !== '0' && parseFloat(messagePercentage) > 0) {
-            statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">消息占比</div>
-						<div class="stat-value">${messagePercentage}%</div>
-					</div>
-            `)
+            overviewCards.push({ label: '消息占比', value: `${messagePercentage}%` })
         }
-        
-        statCards.push(`
-					<div class="stat-card">
-						<div class="stat-label">平均每日发言</div>
-						<div class="stat-value">${CommonUtils.formatNumber(averageDaily)}</div>
-					</div>
-        `)
-        const statsGridHtml = statCards.join('\n\t\t\t\t\t')
+
+        const overviewCardsHtml = overviewCards
+            .map(card => `
+                <div class="overview-card">
+                    <div class="overview-label">${card.label}</div>
+                    <div class="overview-value">${card.value}</div>
+                </div>
+            `)
+            .join('')
+
+        const parseTypeBucket = (raw = {}) => ({
+            textMessages: Math.max(0, parseInt(raw.textMessages || 0, 10) || 0),
+            replyMessages: Math.max(0, parseInt(raw.replyMessages || 0, 10) || 0),
+            atMentions: Math.max(0, parseInt(raw.atMentions || 0, 10) || 0),
+            emojis: Math.max(0, parseInt(raw.emojis || 0, 10) || 0),
+            images: Math.max(0, parseInt(raw.images || 0, 10) || 0),
+            links: Math.max(0, parseInt(raw.links || 0, 10) || 0),
+            videos: Math.max(0, parseInt(raw.videos || 0, 10) || 0),
+            mediaMessages: Math.max(0, parseInt(raw.mediaMessages || 0, 10) || 0)
+        })
+
+        const rawTypeStats = userData.message_type_stats || {}
+        const rawTypePeriods = rawTypeStats.periods || {}
+        const typePeriodBuckets = {
+            hour: parseTypeBucket(rawTypePeriods.hour || rawTypeStats.hour || {}),
+            day: parseTypeBucket(rawTypePeriods.day || rawTypeStats.day || rawTypeStats.today || {}),
+            week: parseTypeBucket(rawTypePeriods.week || rawTypeStats.week || {}),
+            month: parseTypeBucket(rawTypePeriods.month || rawTypeStats.month || {}),
+            year: parseTypeBucket(rawTypePeriods.year || rawTypeStats.year || {}),
+            total: parseTypeBucket(rawTypePeriods.total || rawTypeStats.total || {})
+        }
+        const typeStatsAvailable = rawTypeStats.available !== false
+        const typeStatsNote = rawTypeStats.note || '消息类型统计基于消息采集数据'
+
+        const typeItems = [
+            { key: 'textMessages', label: '文本消息' },
+            { key: 'replyMessages', label: '回复消息' },
+            { key: 'atMentions', label: '艾特次数' },
+            { key: 'emojis', label: '表情总数' },
+            { key: 'images', label: '图片总数' },
+            { key: 'links', label: '链接总数' },
+            { key: 'videos', label: '视频总数' },
+            { key: 'mediaMessages', label: '媒体消息' }
+        ]
+
+        const messageTypeRowsHtml = typeStatsAvailable
+            ? typeItems.map(item => {
+                const cells = periodOrder
+                    .map(period => `<td>${CommonUtils.formatNumber(typePeriodBuckets[period.key]?.[item.key] || 0)}</td>`)
+                    .join('')
+                return `
+                    <tr>
+                        <th scope="row">${item.label}</th>
+                        ${cells}
+                    </tr>
+                `
+            }).join('\n')
+            : `<tr><td class="message-type-empty" colspan="${periodOrder.length + 1}">消息类型统计不可用</td></tr>`
 
         return this.replaceTemplateVars(template, {
             BACKGROUND_STYLE: backgroundStyle,
@@ -572,7 +601,13 @@ class TemplateManager {
             DISPLAY_NAME: displayName,
             LAST_SPEAKING_TIME: lastSpeakingTime,
             GLOBAL_INFO: globalInfo,
-            STATS_GRID: statsGridHtml,
+            OVERVIEW_CARDS: overviewCardsHtml,
+            PERIOD_HEADERS: periodHeaderCellsHtml,
+            PERIOD_COUNT_CELLS: periodCountCellsHtml,
+            PERIOD_WORD_CELLS: periodWordCellsHtml,
+            MESSAGE_TYPE_HEADERS: periodHeaderCellsHtml,
+            MESSAGE_TYPE_ROWS: messageTypeRowsHtml,
+            MESSAGE_TYPES_NOTE: typeStatsNote,
             GENERATE_TIME: this.getGenerateTime(),
             VERSION: this.version
         })

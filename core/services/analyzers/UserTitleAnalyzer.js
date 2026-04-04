@@ -11,6 +11,7 @@ export default class UserTitleAnalyzer extends BaseAnalyzer {
     super(aiService, config)
     this.maxTitles = config.max_user_titles || 8
     this.minMessages = config.min_messages_for_title || 5
+    this.promptTemplate = typeof config.promptTemplate === 'string' ? config.promptTemplate : ''
   }
 
   /**
@@ -145,9 +146,21 @@ export default class UserTitleAnalyzer extends BaseAnalyzer {
       })
       .join('\n\n')
 
+    const template = this.promptTemplate.trim() || this.getDefaultPromptTemplate()
+
+    return this.renderPromptTemplate(template, {
+      maxTitles: this.maxTitles,
+      userText
+    })
+  }
+
+  /**
+   * 获取默认提示词模板
+   */
+  getDefaultPromptTemplate() {
     return `你是一个群聊行为分析专家,负责基于用户的聊天行为模式为他们分配有趣的称号和 MBTI 人格类型。
 
-请为以下用户分配创意称号和 MBTI 类型,最多选择 ${this.maxTitles} 位最有特色的用户。
+请为以下用户分配创意称号和 MBTI 类型,最多选择 {{maxTitles}} 位最有特色的用户。
 
 称号要求:
 1. **有趣且贴切**: 称号应该幽默、有创意,同时准确反映用户的行为特征
@@ -174,11 +187,11 @@ MBTI 类型:
 - 随机、时间不定 → P (知觉)
 
 用户行为数据:
-${userText}
+{{userText}}
 
 ---
 
-请选择最多 ${this.maxTitles} 位最有特色的用户,为他们分配称号和 MBTI,并简要说明理由。
+请选择最多 {{maxTitles}} 位最有特色的用户,为他们分配称号和 MBTI,并简要说明理由。
 
 **重要：你必须只返回一个 JSON 数组，不要包含任何说明文字、代码块标记或其他内容。直接输出 JSON，从 [ 开始，以 ] 结束。**
 **重要：user_id 字段必须填写用户ID（纯数字），不要填写昵称！**

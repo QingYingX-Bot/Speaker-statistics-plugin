@@ -17,7 +17,7 @@ export function getGroupAnalysisSchemas() {
       component: 'InputNumber',
       componentProps: {
         min: 1,
-        max: 30
+        max: 90
       }
     },
     {
@@ -208,6 +208,49 @@ export function getGroupAnalysisSchemas() {
       componentProps: {
         min: 1,
         max: 50
+      }
+    },
+    {
+      label: 'AI 提示词模板（高级）',
+      component: 'Divider'
+    },
+    {
+      field: 'groupAnalysis.analysis.topic.promptTemplate',
+      label: '话题分析提示词模板',
+      bottomHelpMessage: '支持变量：{{formattedMessages}}。建议在 data/config/group-analysis.json 中编辑多行内容。',
+      component: 'InputTextArea',
+      componentProps: {
+        rows: 12,
+        autoSize: {
+          minRows: 8,
+          maxRows: 24
+        }
+      }
+    },
+    {
+      field: 'groupAnalysis.analysis.goldenQuote.promptTemplate',
+      label: '金句提取提示词模板',
+      bottomHelpMessage: '支持变量：{{formattedMessages}}、{{maxQuotes}}。建议在配置文件中多行编辑。',
+      component: 'InputTextArea',
+      componentProps: {
+        rows: 12,
+        autoSize: {
+          minRows: 8,
+          maxRows: 24
+        }
+      }
+    },
+    {
+      field: 'groupAnalysis.analysis.userTitle.promptTemplate',
+      label: '用户称号提示词模板',
+      bottomHelpMessage: '支持变量：{{userText}}、{{maxTitles}}。建议在配置文件中多行编辑。',
+      component: 'InputTextArea',
+      componentProps: {
+        rows: 12,
+        autoSize: {
+          minRows: 8,
+          maxRows: 24
+        }
       }
     },
     {

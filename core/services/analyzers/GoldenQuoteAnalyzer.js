@@ -12,6 +12,7 @@ export default class GoldenQuoteAnalyzer extends BaseAnalyzer {
     this.maxQuotes = config.max_golden_quotes || 5
     this.minLength = config.min_quote_length || 5
     this.maxLength = config.max_quote_length || 100
+    this.promptTemplate = typeof config.promptTemplate === 'string' ? config.promptTemplate : ''
   }
 
   /**
@@ -112,9 +113,21 @@ export default class GoldenQuoteAnalyzer extends BaseAnalyzer {
    * @param {string} formattedMessages - 格式化后的消息
    */
   buildPrompt(formattedMessages) {
+    const template = this.promptTemplate.trim() || this.getDefaultPromptTemplate()
+
+    return this.renderPromptTemplate(template, {
+      maxQuotes: this.maxQuotes,
+      formattedMessages
+    })
+  }
+
+  /**
+   * 获取默认提示词模板
+   */
+  getDefaultPromptTemplate() {
     return `你是一个群聊金句识别专家,负责从群聊记录中挑选出最有价值的语句。
 
-请从以下群聊记录中选出最多 ${this.maxQuotes} 条"群圣经"(金句),这些语句应该符合以下标准:
+请从以下群聊记录中选出最多 {{maxQuotes}} 条"群圣经"(金句),这些语句应该符合以下标准:
 1. **有趣幽默**: 让人会心一笑的段子、梗、神回复
 2. **富有哲理**: 发人深省、有深度的思考和观点
 3. **震撼力强**: 出人意料、一针见血的评论
@@ -131,7 +144,7 @@ export default class GoldenQuoteAnalyzer extends BaseAnalyzer {
 群聊记录格式: [用户ID]: 消息内容
 
 群聊记录:
-${formattedMessages}
+{{formattedMessages}}
 
 ---
 
