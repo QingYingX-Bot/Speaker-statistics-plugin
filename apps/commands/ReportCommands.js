@@ -30,7 +30,7 @@ class ReportCommands {
   static getRules() {
     return [
       {
-        reg: '^#水群分析(?:\\s+(\\d{5,12}))?$',
+        reg: '^#水群分析(?:\\s+(?:\\d{5,12}|今[天日]|昨[天日]))?$',
         fnc: 'generateReport'
       },
       {
@@ -285,9 +285,10 @@ export class ReportPlugin {
    * 检查群聊报告生成冷却状态
    * @param {number} groupId - 群号
    * @param {boolean} ignoreCooldown - 是否忽略冷却限制（主人/定时任务使用）
+   * @param {string|null} queryDate - 当前查询日期（YYYY-MM-DD）
    * @returns {Object} { inCooldown, remainingMinutes, lastGenerated }
    */
-  async checkCooldown(groupId, ignoreCooldown = false) {
+  async checkCooldown(groupId, ignoreCooldown = false, queryDate = null) {
     if (ignoreCooldown) {
       return { inCooldown: false, remainingMinutes: 0, lastGenerated: null }
     }
@@ -309,14 +310,20 @@ export class ReportPlugin {
       const now = Date.now()
       const elapsedMinutes = Math.floor((now - generatedAt) / 1000 / 60)
       const remainingMinutes = cooldownMinutes - elapsedMinutes
+      const generatedDate = cooldownData.generatedDate || today
+      const targetDate = queryDate || today
+      const isSameDate = generatedDate === targetDate
 
       if (remainingMinutes > 0) {
         return {
-          inCooldown: true,
+          inCooldown: isSameDate,
           remainingMinutes,
           lastGenerated: {
             timestamp: generatedAt,
             generatedBy: cooldownData.generatedBy || 'user',
+            generatedDate,
+            queryDate: targetDate,
+            isSameDate,
             messageCount: parseInt(cooldownData.messageCount || 0),
             elapsedMinutes
           }
@@ -336,22 +343,25 @@ export class ReportPlugin {
    * @param {number} groupId - 群号
    * @param {string} generatedBy - 生成来源 ('user' | 'scheduled' | 'master')
    * @param {number} messageCount - 消息数量
+   * @param {string|null} generatedDate - 对应生成日期（YYYY-MM-DD）
    */
-  async setCooldown(groupId, generatedBy = 'user', messageCount = 0) {
+  async setCooldown(groupId, generatedBy = 'user', messageCount = 0, generatedDate = null) {
     try {
       const today = moment().format('YYYY-MM-DD')
       const cooldownKey = `Yz:groupManager:cooldown:${groupId}:${today}`
+      const targetDate = generatedDate || today
 
       await redis.hSet(cooldownKey, {
         generatedAt: Date.now().toString(),
         generatedBy,
+        generatedDate: targetDate,
         messageCount: messageCount.toString()
       })
 
       // 设置过期时间为24小时（跨日自动清理）
       await redis.expire(cooldownKey, 86400)
 
-      logger.debug(`[报告] 已设置冷却标记: 群 ${groupId}, 来源: ${generatedBy}`)
+      logger.debug(`[报告] 已设置冷却标记: 群 ${groupId}, 来源: ${generatedBy}, 报告日期: ${targetDate}`)
     } catch (err) {
       logger.error(`[报告] 设置冷却标记失败: ${err}`)
     }
@@ -481,7 +491,7 @@ export class ReportPlugin {
             })
 
             // 设置冷却标记（防止定时任务后1小时内频繁手动触发）
-            await this.setCooldown(groupId, 'scheduled', messages.length)
+            await this.setCooldown(groupId, 'scheduled', messages.length, targetDate)
 
             logger.mark(`[报告] 群 ${groupId} ${targetDate} 报告生成成功 (${messages.length} 条消息)`)
 
@@ -709,12 +719,25 @@ export class ReportPlugin {
     const isPrivate = !e.isGroup
 
     let specifiedGroupId = null
+    let queryDate = moment().format('YYYY-MM-DD')
+    let dateLabel = '今天'
 
     if (match) {
       for (let i = 1; i < match.length; i++) {
-        if (!match[i]) continue
-        if (/^\d{5,12}$/.test(match[i])) {
-          specifiedGroupId = Number(match[i])
+        if (!match[i]) {
+          continue
+        }
+
+        const arg = String(match[i]).trim()
+
+        if (/^\d{5,12}$/.test(arg)) {
+          specifiedGroupId = Number(arg)
+        } else if (/^(今天|今日)$/.test(arg)) {
+          queryDate = moment().format('YYYY-MM-DD')
+          dateLabel = '今天'
+        } else if (/^(昨天|昨日)$/.test(arg)) {
+          queryDate = moment().subtract(1, 'days').format('YYYY-MM-DD')
+          dateLabel = '昨天'
         }
       }
     }
@@ -746,8 +769,6 @@ export class ReportPlugin {
       return null
     }
 
-    const queryDate = moment().format('YYYY-MM-DD')
-
     let groupName = `群${targetGroupId}`
     try {
       const groupInfo = await group.getInfo?.()
@@ -755,7 +776,7 @@ export class ReportPlugin {
     } catch (err) {
     }
 
-    return { targetGroupId, queryDate, isRemote, groupName, group }
+    return { targetGroupId, queryDate, dateLabel, isRemote, groupName, group }
   }
 
   /**
@@ -775,21 +796,48 @@ export class ReportPlugin {
 
     try {
       // 解析查询参数（群号、权限校验）
-      const params = await this.parseReportParams(e, /^#水群分析(?:\s+(\d{5,12}))?$/)
+      const params = await this.parseReportParams(e, /^#水群分析(?:\s+(\d{5,12}|今[天日]|昨[天日]))?$/)
       if (!params) return
 
-      const { targetGroupId, queryDate, isRemote, groupName } = params
+      const { targetGroupId, queryDate, dateLabel, isRemote, groupName } = params
       const groupHint = isRemote ? ` [${groupName}]` : ''
 
       // 从 Redis 获取指定日期的报告
       let report = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
 
-      const cooldown = await this.checkCooldown(targetGroupId, false)
+      const cooldown = await this.checkCooldown(targetGroupId, false, queryDate)
 
       // 在冷却期内且有缓存 → 直接返回缓存
       if (cooldown.inCooldown && report) {
         const elapsedMinutes = cooldown.lastGenerated?.elapsedMinutes || 0
-        logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的今天报告（冷却中，${elapsedMinutes}分钟前已生成）`)
+        logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告（冷却中，${elapsedMinutes}分钟前已生成）`)
+
+        const img = await this.renderReport(report, {
+          groupName,
+          model: aiService?.model || '',
+          tokenUsage: report.tokenUsage,
+          date: queryDate
+        })
+
+        if (img) {
+          return this.reply(img)
+        }
+
+        return this.reply('渲染失败', true)
+      }
+
+      // 冷却记录存在但日期不一致（例如刚生成了今天，当前查询昨天）→ 直接返回已有缓存
+      if (report && cooldown.lastGenerated?.isSameDate === false) {
+        const elapsedMinutes = cooldown.lastGenerated?.elapsedMinutes || 0
+        const today = moment().format('YYYY-MM-DD')
+        const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD')
+        const generatedDate = cooldown.lastGenerated?.generatedDate
+        const previousLabel = generatedDate === today
+          ? '今天'
+          : (generatedDate === yesterday ? '昨天' : generatedDate)
+        logger.info(
+          `[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告（命中缓存，${elapsedMinutes}分钟前生成的是${previousLabel}）`
+        )
 
         const img = await this.renderReport(report, {
           groupName,
@@ -808,7 +856,7 @@ export class ReportPlugin {
       const messages = await messageCollector.getMessages(targetGroupId, 1, queryDate)
 
       if (messages.length === 0) {
-        return this.reply('今天还没有消息，无法生成报告', true)
+        return this.reply(`${dateLabel}还没有消息，无法生成报告`, true)
       }
 
       // 尝试获取生成锁
@@ -817,9 +865,9 @@ export class ReportPlugin {
       }
 
       try {
-        await this.reply(`正在生成今天的水群分析${groupHint}（${messages.length}条消息），请稍候...`)
+        await this.reply(`正在生成${dateLabel}的水群分析${groupHint}（${messages.length}条消息），请稍候...`)
 
-        logger.info(`[报告] 用户 ${e.user_id} 触发生成群 ${targetGroupId} (${groupName}) 的今天报告 (消息数: ${messages.length})`)
+        logger.info(`[报告] 用户 ${e.user_id} 触发生成群 ${targetGroupId} (${groupName}) 的${dateLabel}报告 (消息数: ${messages.length})`)
 
         const analysisResults = await this.performAnalysis(messages, 1, targetGroupId, queryDate)
 
@@ -836,9 +884,9 @@ export class ReportPlugin {
           tokenUsage: analysisResults.tokenUsage
         })
 
-        await this.setCooldown(targetGroupId, 'user', messages.length)
+        await this.setCooldown(targetGroupId, 'user', messages.length, queryDate)
 
-        logger.mark(`[报告] 用户触发今天报告生成成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
+        logger.mark(`[报告] 用户触发${dateLabel}报告生成成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
 
         const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
         const img = await this.renderReport(savedReport || analysisResults, {
@@ -1070,7 +1118,7 @@ export class ReportPlugin {
         })
 
         // 设置冷却标记（主人下次触发依然会无视冷却）
-        await this.setCooldown(targetGroupId, 'master', messages.length)
+        await this.setCooldown(targetGroupId, 'master', messages.length, targetDate)
 
         logger.mark(`[报告] 主人强制生成今天报告成功 - 群 ${targetGroupId}, 消息数: ${messages.length}`)
 

@@ -1,5 +1,5 @@
 {
-  "name": "speaker-statistics-plugin",
+  "name": "Speaker-statistics-plugin",
   "version": "5.0.1",
   "description": "群聊水群统计插件 for Yunzai-Bot",
   "type": "module",
