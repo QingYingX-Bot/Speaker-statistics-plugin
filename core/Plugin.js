@@ -183,6 +183,22 @@ class Plugin extends plugin {
         return await this.adminCommands.viewArchivedGroups(e)
     }
 
+    async refreshNicknames(e) {
+        return await this.adminCommands.refreshNicknames(e)
+    }
+
+    async refreshAllNicknames(e) {
+        return await this.adminCommands.refreshAllNicknames(e)
+    }
+
+    async cleanInvalidRecords(e) {
+        return await this.adminCommands.cleanInvalidRecords(e)
+    }
+
+    async cleanAllInvalidRecords(e) {
+        return await this.adminCommands.cleanAllInvalidRecords(e)
+    }
+
     async clearCache(e) {
         return await this.adminCommands.clearCache(e)
     }

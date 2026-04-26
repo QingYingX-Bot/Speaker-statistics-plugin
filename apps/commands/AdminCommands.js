@@ -133,6 +133,26 @@ class AdminCommands {
                 permission: 'master'
             },
             {
+                reg: '^#水群刷新昵称$',
+                fnc: 'refreshNicknames',
+                permission: 'master'
+            },
+            {
+                reg: '^#水群总刷新昵称$',
+                fnc: 'refreshAllNicknames',
+                permission: 'master'
+            },
+            {
+                reg: '^#水群清理无效记录$',
+                fnc: 'cleanInvalidRecords',
+                permission: 'master'
+            },
+            {
+                reg: '^#水群总清理无效记录$',
+                fnc: 'cleanAllInvalidRecords',
+                permission: 'master'
+            },
+            {
                 reg: '^#水群清理缓存$',
                 fnc: 'clearCache',
                 permission: 'master'
@@ -665,6 +685,538 @@ class AdminCommands {
             },
             '查看归档列表失败',
             () => e.reply('查询失败，请稍后重试')
+        )
+    }
+
+    /**
+     * 获取当前群成员列表
+     * @param {Object} e 消息事件
+     * @param {string} groupId 群号
+     * @returns {Promise<Map|null>}
+     */
+    async getGroupMemberMap(e, groupId) {
+        const candidates = []
+        const addCandidate = (group) => {
+            if (group && !candidates.includes(group)) {
+                candidates.push(group)
+            }
+        }
+
+        addCandidate(e?.group)
+
+        try {
+            const runtimeGroup = this.dataService.resolveRuntimeGroup?.(groupId)?.group
+            addCandidate(runtimeGroup)
+        } catch {
+            // 忽略运行时群对象解析失败，继续使用事件群对象
+        }
+
+        for (const group of candidates) {
+            if (!group || typeof group.getMemberMap !== 'function') {
+                continue
+            }
+
+            try {
+                const memberMap = await group.getMemberMap()
+                if (memberMap && typeof memberMap.get === 'function' && typeof memberMap.size === 'number' && memberMap.size > 0) {
+                    return memberMap
+                }
+            } catch (err) {
+                globalConfig.warn(`[发言统计] 获取群成员列表失败: ${groupId}`, err?.message || err)
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 从成员 Map 中查找用户
+     * @param {Map} memberMap 群成员 Map
+     * @param {string} userId 用户 ID
+     * @returns {Object|null}
+     */
+    getMemberFromMap(memberMap, userId) {
+        if (!memberMap) return null
+
+        const stringId = String(userId)
+        const rawId = stringId.replace(/^(dc|tg)_/i, '')
+        const candidates = [stringId]
+
+        if (rawId && rawId !== stringId) {
+            candidates.push(rawId)
+        }
+
+        if (/^\d+$/.test(rawId)) {
+            const numberId = Number(rawId)
+            if (Number.isSafeInteger(numberId)) {
+                candidates.push(numberId)
+            }
+            candidates.push(`dc_${rawId}`, `tg_${rawId}`)
+        }
+
+        for (const candidate of candidates) {
+            const direct = memberMap.get(candidate)
+            if (direct) return direct
+        }
+
+        const stringCandidates = new Set(candidates.map(candidate => String(candidate)))
+
+        for (const [key, value] of memberMap) {
+            if (stringCandidates.has(String(key))) {
+                return value
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 从群成员对象中提取最新可展示昵称
+     * @param {Object|string} member 群成员对象
+     * @param {string} userId 用户 ID
+     * @returns {string}
+     */
+    extractMemberNickname(member, userId) {
+        if (!member) return ''
+        if (typeof member === 'string') return member.trim()
+
+        const nickname = member.card
+            || member.nickname
+            || member.nick
+            || member.name
+            || member.username
+            || member.remark
+            || ''
+
+        return String(nickname || '')
+            .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+            .replace(/[\u2000-\u200A\u2028-\u2029]/g, ' ')
+            .replace(/[\s\u00A0]+/g, ' ')
+            .trim()
+            || `用户${userId}`
+    }
+
+    /**
+     * 创建转发消息
+     * @param {Object} e 消息事件
+     * @param {string} title 转发标题
+     * @param {string[]} pages 文本页
+     * @returns {Object}
+     */
+    makeForward(e, title, pages) {
+        return common.makeForwardMsg(e, pages.filter(Boolean).map(page => [page]), title)
+    }
+
+    /**
+     * 取得当前 Bot.gl 中可维护的群
+     * @param {string} contextLog 日志上下文
+     * @returns {Promise<Array>}
+     */
+    async getMaintenanceGroupEntries(contextLog) {
+        await this.refreshBotGroupList()
+        const runtimeEntries = this.dataService.getRuntimeGroupEntries()
+        if (!runtimeEntries || runtimeEntries.length === 0) {
+            global.logger?.mark?.(`[发言统计] ${contextLog} 当前群列表为空`)
+            return []
+        }
+
+        const dbGroupIds = new Set((await this.dataService.getGroupIds()).map(id => String(id)))
+        const entries = runtimeEntries.filter(entry => {
+            const candidates = this.dataService.buildGroupIdCandidates?.(entry.groupId) || [entry.groupId]
+            return candidates.some(candidate => dbGroupIds.has(String(candidate)))
+        })
+
+        global.logger?.mark?.(`[发言统计] ${contextLog} 当前群列表: 群数=${runtimeEntries.length}, 有统计记录=${entries.length}`)
+        return entries
+    }
+
+    /**
+     * 获取群展示名称
+     * @param {string} groupId 群号
+     * @param {Object|null} e 消息事件
+     * @param {string} fallbackName 兜底群名
+     * @returns {Promise<string>}
+     */
+    async getGroupDisplayName(groupId, e = null, fallbackName = '') {
+        const normalizedFallback = String(fallbackName || '').trim()
+        if (normalizedFallback) return normalizedFallback
+
+        try {
+            return await this.dataService.getPreferredGroupName(groupId, e)
+        } catch {
+            return this.dataService.getDefaultGroupDisplayName?.(groupId) || `群${groupId}`
+        }
+    }
+
+    /**
+     * 刷新单个群的统计昵称
+     * @param {string} groupId 群号
+     * @param {Map} memberMap 群成员 Map
+     * @param {string} groupName 群名
+     * @returns {Promise<Object>}
+     */
+    async refreshNicknamesForGroup(groupId, memberMap, groupName = '') {
+        const users = await this.dataService.dbService.getAllGroupUsers(groupId)
+        const result = {
+            groupId,
+            groupName,
+            memberCount: memberMap?.size || 0,
+            totalUsers: users?.length || 0,
+            updatedCount: 0,
+            unchangedCount: 0,
+            missingCount: 0,
+            emptyCount: 0,
+            examples: [],
+            skipped: false,
+            reason: ''
+        }
+
+        if (!memberMap || memberMap.size === 0) {
+            result.skipped = true
+            result.reason = '无法获取群成员列表'
+            return result
+        }
+
+        if (!users || users.length === 0) {
+            return result
+        }
+
+        for (const user of users) {
+            const userId = String(user.user_id)
+            const member = this.getMemberFromMap(memberMap, userId)
+            if (!member) {
+                result.missingCount++
+                continue
+            }
+
+            const nextNickname = this.extractMemberNickname(member, userId)
+            if (!nextNickname) {
+                result.emptyCount++
+                continue
+            }
+
+            const currentNickname = String(user.nickname || '').trim()
+            if (currentNickname === nextNickname) {
+                result.unchangedCount++
+                continue
+            }
+
+            const statsJson = this.dataService.dbService._parseStatsJson(user.stats_json)
+            statsJson.nickname = nextNickname
+
+            await this.dataService.dbService.run(
+                'UPDATE user_agg_stats SET stats_json = $1 WHERE group_id = $2 AND user_id = $3',
+                JSON.stringify(statsJson),
+                groupId,
+                userId
+            )
+
+            result.updatedCount++
+            if (result.examples.length < 5) {
+                result.examples.push(`${currentNickname || userId} → ${nextNickname}`)
+            }
+        }
+
+        this.dataService.clearCache(groupId)
+        return result
+    }
+
+    /**
+     * 从群统计中删除指定用户
+     * @param {string} groupId 群号
+     * @param {string[]} userIds 用户 ID 数组
+     * @returns {Promise<Object>}
+     */
+    async deleteUsersFromGroupStats(groupId, userIds) {
+        const uniqueUserIds = [...new Set((userIds || []).map(id => String(id)).filter(Boolean))]
+        const chunkSize = 300
+        let granularChanges = 0
+        let aggChanges = 0
+
+        for (let i = 0; i < uniqueUserIds.length; i += chunkSize) {
+            const chunk = uniqueUserIds.slice(i, i + chunkSize)
+            if (chunk.length === 0) continue
+
+            const placeholders = chunk.map((_, index) => `$${index + 2}`).join(',')
+            const granularResult = await this.dataService.dbService.run(
+                `DELETE FROM message_granular_stats WHERE group_id = $1 AND user_id IN (${placeholders})`,
+                groupId,
+                ...chunk
+            )
+            const aggResult = await this.dataService.dbService.run(
+                `DELETE FROM user_agg_stats WHERE group_id = $1 AND user_id IN (${placeholders})`,
+                groupId,
+                ...chunk
+            )
+
+            granularChanges += granularResult?.changes || 0
+            aggChanges += aggResult?.changes || 0
+        }
+
+        if (uniqueUserIds.length > 0) {
+            this.dataService.clearCache(groupId)
+        }
+
+        return {
+            userCount: uniqueUserIds.length,
+            granularChanges,
+            aggChanges
+        }
+    }
+
+    /**
+     * 清理单个群中已退群用户的统计记录
+     * @param {string} groupId 群号
+     * @param {Map} memberMap 群成员 Map
+     * @param {string} groupName 群名
+     * @returns {Promise<Object>}
+     */
+    async cleanInvalidRecordsForGroup(groupId, memberMap, groupName = '') {
+        const users = await this.dataService.dbService.getAllGroupUsers(groupId)
+        const result = {
+            groupId,
+            groupName,
+            memberCount: memberMap?.size || 0,
+            totalUsers: users?.length || 0,
+            invalidUsers: [],
+            deletedUserCount: 0,
+            deletedGranularRows: 0,
+            deletedAggRows: 0,
+            skipped: false,
+            reason: ''
+        }
+
+        if (!memberMap || memberMap.size === 0) {
+            result.skipped = true
+            result.reason = '无法获取群成员列表'
+            return result
+        }
+
+        if (!users || users.length === 0) {
+            return result
+        }
+
+        for (const user of users) {
+            const userId = String(user.user_id)
+            const member = this.getMemberFromMap(memberMap, userId)
+            if (member) continue
+
+            result.invalidUsers.push({
+                userId,
+                nickname: String(user.nickname || '').trim() || userId,
+                total: parseInt(user.total_count || 0, 10)
+            })
+        }
+
+        const deleteResult = await this.deleteUsersFromGroupStats(
+            groupId,
+            result.invalidUsers.map(user => user.userId)
+        )
+        result.deletedUserCount = deleteResult.userCount
+        result.deletedGranularRows = deleteResult.granularChanges
+        result.deletedAggRows = deleteResult.aggChanges
+
+        return result
+    }
+
+    buildNicknameRefreshForward(e, title, results) {
+        const totals = results.reduce((acc, item) => {
+            acc.groups += 1
+            acc.skipped += item.skipped ? 1 : 0
+            acc.totalUsers += item.totalUsers || 0
+            acc.updated += item.updatedCount || 0
+            acc.unchanged += item.unchangedCount || 0
+            acc.missing += item.missingCount || 0
+            acc.empty += item.emptyCount || 0
+            return acc
+        }, { groups: 0, skipped: 0, totalUsers: 0, updated: 0, unchanged: 0, missing: 0, empty: 0 })
+
+        const pages = [
+            `✅ ${title}完成\n\n` +
+            `📊 处理群数: ${totals.groups} 个\n` +
+            `- 跳过群数: ${totals.skipped} 个\n` +
+            `- 统计用户: ${totals.totalUsers} 人\n` +
+            `- 已更新: ${totals.updated} 人\n` +
+            `- 无变化: ${totals.unchanged} 人\n` +
+            `- 已不在群内/未获取到: ${totals.missing} 人\n` +
+            `- 昵称为空跳过: ${totals.empty} 人\n\n` +
+            `💡 已清理相关统计缓存，排行榜/查询会使用刷新后的昵称`
+        ]
+
+        const batchSize = 8
+        for (let i = 0; i < results.length; i += batchSize) {
+            const batch = results.slice(i, i + batchSize)
+            let page = `📋 群刷新明细 ${Math.floor(i / batchSize) + 1}\n\n`
+            for (const item of batch) {
+                page += `${item.groupName || item.groupId} (${CommonUtils.maskGroupId(item.groupId)})\n`
+                if (item.skipped) {
+                    page += `  跳过: ${item.reason}\n\n`
+                    continue
+                }
+                page += `  成员/统计: ${item.memberCount}/${item.totalUsers}\n`
+                page += `  更新/无变化/缺失: ${item.updatedCount}/${item.unchangedCount}/${item.missingCount}\n`
+                if (item.examples?.length > 0) {
+                    page += `  示例: ${item.examples.join('；')}\n`
+                }
+                page += '\n'
+            }
+            pages.push(page.trimEnd())
+        }
+
+        return this.makeForward(e, title, pages)
+    }
+
+    buildInvalidCleanForward(e, title, results) {
+        const totals = results.reduce((acc, item) => {
+            acc.groups += 1
+            acc.skipped += item.skipped ? 1 : 0
+            acc.totalUsers += item.totalUsers || 0
+            acc.invalid += item.invalidUsers?.length || 0
+            acc.deletedUsers += item.deletedUserCount || 0
+            acc.deletedGranularRows += item.deletedGranularRows || 0
+            acc.deletedAggRows += item.deletedAggRows || 0
+            return acc
+        }, { groups: 0, skipped: 0, totalUsers: 0, invalid: 0, deletedUsers: 0, deletedGranularRows: 0, deletedAggRows: 0 })
+
+        const pages = [
+            `✅ ${title}完成\n\n` +
+            `📊 处理群数: ${totals.groups} 个\n` +
+            `- 跳过群数: ${totals.skipped} 个\n` +
+            `- 数据库统计用户: ${totals.totalUsers} 人\n` +
+            `- 发现无效用户: ${totals.invalid} 人\n` +
+            `- 已删除用户统计: ${totals.deletedUsers} 人\n` +
+            `- 删除小时明细行: ${totals.deletedGranularRows} 行\n` +
+            `- 删除用户聚合行: ${totals.deletedAggRows} 行\n\n` +
+            `💡 无效记录指“数据库里有统计，但当前群成员列表里已经不存在”的用户`
+        ]
+
+        const batchSize = 8
+        for (let i = 0; i < results.length; i += batchSize) {
+            const batch = results.slice(i, i + batchSize)
+            let page = `📋 清理明细 ${Math.floor(i / batchSize) + 1}\n\n`
+            for (const item of batch) {
+                page += `${item.groupName || item.groupId} (${CommonUtils.maskGroupId(item.groupId)})\n`
+                if (item.skipped) {
+                    page += `  跳过: ${item.reason}\n\n`
+                    continue
+                }
+                page += `  成员/统计: ${item.memberCount}/${item.totalUsers}\n`
+                page += `  删除用户/明细行/聚合行: ${item.deletedUserCount}/${item.deletedGranularRows}/${item.deletedAggRows}\n`
+                if (item.invalidUsers?.length > 0) {
+                    const samples = item.invalidUsers.slice(0, 5).map(user => `${user.nickname}(${user.userId})`)
+                    page += `  示例: ${samples.join('；')}\n`
+                }
+                page += '\n'
+            }
+            pages.push(page.trimEnd())
+        }
+
+        return this.makeForward(e, title, pages)
+    }
+
+    /**
+     * 刷新当前群统计记录中的昵称
+     */
+    async refreshNicknames(e) {
+        const validation = CommonUtils.validateGroupMessage(e)
+        if (!validation.valid) {
+            return e.reply(validation.message)
+        }
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const groupId = String(e.group_id)
+                await e.reply('🔄 正在刷新当前群统计昵称，请稍候...')
+
+                const memberMap = await this.getGroupMemberMap(e, groupId)
+                const groupName = await this.getGroupDisplayName(groupId, e)
+                const result = await this.refreshNicknamesForGroup(groupId, memberMap, groupName)
+                return e.reply(this.buildNicknameRefreshForward(e, '水群刷新昵称', [result]))
+            },
+            '刷新昵称失败',
+            () => e.reply('刷新昵称失败，请稍后重试')
+        )
+    }
+
+    /**
+     * 刷新所有当前群统计记录中的昵称
+     */
+    async refreshAllNicknames(e) {
+        return await CommandWrapper.safeExecute(
+            async () => {
+                await e.reply('🔄 正在刷新所有当前群统计昵称，请稍候...')
+
+                const entries = await this.getMaintenanceGroupEntries('#水群总刷新昵称')
+                if (!entries || entries.length === 0) {
+                    return e.reply('❌ 当前群列表中没有找到可刷新的统计数据，请先使用 #群列表 后再试')
+                }
+
+                const results = []
+                for (const entry of entries) {
+                    const groupId = String(entry.groupId)
+                    const memberMap = await this.getGroupMemberMap({ group: entry.group }, groupId)
+                    const groupName = await this.getGroupDisplayName(groupId, null, entry.groupName)
+                    const result = await this.refreshNicknamesForGroup(groupId, memberMap, groupName)
+                    results.push(result)
+                }
+
+                return e.reply(this.buildNicknameRefreshForward(e, '水群总刷新昵称', results))
+            },
+            '总刷新昵称失败',
+            () => e.reply('总刷新昵称失败，请稍后重试')
+        )
+    }
+
+    /**
+     * 清理当前群已退群用户的统计记录
+     */
+    async cleanInvalidRecords(e) {
+        const validation = CommonUtils.validateGroupMessage(e)
+        if (!validation.valid) {
+            return e.reply(validation.message)
+        }
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const groupId = String(e.group_id)
+                await e.reply('🧹 正在清理当前群无效统计记录，请稍候...')
+
+                const memberMap = await this.getGroupMemberMap(e, groupId)
+                const groupName = await this.getGroupDisplayName(groupId, e)
+                const result = await this.cleanInvalidRecordsForGroup(groupId, memberMap, groupName)
+                return e.reply(this.buildInvalidCleanForward(e, '水群清理无效记录', [result]))
+            },
+            '清理无效记录失败',
+            () => e.reply('清理无效记录失败，请稍后重试')
+        )
+    }
+
+    /**
+     * 清理所有当前群已退群用户的统计记录
+     */
+    async cleanAllInvalidRecords(e) {
+        return await CommandWrapper.safeExecute(
+            async () => {
+                await e.reply('🧹 正在清理所有当前群无效统计记录，请稍候...')
+
+                const entries = await this.getMaintenanceGroupEntries('#水群总清理无效记录')
+                if (!entries || entries.length === 0) {
+                    return e.reply('❌ 当前群列表中没有找到可清理的统计数据，请先使用 #群列表 后再试')
+                }
+
+                const results = []
+                for (const entry of entries) {
+                    const groupId = String(entry.groupId)
+                    const memberMap = await this.getGroupMemberMap({ group: entry.group }, groupId)
+                    const groupName = await this.getGroupDisplayName(groupId, null, entry.groupName)
+                    const result = await this.cleanInvalidRecordsForGroup(groupId, memberMap, groupName)
+                    results.push(result)
+                }
+
+                return e.reply(this.buildInvalidCleanForward(e, '水群总清理无效记录', results))
+            },
+            '总清理无效记录失败',
+            () => e.reply('总清理无效记录失败，请稍后重试')
         )
     }
 

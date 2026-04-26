@@ -110,6 +110,10 @@
             { cmd:'#水群归档僵尸群', desc:'列出所有僵尸群' },
             { cmd:'#水群确认归档', desc:'确认归档列出的僵尸群' },
             { cmd:'#水群查看归档列表', desc:'查看当前归档群组列表' },
+            { cmd:'#水群刷新昵称', desc:'从当前群成员列表刷新统计昵称' },
+            { cmd:'#水群总刷新昵称', desc:'刷新所有当前群统计昵称' },
+            { cmd:'#水群清理无效记录', desc:'清理当前群已退群用户统计' },
+            { cmd:'#水群总清理无效记录', desc:'清理所有当前群已退群用户统计' },
             { cmd:'#水群清理缓存', desc:'清理运行缓存' }
           ]).map(it => el('li', { class: 'command-item' }, [ el('span', { class: 'command' }, it.cmd), el('span', { class: 'command-desc' }, it.desc) ])))
         ]);
