@@ -2198,16 +2198,23 @@ class DataService {
      * @param {number} pageSize 每页显示的群组数量
      * @returns {Promise<Object>} 全局统计数据
      */
-    async getGlobalStats(page = 1, pageSize = 9) {
+    async getGlobalStats(page = 1, pageSize = 9, options = {}) {
+        const shouldLog = options?.quiet !== true
+        const logGlobalStats = (...args) => {
+            if (shouldLog) {
+                global.logger?.mark?.(...args)
+            }
+        }
+
         try {
             const cacheKey = `globalStats:${page}:${pageSize}`
-            const cached = this.globalStatsCache.get(cacheKey)
+            const cached = options?.forceRefresh === true ? null : this.globalStatsCache.get(cacheKey)
             if (cached) {
-                global.logger?.mark?.(`[发言统计] 全局统计 使用缓存 (page=${page}, pageSize=${pageSize}), 统计群数=${cached.totalGroups}`)
+                logGlobalStats(`[发言统计] 全局统计 使用缓存 (page=${page}, pageSize=${pageSize}), 统计群数=${cached.totalGroups}`)
                 return cached
             }
 
-            global.logger?.mark?.('[发言统计] 全局统计 开始从数据库与 Bot.gl 计算')
+            logGlobalStats('[发言统计] 全局统计 开始从数据库与 Bot.gl 计算')
             const timeInfo = TimeUtils.getCurrentDateTime()
             const todayKey = timeInfo.formattedDate
             const monthKey = timeInfo.monthKey
@@ -2255,15 +2262,15 @@ class DataService {
                 const age = Date.now() - this.currentGroupIdsCache.updatedAt
                 if (age < this.currentGroupIdsCacheTTL) {
                     currentGroupIds = this.currentGroupIdsCache.set
-                    global.logger?.mark?.(`[发言统计] 全局统计 当前群列表来自缓存, 群数=${currentGroupIds.size}, 缓存已存在${Math.round(age / 1000)}秒`)
+                    logGlobalStats(`[发言统计] 全局统计 当前群列表来自缓存, 群数=${currentGroupIds.size}, 缓存已存在${Math.round(age / 1000)}秒`)
                 }
             }
             if (currentGroupIds !== null && currentGroupIds.size > 0) {
-                global.logger?.mark?.(`[发言统计] 全局统计 当前群列表: 来源=${runtimeGroupEntries.length > 0 ? 'Bot.gl' : '缓存'}, 群数=${currentGroupIds.size}`)
+                logGlobalStats(`[发言统计] 全局统计 当前群列表: 来源=${runtimeGroupEntries.length > 0 ? 'Bot.gl' : '缓存'}, 群数=${currentGroupIds.size}`)
             } else {
-                global.logger?.mark?.('[发言统计] 全局统计 未获取到当前群列表(Bot.gl/缓存均不可用), 将统计数据库全部非归档群')
+                logGlobalStats('[发言统计] 全局统计 未获取到当前群列表(Bot.gl/缓存均不可用), 将统计数据库全部非归档群')
             }
-            global.logger?.mark?.(`[发言统计] 全局统计 数据库群数=${allGroupIds.length}, 已归档群数=${archivedGroupIdsSet.size}`)
+            logGlobalStats(`[发言统计] 全局统计 数据库群数=${allGroupIds.length}, 已归档群数=${archivedGroupIdsSet.size}`)
 
             let totalGroups = 0
             let totalUsersSet = new Set()
@@ -2414,7 +2421,7 @@ class DataService {
                 totalMessages = mergedGroupStatsList.reduce((s, g) => s + (g.totalMessages || 0), 0)
                 totalWords = mergedGroupStatsList.reduce((s, g) => s + (g.totalWords || 0), 0)
             }
-            global.logger?.mark?.(`[发言统计] 全局统计 计算完成: 统计群数=${totalGroups}, 统计用户数=${totalUsersSet.size}, 消息总量=${totalMessages}, 群列表条数=${mergedGroupStatsList.length}`)
+            logGlobalStats(`[发言统计] 全局统计 计算完成: 统计群数=${totalGroups}, 统计用户数=${totalUsersSet.size}, 消息总量=${totalMessages}, 群列表条数=${mergedGroupStatsList.length}`)
 
             const totalPages = Math.ceil(mergedGroupStatsList.length / pageSize)
             const startIndex = (page - 1) * pageSize

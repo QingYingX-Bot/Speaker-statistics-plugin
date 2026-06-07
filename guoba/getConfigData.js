@@ -15,7 +15,8 @@ export async function getConfigData() {
       database,
       dataStorage,
       archivedGroups,
-      groupAnalysis
+      groupAnalysis,
+      web
     } = config
 
     return {
@@ -25,7 +26,8 @@ export async function getConfigData() {
       database,
       dataStorage,
       archivedGroups,
-      groupAnalysis
+      groupAnalysis,
+      web
     }
   } catch (err) {
     globalConfig.error('[发言统计] 获取配置失败:', err)

@@ -159,6 +159,14 @@ class Plugin extends plugin {
         return await this.adminCommands.clearRanking(e)
     }
 
+    async syncRedisStats(e) {
+        return await this.adminCommands.syncRedisStats(e)
+    }
+
+    async syncAllRedisStats(e) {
+        return await this.adminCommands.syncAllRedisStats(e)
+    }
+
     async setDisplayCount(e) {
         return await this.adminCommands.setDisplayCount(e)
     }

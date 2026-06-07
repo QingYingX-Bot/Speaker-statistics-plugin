@@ -108,6 +108,14 @@ class PathResolver {
     }
 
     /**
+     * 获取 Web 管理端静态资源目录
+     * @returns {string} Web 管理端静态资源目录
+     */
+    static getWebServerDir() {
+        return path.join(this.getResourcesDir(), 'server')
+    }
+
+    /**
      * 获取群聊报告模板根目录
      * @returns {string} 群聊报告模板根目录
      */

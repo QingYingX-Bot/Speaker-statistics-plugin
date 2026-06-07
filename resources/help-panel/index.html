@@ -107,6 +107,8 @@
           el('div', { class: 'category-title' }, [ '数据管理' ]),
           el('ul', { class: 'command-list' }, uniqueCommands([
             { cmd:'#水群清除统计', desc:'清除当前群统计数据' },
+            { cmd:'#水群同步Redis统计', desc:'从数据库补当前群 Redis 消息类型统计' },
+            { cmd:'#水群总同步Redis统计', desc:'从数据库补全部群 Redis 消息类型统计' },
             { cmd:'#水群归档僵尸群', desc:'列出所有僵尸群' },
             { cmd:'#水群确认归档', desc:'确认归档列出的僵尸群' },
             { cmd:'#水群查看归档列表', desc:'查看当前归档群组列表' },

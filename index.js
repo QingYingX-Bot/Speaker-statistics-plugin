@@ -14,6 +14,17 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const packageJsonPath = path.join(__dirname, 'package.json')
+const localExtensionPath = path.join(__dirname, 'data', 'temp', 'local-extension.js')
+
+async function loadLocalExtension() {
+  if (!fs.existsSync(localExtensionPath)) return
+  await import(pathToFileURL(localExtensionPath).href)
+}
+
+async function startWebManagementServer() {
+  const { startWebServer } = await import('./core/web/WebServer.js')
+  return await startWebServer()
+}
 
 let packageJson
 try {
@@ -33,6 +44,18 @@ try {
   const errorMsg = err.message || '数据库初始化失败'
   global.logger.error('[发言统计] ' + errorMsg)
   throw errorMsg
+}
+
+try {
+  await loadLocalExtension()
+} catch (err) {
+  global.logger.error('[发言统计] 本地扩展初始化失败:', err)
+}
+
+try {
+  await startWebManagementServer()
+} catch (err) {
+  global.logger.error('[发言统计] Web 管理端启动失败:', err)
 }
 
 // 2) 启动水群分析配置与服务生命周期

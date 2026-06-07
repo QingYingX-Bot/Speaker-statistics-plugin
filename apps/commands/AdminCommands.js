@@ -4,6 +4,7 @@ import { CommonUtils } from '../../core/utils/CommonUtils.js'
 import { PathResolver } from '../../core/utils/PathResolver.js'
 import { CommandWrapper } from '../../core/utils/CommandWrapper.js'
 import { TimeUtils } from '../../core/utils/TimeUtils.js'
+import RedisStatsSyncService from '../../core/services/RedisStatsSyncService.js'
 import common from '../../../../lib/common/common.js'
 import fs from 'fs'
 import path from 'path'
@@ -16,6 +17,7 @@ class AdminCommands {
 
     constructor(dataService = null) {
         this.dataService = dataService || new DataService()
+        this.redisStatsSyncService = new RedisStatsSyncService(this.dataService)
     }
 
     /**
@@ -103,6 +105,16 @@ class AdminCommands {
                 permission: 'master'
             },
             {
+                reg: '^#水群同步[Rr]edis统计$',
+                fnc: 'syncRedisStats',
+                permission: 'master'
+            },
+            {
+                reg: '^#水群总同步[Rr]edis统计$',
+                fnc: 'syncAllRedisStats',
+                permission: 'master'
+            },
+            {
                 reg: '^#水群设置人数\\+(\\d+)$',
                 fnc: 'setDisplayCount',
                 permission: 'master'
@@ -178,6 +190,51 @@ class AdminCommands {
             '清除统计失败',
             () => e.reply('清除失败，请稍后重试')
         )
+    }
+
+    /**
+     * 从数据库小时分层统计同步当前群 Redis 消息采集缓存
+     */
+    async syncRedisStats(e) {
+        const validation = CommonUtils.validateGroupMessage(e)
+        if (!validation.valid) {
+            return e.reply(validation.message)
+        }
+
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const result = await this.redisStatsSyncService.sync({ groupId: String(e.group_id) })
+                return e.reply(this.formatRedisSyncResult(result, '当前群'))
+            },
+            '同步 Redis 统计失败',
+            () => e.reply('同步失败，请稍后重试')
+        )
+    }
+
+    /**
+     * 从数据库小时分层统计同步全部群 Redis 消息采集缓存
+     */
+    async syncAllRedisStats(e) {
+        return await CommandWrapper.safeExecute(
+            async () => {
+                const result = await this.redisStatsSyncService.sync()
+                return e.reply(this.formatRedisSyncResult(result, '全部群'))
+            },
+            '同步 Redis 统计失败',
+            () => e.reply('同步失败，请稍后重试')
+        )
+    }
+
+    formatRedisSyncResult(result, scopeName) {
+        return [
+            `${scopeName} 数据库统计已同步到 Redis`,
+            `扫描群数：${result.groups}`,
+            `数据库分层：${CommonUtils.formatNumber(result.rows)} 行`,
+            `写入消息权重：${CommonUtils.formatNumber(result.messages)} 条`,
+            `写入 Redis Key：${result.keys}`,
+            `替换旧同步占位：${CommonUtils.formatNumber(result.replaced)} 条`,
+            `保护真实采集 Key：${result.skippedKeys}`
+        ].join('\n')
     }
 
     /**

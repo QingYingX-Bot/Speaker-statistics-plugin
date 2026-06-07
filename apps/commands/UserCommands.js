@@ -261,7 +261,9 @@ class UserCommands {
     if (!bucket || !msg || typeof msg !== 'object') return
 
     const text = String(msg.message || '').trim()
-    const hasText = text !== '' && text !== '[表情]'
+    const isDatabaseSyncMessage = msg.source === 'database_sync'
+    const hasText = isDatabaseSyncMessage || (text !== '' && text !== '[表情]')
+    const messageCount = Math.max(1, parseInt(msg.messageCount || 1, 10) || 1)
     const hasReply = msg.hasReply === true
     const emojiCount = Math.max(0, parseInt(msg?.faces?.total || 0, 10) || 0)
     const imageCount = Array.isArray(msg.images) ? msg.images.length : 0
@@ -274,8 +276,8 @@ class UserCommands {
     }
     atCount = Math.max(0, atCount || 0)
 
-    if (hasText) bucket.textMessages += 1
-    if (hasReply) bucket.replyMessages += 1
+    if (hasText) bucket.textMessages += messageCount
+    if (hasReply) bucket.replyMessages += messageCount
     if (atCount > 0) bucket.atMentions += atCount
     if (emojiCount > 0) bucket.emojis += emojiCount
     if (imageCount > 0) bucket.images += imageCount
@@ -283,7 +285,7 @@ class UserCommands {
     if (videoCount > 0) bucket.videos += videoCount
 
     if (emojiCount > 0 || imageCount > 0 || linkCount > 0 || videoCount > 0) {
-      bucket.mediaMessages += 1
+      bucket.mediaMessages += messageCount
     }
   }
 

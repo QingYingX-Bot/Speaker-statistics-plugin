@@ -5,6 +5,7 @@ import { databaseTemplate } from './templates/databaseTemplate.js'
 import { dataStorageTemplate } from './templates/dataStorageTemplate.js'
 import { archivedGroupsTemplate } from './templates/archivedGroupsTemplate.js'
 import { groupAnalysisTemplate } from './templates/groupAnalysisTemplate.js'
+import { webTemplate } from './templates/webTemplate.js'
 
 /**
  * 配置文件拆分映射
@@ -17,7 +18,8 @@ const configFileMap = Object.freeze({
   database: 'database.json',
   dataStorage: 'storage.json',
   archivedGroups: 'archived-groups.json',
-  groupAnalysis: 'group-analysis.json'
+  groupAnalysis: 'group-analysis.json',
+  web: 'web.json'
 })
 
 /**
@@ -30,7 +32,8 @@ const configFileTemplates = {
   database: databaseTemplate,
   dataStorage: dataStorageTemplate,
   archivedGroups: archivedGroupsTemplate,
-  groupAnalysis: groupAnalysisTemplate
+  groupAnalysis: groupAnalysisTemplate,
+  web: webTemplate
 }
 
 /**

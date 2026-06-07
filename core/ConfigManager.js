@@ -137,6 +137,7 @@ function setByPath(target, keyPath, value) {
  * - storage.json
  * - archived-groups.json
  * - group-analysis.json
+ * - web.json
  */
 class ConfigManager {
   constructor() {

@@ -1,8 +1,11 @@
 # 依赖目录
 node_modules/
 
-# Vue Web 源码目录（5.0.0 仅提交构建产物 resources/web）
-/web/
+# 使用 package-lock.json 作为提交锁文件，忽略本地 pnpm 生成文件
+pnpm-lock.yaml
+
+# Web 源码目录（仅提交构建产物 resources/server）
+/Speaker-statistics-Web/
 
 # data 目录下的文件忽略规则（精确控制，而不是忽略整个目录）
 # 忽略配置文件（这些是用户自定义的，不应该提交）

@@ -5,10 +5,11 @@ import { getDatabaseSchemas } from './schemas/database.js'
 import { getStorageSchemas } from './schemas/storage.js'
 import { getArchivedGroupsSchemas } from './schemas/archivedGroups.js'
 import { getGroupAnalysisSchemas } from './schemas/groupAnalysis.js'
+import { getWebSchemas } from './schemas/web.js'
 
 /**
  * Guoba-Plugin 配置 Schemas
- * 按 data/config 下 7 个配置文件分组维护
+ * 按 data/config 下 8 个配置文件分组维护
  */
 export function getConfigSchemas() {
   return [
@@ -18,6 +19,7 @@ export function getConfigSchemas() {
     ...getDatabaseSchemas(),
     ...getStorageSchemas(),
     ...getArchivedGroupsSchemas(),
-    ...getGroupAnalysisSchemas()
+    ...getGroupAnalysisSchemas(),
+    ...getWebSchemas()
   ]
 }
