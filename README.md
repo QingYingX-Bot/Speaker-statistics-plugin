@@ -12,7 +12,7 @@
 
 发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况，并提供群聊分析、词云、归档清理和锅巴配置能力。
 
-- 文档版本：`5.1.0`
+- 文档版本：`5.1.1`
 - 发布日期：`2026-06-07`
 
 ### 核心特性
@@ -20,6 +20,7 @@
 - 📊 **多维度统计**：总榜、日榜、周榜、月榜、年榜、趋势全覆盖
 - 👤 **个人查询**：支持个人统计、跨群列表、@ 查询他人
 - 🪪 **当前群昵称展示**：个人查询和排行榜优先显示用户在当前群的群名片 / 群昵称
+- 🎨 **排行榜个人背景**：支持私聊生成短期链接，通过 Web 页面设置自己的排行榜行背景
 - 🤖 **群聊分析**：支持基础总结、活跃图表、AI 话题分析、金句和称号
 - ☁️ **词云能力**：支持群词云和个人词云
 - ⚙️ **可视化配置**：支持通过 Guoba-Plugin 图形化管理配置
@@ -59,12 +60,15 @@ git clone https://github.com/QingYingX-Bot/Speaker-statistics-plugin.git ./plugi
 
 2. **安装依赖**
 
+在 Yunzai 根目录执行：
+
 ```bash
 pnpm install --filter=Speaker-statistics-plugin
 ```
 
 > 💡 **提示**：
-> - `pnpm install` 会安装插件运行所需依赖。
+> - `pnpm install --filter=Speaker-statistics-plugin` 会按 Yunzai 根目录的 pnpm workspace 安装插件依赖。
+> - 单独进入插件目录安装时，也可以使用 `npm install`，会按 `package-lock.json` 安装。
 > - 如果只使用 PostgreSQL，可忽略 SQLite 相关依赖的安装提示。
 
 3. **配置数据库**
@@ -137,10 +141,12 @@ pnpm install --filter=Speaker-statistics-plugin
 | 查询他人 | `#水群查询 @用户` | 查看指定用户统计 |
 | 群列表 | `#水群查询群列表` | 查看自己活跃过的群列表 |
 | 查询他人群列表 | `#水群查询群列表 @用户` | 查看指定用户群列表 |
+| 排行榜背景 | `#水群设置背景` / `#水群背景设置` | 私聊生成短期链接，设置自己的排行榜行背景 |
 
 > 💡 **昵称说明**：
 > - `#水群查询`、`#水群查询 @用户` 和排行榜会优先展示用户在当前群的群名片 / 群昵称。
 > - 统计数据仍按用户 ID 聚合，改名只影响展示名称。
+> - `#水群设置背景` / `#水群背景设置` 仅支持私聊使用，生成的链接会绑定当前用户并在过期后失效。
 
 ### 水群分析功能
 
@@ -179,12 +185,20 @@ pnpm install --filter=Speaker-statistics-plugin
 | `web.basePath` | 页面访问路径，默认 `/` |
 | `web.apiBasePath` | API 访问路径，默认 `/api` |
 | `web.localOnly` | 是否仅允许本机访问 |
+| `web.allowExternalManageAccess` | `web.localOnly` 关闭时，是否允许公网访问普通管理端页面和统计 API |
+| `web.accessLog` | 是否记录页面访问、背景设置、上传、删除和访问拒绝日志 |
 | `web.queryLog` | 网页查询概览和群组列表时是否输出全局统计计算日志 |
+| `web.backgroundEditor.enabled` | 是否启用排行榜背景编辑器 |
+| `web.backgroundEditor.tokenTtlMinutes` | 背景设置链接有效期，单位分钟 |
+| `web.backgroundEditor.maxImageMB` | 背景图片大小限制，单位 MB |
 
 > 💡 **说明**：
 > - Web 管理端提供统计概览、群组列表和排行查询。
 > - 默认仅本机访问，公网访问建议放在反向代理、HTTPS 和访问控制之后。
+> - 若 `web.localOnly=false` 且 `web.allowExternalManageAccess=false`，公网只能访问带 `backgroundToken` 的背景设置页面，局域网 IP 访问管理端保持可用。
 > - 日榜、周榜、月榜、年榜在未填写群号时按全部当前群聚合统计。
+> - 管理端“背景”页支持查看、搜索、上传替换和删除所有用户的排行榜个人背景。
+> - 排行榜背景设置链接由私聊命令生成，图片保存在 `data/backgrounds/ranking/`。
 
 ### 管理功能（仅主人）
 
@@ -343,7 +357,7 @@ Speaker-statistics-plugin/
 
 ## 🔄 兼容性说明
 
-- 本版本重新提供轻量 Web 管理端，背景相关功能仍已移除。
+- 本版本重新提供轻量 Web 管理端，并支持排行榜个人背景设置与管理。
 - 本版本已移除旧 `src/*` 路径。
 - 当前版本以 `data/config/*.json` 为唯一主配置入口。
 

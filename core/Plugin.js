@@ -7,6 +7,7 @@ import { AdminCommands } from '../apps/commands/AdminCommands.js'
 import { HelpCommands } from '../apps/commands/HelpCommands.js'
 import { ReportCommands } from '../apps/commands/ReportCommands.js'
 import { WordCloudCommands } from '../apps/commands/WordCloudCommands.js'
+import { BackgroundCommands } from '../apps/commands/BackgroundCommands.js'
 import { globalConfig } from './ConfigManager.js'
 import { ImageGenerator } from './render/ImageGenerator.js'
 
@@ -26,7 +27,8 @@ class Plugin extends plugin {
                 ...AdminCommands.getRules(),
                 ...HelpCommands.getRules(),
                 ...ReportCommands.getRules(),
-                ...WordCloudCommands.getRules()
+                ...WordCloudCommands.getRules(),
+                ...BackgroundCommands.getRules()
             ]
         });
 
@@ -44,7 +46,8 @@ class Plugin extends plugin {
                 adminCommands: new AdminCommands(dataService),
                 helpCommands: new HelpCommands(dataService, imageGenerator),
                 reportCommands: new ReportCommands(),
-                wordCloudCommands: new WordCloudCommands()
+                wordCloudCommands: new WordCloudCommands(),
+                backgroundCommands: new BackgroundCommands()
             }
             globalConfig.debug('插件核心组件初始化完成')
         }
@@ -57,6 +60,7 @@ class Plugin extends plugin {
         this.helpCommands = Plugin._sharedCore.helpCommands
         this.reportCommands = Plugin._sharedCore.reportCommands
         this.wordCloudCommands = Plugin._sharedCore.wordCloudCommands
+        this.backgroundCommands = Plugin._sharedCore.backgroundCommands
 
         // 群聊报告定时任务挂载到主插件，保持“单主插件”结构
         const reportTasks = this.reportCommands?.getTasks?.() || []
@@ -233,6 +237,10 @@ class Plugin extends plugin {
 
     async generatePersonalWordCloud(e) {
         return await this.wordCloudCommands.generatePersonalWordCloud(e)
+    }
+
+    async openBackgroundEditor(e) {
+        return await this.backgroundCommands.openBackgroundEditor(e)
     }
 
     async accept(e) {

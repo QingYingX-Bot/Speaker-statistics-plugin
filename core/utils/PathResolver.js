@@ -76,6 +76,16 @@ class PathResolver {
     }
 
     /**
+     * 获取背景图片目录路径
+     * @param {string} subDir 子目录
+     * @returns {string} 背景图片目录路径
+     */
+    static getBackgroundsDir(subDir = '') {
+        const baseDir = path.join(this.getDataDir(), 'backgrounds')
+        return subDir ? path.join(baseDir, subDir) : baseDir
+    }
+
+    /**
      * 获取配置目录路径
      * @returns {string} 配置目录路径
      */

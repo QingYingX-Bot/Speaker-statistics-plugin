@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import http from 'node:http'
+import zlib from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { PathResolver } from '../utils/PathResolver.js'
 import { TimeUtils } from '../utils/TimeUtils.js'
@@ -10,16 +11,25 @@ import { getDatabaseService } from '../database/DatabaseService.js'
 import {
   MIME_TYPES,
   createMiniApp,
+  createHttpError,
   formatBytes,
   getPublicHost,
   isLocalRequest,
+  isPrivateHostRequest,
   normalizeHost,
   normalizeMountPath,
   normalizeUrl,
   parsePositiveInt,
+  readJsonBody,
   sendJson
 } from './httpUtils.js'
 import { getGlobalPeriodRanking } from './rankingHelper.js'
+import { backgroundService } from '../services/BackgroundService.js'
+import { backgroundTokenService } from '../services/BackgroundTokenService.js'
+import { getClientIp, getSafeRequestPath, logWebAccess } from './WebAccessLogger.js'
+import { sendAccessDeniedPage } from './WebErrorPages.js'
+import { backgroundAdminController } from './BackgroundAdminController.js'
+import { getBackgroundPreviewData } from './BackgroundPreviewData.js'
 
 class SpeakerWebServer {
   constructor() {
@@ -30,6 +40,8 @@ class SpeakerWebServer {
     this.staticDir = PathResolver.getWebServerDir()
     this.dataService = getDataService()
     this.dbService = getDatabaseService()
+    this.backgroundService = backgroundService
+    this.backgroundTokenService = backgroundTokenService
   }
 
   getVersion() {
@@ -52,7 +64,14 @@ class SpeakerWebServer {
       basePath: normalizeMountPath(cfg.basePath, '/'),
       apiBasePath: normalizeMountPath(cfg.apiBasePath, '/api'),
       localOnly: cfg.localOnly !== false,
-      queryLog: cfg.queryLog === true
+      allowExternalManageAccess: cfg.allowExternalManageAccess === true,
+      accessLog: cfg.accessLog !== false,
+      queryLog: cfg.queryLog === true,
+      backgroundEditor: {
+        enabled: cfg.backgroundEditor?.enabled !== false,
+        tokenTtlMinutes: parsePositiveInt(cfg.backgroundEditor?.tokenTtlMinutes, 30, 1, 1440),
+        maxImageMB: parsePositiveInt(cfg.backgroundEditor?.maxImageMB, 2, 1, 20)
+      }
     }
   }
 
@@ -64,31 +83,84 @@ class SpeakerWebServer {
   }
 
   canAccess(req, cfg) {
-    if (cfg.localOnly && !isLocalRequest(req)) {
+    return this.canAccessManagement(req, cfg)
+  }
+
+  canAccessManagement(req, cfg) {
+    if (isLocalRequest(req)) return { ok: true }
+
+    if (cfg.localOnly) {
       return { ok: false, status: 403, message: 'Web 管理端仅允许本机访问' }
+    }
+
+    if (isPrivateHostRequest(req)) return { ok: true }
+
+    if (!cfg.allowExternalManageAccess) {
+      return { ok: false, status: 403, message: 'Web 管理端已禁止公网访问' }
     }
 
     return { ok: true }
   }
 
-  requireAccess(req, res, cfg = this.getConfig()) {
-    const access = this.canAccess(req, cfg)
+  canAccessBackgroundEditor(req, cfg) {
+    if (isLocalRequest(req)) return { ok: true }
+
+    if (cfg.localOnly) {
+      return { ok: false, status: 403, message: '背景设置页面仅允许本机访问' }
+    }
+
+    return { ok: true }
+  }
+
+  requireAccess(req, res, cfg = this.getConfig(), scope = 'management', responseType = 'json') {
+    const access = scope === 'background'
+      ? this.canAccessBackgroundEditor(req, cfg)
+      : this.canAccessManagement(req, cfg)
     if (access.ok) return true
+    logWebAccess(cfg, `访问被拒: scope=${scope}, ip=${getClientIp(req)}, path=${getSafeRequestPath(req)}, reason=${access.message}`)
+    if (responseType === 'html') {
+      sendAccessDeniedPage(res, access.message)
+      return false
+    }
     sendJson(res, access.status, { ok: false, message: access.message })
     return false
   }
 
-  async apiHandler(handler, req, res) {
+  async apiHandler(handler, req, res, options = {}) {
     const cfg = this.getConfig()
-    if (!this.requireAccess(req, res, cfg)) return
+    if (!this.requireAccess(req, res, cfg, options.access)) return
 
     try {
       const data = await handler(req, cfg)
       sendJson(res, 200, { ok: true, data })
     } catch (err) {
-      globalConfig.error('[Web管理端] API 处理失败:', err)
-      sendJson(res, 500, { ok: false, message: err?.message || '请求失败' })
+      const status = Number(err?.statusCode || 500)
+      if (status >= 500) {
+        globalConfig.error('[Web管理端] API 处理失败:', err)
+      }
+      sendJson(res, status, { ok: false, message: err?.message || '请求失败' })
     }
+  }
+
+  validateBackgroundEditor(cfg) {
+    if (cfg.backgroundEditor.enabled === false) {
+      throw createHttpError(403, '背景设置页面已关闭')
+    }
+  }
+
+  validateBackgroundToken(token, cfg) {
+    this.validateBackgroundEditor(cfg)
+    const result = this.backgroundTokenService.validateToken(token)
+    if (!result.ok) {
+      throw createHttpError(result.status || 401, result.message || '背景设置链接无效')
+    }
+    return result
+  }
+
+  maskUserId(userId) {
+    const raw = String(userId || '')
+    if (raw.length <= 6) return raw
+    return `${raw.slice(0, 3)}****${raw.slice(-3)}`
   }
 
   async getStatus() {
@@ -112,7 +184,10 @@ class SpeakerWebServer {
         basePath: webCfg.basePath,
         apiBasePath: webCfg.apiBasePath,
         localOnly: webCfg.localOnly,
-        queryLog: webCfg.queryLog
+        allowExternalManageAccess: webCfg.allowExternalManageAccess,
+        accessLog: webCfg.accessLog,
+        queryLog: webCfg.queryLog,
+        backgroundEditor: webCfg.backgroundEditor
       },
       switches: {
         enableStatistics: cfg?.global?.enableStatistics !== false,
@@ -175,6 +250,85 @@ class SpeakerWebServer {
     return { groupId, period, rankings }
   }
 
+  async getBackgroundSession(req, cfg) {
+    const tokenInfo = this.validateBackgroundToken(req.query?.token, cfg)
+    const info = this.backgroundService.getRankingBackgroundInfo(tokenInfo.userId)
+    const preview = await getBackgroundPreviewData(this.dataService, tokenInfo.userId)
+    logWebAccess(cfg, `背景设置会话: user=${this.maskUserId(tokenInfo.userId)}, ip=${getClientIp(req)}`)
+    return {
+      userIdMasked: this.maskUserId(tokenInfo.userId),
+      expiresAt: tokenInfo.expiresAt,
+      hasBackground: info.exists === true,
+      background: info,
+      preview,
+      limits: {
+        maxImageMB: cfg.backgroundEditor.maxImageMB,
+        recommendedWidth: 1392,
+        recommendedHeight: 210
+      }
+    }
+  }
+
+  async applyBackground(req, cfg) {
+    this.validateBackgroundEditor(cfg)
+    const maxImageBytes = cfg.backgroundEditor.maxImageMB * 1024 * 1024
+    const bodyLimit = Math.ceil(maxImageBytes * 1.5) + 64 * 1024
+    const body = await readJsonBody(req, bodyLimit)
+    const tokenInfo = this.validateBackgroundToken(body.token, cfg)
+    let saved
+    try {
+      saved = this.backgroundService.saveRankingBackground(
+        tokenInfo.userId,
+        body.imageBase64,
+        body.mimeType,
+        maxImageBytes
+      )
+    } catch (err) {
+      throw createHttpError(400, err?.message || '背景图片保存失败')
+    }
+
+    logWebAccess(cfg, `背景上传保存: user=${this.maskUserId(tokenInfo.userId)}, size=${formatBytes(saved.size)}, mimeType=${saved.mimeType}, ip=${getClientIp(req)}`)
+    return {
+      size: saved.size,
+      mimeType: saved.mimeType,
+      hasBackground: true
+    }
+  }
+
+  async deleteBackground(req, cfg) {
+    const body = await readJsonBody(req, 64 * 1024)
+    const tokenInfo = this.validateBackgroundToken(body.token, cfg)
+    const deleted = this.backgroundService.deleteRankingBackground(tokenInfo.userId)
+    logWebAccess(cfg, `背景删除: user=${this.maskUserId(tokenInfo.userId)}, deleted=${deleted}, ip=${getClientIp(req)}`)
+    return { deleted, hasBackground: false }
+  }
+
+  sendBackgroundImage(req, res) {
+    const cfg = this.getConfig()
+    if (!this.requireAccess(req, res, cfg, 'background')) return
+
+    try {
+      const tokenInfo = this.validateBackgroundToken(req.query?.token, cfg)
+      const image = this.backgroundService.getRankingBackgroundBuffer(tokenInfo.userId)
+      if (!image) {
+        sendJson(res, 404, { ok: false, message: '背景图片不存在' })
+        return
+      }
+      logWebAccess(cfg, `背景图片读取: user=${this.maskUserId(tokenInfo.userId)}, size=${formatBytes(image.buffer.length)}, ip=${getClientIp(req)}`)
+
+      res.statusCode = 200
+      res.setHeader('Content-Type', image.mimeType)
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(image.buffer)
+    } catch (err) {
+      const status = Number(err?.statusCode || 500)
+      if (status >= 500) {
+        globalConfig.error('[Web管理端] 背景图片读取失败:', err)
+      }
+      sendJson(res, status, { ok: false, message: err?.message || '请求失败' })
+    }
+  }
+
   registerApi(app, apiBasePath) {
     app.get(`${apiBasePath}/status`, (req, res) => {
       this.apiHandler(() => this.getStatus(), req, res)
@@ -191,13 +345,113 @@ class SpeakerWebServer {
     app.get(`${apiBasePath}/ranking`, (req, res) => {
       this.apiHandler((request) => this.getRanking(request), req, res)
     })
+
+    app.get(`${apiBasePath}/background/session`, (req, res) => {
+      this.apiHandler((request, cfg) => this.getBackgroundSession(request, cfg), req, res, { access: 'background' })
+    })
+
+    app.get(`${apiBasePath}/background/image`, (req, res) => {
+      this.sendBackgroundImage(req, res)
+    })
+
+    app.post(`${apiBasePath}/background/apply`, (req, res) => {
+      this.apiHandler((request, cfg) => this.applyBackground(request, cfg), req, res, { access: 'background' })
+    })
+
+    app.delete(`${apiBasePath}/background`, (req, res) => {
+      this.apiHandler((request, cfg) => this.deleteBackground(request, cfg), req, res, { access: 'background' })
+    })
+
+    backgroundAdminController.register(app, apiBasePath, this)
   }
 
-  sendStaticFile(res, filePath) {
+  isBackgroundEditorPageRequest(req) {
+    return Boolean(String(req.query?.backgroundToken || '').trim())
+  }
+
+  isPublicWebAssetRequest(requestPath) {
+    const normalized = String(requestPath || '/')
+    return normalized === '/favicon.ico' || normalized.startsWith('/assets/')
+  }
+
+  requireStaticAccess(req, res, cfg, requestPath) {
+    const scope = this.isBackgroundEditorPageRequest(req) || this.isPublicWebAssetRequest(requestPath)
+      ? 'background'
+      : 'management'
+    return this.requireAccess(req, res, cfg, scope, 'html')
+  }
+
+  getStaticCacheHeader(filePath) {
+    const normalized = path.normalize(filePath)
     const ext = path.extname(filePath).toLowerCase()
+    if (ext === '.html') return 'no-store'
+    if (normalized.includes(`${path.sep}assets${path.sep}`) || normalized.includes(`${path.sep}font${path.sep}`)) {
+      return 'public, max-age=31536000, immutable'
+    }
+    return 'public, max-age=3600'
+  }
+
+  getStaticEncoding(req, ext, size) {
+    if (size < 1024) return ''
+    const compressible = new Set(['.html', '.js', '.css', '.json', '.svg', '.ttf'])
+    if (!compressible.has(ext)) return ''
+
+    const acceptEncoding = String(req.headers?.['accept-encoding'] || '').toLowerCase()
+    if (acceptEncoding.includes('br')) return 'br'
+    if (acceptEncoding.includes('gzip')) return 'gzip'
+    return ''
+  }
+
+  sendStaticFile(req, res, filePath) {
+    const ext = path.extname(filePath).toLowerCase()
+    const stat = fs.statSync(filePath)
+    const encoding = this.getStaticEncoding(req, ext, stat.size)
+
     res.statusCode = 200
     res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream')
+    res.setHeader('Cache-Control', this.getStaticCacheHeader(filePath))
+    res.setHeader('Last-Modified', stat.mtime.toUTCString())
+
+    if (encoding) {
+      res.setHeader('Content-Encoding', encoding)
+      const stream = encoding === 'br'
+        ? zlib.createBrotliCompress()
+        : zlib.createGzip({ level: 6 })
+      fs.createReadStream(filePath).pipe(stream).pipe(res)
+      return
+    }
+
+    res.setHeader('Content-Length', stat.size)
     fs.createReadStream(filePath).pipe(res)
+  }
+
+  sendResourceFontFile(req, res, requestPath) {
+    const relativePath = path.normalize(String(requestPath || '').replace(/^\/font\//, '')).replace(/^(\.\.[/\\])+/, '')
+    const fontDir = path.resolve(PathResolver.getResourcesDir(), 'font')
+    const filePath = path.resolve(fontDir, relativePath)
+    const fontPrefix = fontDir.endsWith(path.sep) ? fontDir : `${fontDir}${path.sep}`
+
+    if (filePath !== fontDir && filePath.startsWith(fontPrefix) && fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
+      this.sendStaticFile(req, res, filePath)
+      return
+    }
+
+    res.statusCode = 404
+    res.end('Font not found')
+  }
+
+  registerFontStatic(app) {
+    app.use('/font', (req, res) => {
+      const cfg = this.getConfig()
+      if (cfg.localOnly && !isLocalRequest(req)) {
+        res.statusCode = 403
+        res.end('Forbidden')
+        return
+      }
+
+      const fontPath = `/font${String(req.path || '').startsWith('/') ? req.path : `/${req.path || ''}`}`
+      this.sendResourceFontFile(req, res, fontPath)
+    })
   }
 
   registerStatic(app, basePath) {
@@ -211,9 +465,11 @@ class SpeakerWebServer {
         return
       }
 
-      if (cfg.localOnly && !isLocalRequest(req)) {
-        res.statusCode = 403
-        res.end('Forbidden')
+      const requestPath = decodeURIComponent(String(req.path || req.url || '/').split('?')[0])
+      if (!this.requireStaticAccess(req, res, cfg, requestPath)) return
+
+      if (requestPath.startsWith('/font/')) {
+        this.sendResourceFontFile(req, res, requestPath)
         return
       }
 
@@ -223,7 +479,6 @@ class SpeakerWebServer {
         return
       }
 
-      const requestPath = decodeURIComponent(String(req.path || req.url || '/').split('?')[0])
       const safePath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, '')
       const relativePath = safePath === '/' || safePath === '.' ? 'index.html' : safePath.replace(/^[/\\]/, '')
       let filePath = path.resolve(this.staticDir, relativePath)
@@ -246,7 +501,12 @@ class SpeakerWebServer {
         return
       }
 
-      this.sendStaticFile(res, filePath)
+      if (path.basename(filePath) === 'index.html') {
+        const type = this.isBackgroundEditorPageRequest(req) ? '背景设置页面访问' : '管理端页面访问'
+        logWebAccess(cfg, `${type}: ip=${getClientIp(req)}, path=${getSafeRequestPath(req)}`)
+      }
+
+      this.sendStaticFile(req, res, filePath)
     })
   }
 
@@ -264,6 +524,7 @@ class SpeakerWebServer {
     this.basePath = cfg.basePath
     this.apiBasePath = cfg.apiBasePath
     this.registerApi(app, this.apiBasePath)
+    this.registerFontStatic(app)
     this.registerStatic(app, this.basePath)
 
     this.server = http.createServer((req, res) => app.handle(req, res))

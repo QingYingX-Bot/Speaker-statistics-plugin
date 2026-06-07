@@ -9,5 +9,12 @@ export const webTemplate = {
   basePath: '/',
   apiBasePath: '/api',
   localOnly: true,
-  queryLog: false
+  allowExternalManageAccess: false,
+  accessLog: true,
+  queryLog: false,
+  backgroundEditor: {
+    enabled: true,
+    tokenTtlMinutes: 30,
+    maxImageMB: 2
+  }
 }

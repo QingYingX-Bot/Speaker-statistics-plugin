@@ -1,3 +1,5 @@
+import { isIP } from 'node:net'
+
 export const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -42,10 +44,85 @@ export function isLocalRequest(req) {
     || address === ''
 }
 
+export function getRequestHost(req) {
+  const raw = String(req?.headers?.host || '').trim().toLowerCase()
+  if (!raw) return ''
+
+  if (raw.startsWith('[')) {
+    const endIndex = raw.indexOf(']')
+    return endIndex > 0 ? raw.slice(1, endIndex) : raw
+  }
+
+  return raw.split(':')[0]
+}
+
+export function isPrivateAddress(value) {
+  const host = String(value || '').trim().toLowerCase().replace(/^::ffff:/, '')
+  if (!host || host === 'localhost' || host === '::1') return true
+
+  if (isIP(host) === 4) {
+    const parts = host.split('.').map(part => Number(part))
+    if (parts.length !== 4 || parts.some(part => !Number.isInteger(part))) return false
+    const [a, b] = parts
+    return a === 10
+      || a === 127
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168)
+      || (a === 169 && b === 254)
+  }
+
+  if (isIP(host) === 6) {
+    return host.startsWith('fc')
+      || host.startsWith('fd')
+      || host.startsWith('fe80:')
+  }
+
+  return false
+}
+
+export function isPrivateHostRequest(req) {
+  return isPrivateAddress(getRequestHost(req))
+}
+
 export function sendJson(res, status, payload) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.end(JSON.stringify(payload))
+}
+
+export function createHttpError(status, message) {
+  const err = new Error(message)
+  err.statusCode = status
+  return err
+}
+
+export function readJsonBody(req, maxBytes = 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let total = 0
+
+    req.on('data', chunk => {
+      total += chunk.length
+      if (total > maxBytes) {
+        reject(createHttpError(413, '请求内容过大'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+
+    req.on('error', err => reject(err))
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8').trim()
+      if (!raw) return resolve({})
+
+      try {
+        resolve(JSON.parse(raw))
+      } catch {
+        reject(createHttpError(400, '请求 JSON 格式无效'))
+      }
+    })
+  })
 }
 
 export function parsePositiveInt(value, fallback, min = 1, max = 100) {
@@ -75,6 +152,12 @@ export function createMiniApp() {
     get(routePath, handler) {
       addRoute('GET', routePath, handler)
     },
+    post(routePath, handler) {
+      addRoute('POST', routePath, handler)
+    },
+    delete(routePath, handler) {
+      addRoute('DELETE', routePath, handler)
+    },
     use(routePath, handler) {
       routes.push({ method: 'USE', routePath, handler })
     },
@@ -85,7 +168,7 @@ export function createMiniApp() {
       req.path = parsedUrl.pathname
 
       for (const route of routes) {
-        if (route.method === 'GET' && req.method === 'GET' && parsedUrl.pathname === route.routePath) {
+        if (route.method === req.method && parsedUrl.pathname === route.routePath) {
           return route.handler(req, res)
         }
 

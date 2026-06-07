@@ -5,6 +5,7 @@ import { globalConfig } from '../ConfigManager.js'
 import { CommonUtils } from '../utils/CommonUtils.js'
 import { TimeUtils } from '../utils/TimeUtils.js'
 import { MemberNameResolver } from '../utils/MemberNameResolver.js'
+import { backgroundService } from '../services/BackgroundService.js'
 
 /**
  * 模板管理器
@@ -26,6 +27,7 @@ class TemplateManager {
         this.cacheTimestamp = new Map()
         this.cacheTTL = 30 * 60 * 1000; // 30分钟缓存
         this.dataService = dataService
+        this.backgroundService = backgroundService
     }
 
     /**
@@ -236,6 +238,13 @@ class TemplateManager {
     }
 
     /**
+     * 获取排行榜项目背景样式
+     */
+    getRankingItemBackgroundStyle(userId) {
+        return this.backgroundService.getRankingBackgroundStyle(userId)
+    }
+
+    /**
      * 生成排名显示
      */
     generateRankDisplay(index) {
@@ -366,9 +375,10 @@ class TemplateManager {
             const rankDisplay = this.generateRankDisplay(index)
             const displayName = await this.getPreferredUserDisplayName(item.user_id, groupId, item.nickname)
             const avatarUrl = await this.getUserAvatarUrl(item.user_id, groupId)
+            const backgroundInfo = this.getRankingItemBackgroundStyle(item.user_id)
 
             const itemHtml = `
-        <div class="rank-item">
+        <div class="rank-item ${backgroundInfo.hasBackground ? 'has-background' : ''}" style="${backgroundInfo.style || ''}">
           <div class="rank-number">${rankDisplay}</div>
           <img class="avatar" src="${avatarUrl}" alt="avatar" onerror="this.style.display='none'">
           <div class="user-info">
@@ -400,6 +410,7 @@ class TemplateManager {
     async generateUserCard(userInfo, totalCount = 0, showExtraStats = false, groupId = null) {
         const displayName = await this.getPreferredUserDisplayName(userInfo.data.user_id, groupId, userInfo.data.nickname)
         const avatarUrl = await this.getUserAvatarUrl(userInfo.data.user_id, groupId)
+        const backgroundInfo = this.getRankingItemBackgroundStyle(userInfo.data.user_id)
         
         // 计算百分比（与主排行榜条目保持一致）
         const count = userInfo.data.count || 0
@@ -407,7 +418,7 @@ class TemplateManager {
 
         return `
       <div class="user-card">
-        <div class="rank-item">
+        <div class="rank-item ${backgroundInfo.hasBackground ? 'has-background' : ''}" style="${backgroundInfo.style || ''}">
           <div class="rank-number">#${userInfo.rank}</div>
           <img class="avatar" src="${avatarUrl}" alt="avatar" onerror="this.style.display='none'">
           <div class="user-info">
