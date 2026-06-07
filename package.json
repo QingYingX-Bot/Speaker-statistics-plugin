@@ -40,6 +40,9 @@
     "statistics",
     "postgresql",
     "sqlite",
-    "ranking"
+    "ranking",
+    "web",
+    "redis",
+    "group-chat"
   ]
 }

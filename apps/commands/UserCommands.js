@@ -3,6 +3,7 @@ import { globalConfig } from '../../core/ConfigManager.js'
 import { CommonUtils } from '../../core/utils/CommonUtils.js'
 import { CommandWrapper } from '../../core/utils/CommandWrapper.js'
 import { UserParser } from '../../core/utils/UserParser.js'
+import { MemberNameResolver } from '../../core/utils/MemberNameResolver.js'
 import { TimeUtils } from '../../core/utils/TimeUtils.js'
 import { ImageGenerator } from '../../core/render/ImageGenerator.js'
 import { getMessageCollector } from '../../core/services/index.js'
@@ -518,7 +519,15 @@ class UserCommands {
         return e.reply(`${userInfo.nickname} 暂无统计数据`)
       }
 
-      let nickname = userStats.nickname || userInfo.nickname
+      const currentGroupId = MemberNameResolver.getCurrentGroupId(e)
+      const currentMemberMap = await MemberNameResolver.getCurrentGroupMemberMap(e, currentGroupId)
+      let nickname = MemberNameResolver.resolveDisplayName({
+        e,
+        groupId: currentGroupId,
+        userId,
+        fallback: userStats.nickname || userInfo.nickname,
+        memberMap: currentMemberMap
+      })
       const totalCount = parseInt(userStats.total_count || 0, 10)
       const totalWords = parseInt(userStats.total_words || 0, 10)
       const totalActiveDays = parseInt(userStats.active_days || 0, 10)
@@ -567,7 +576,7 @@ class UserCommands {
       try {
         const imagePath = await this.imageGenerator.generateUserStatsImage(
           userData,
-          null,
+          currentGroupId || null,
           '全局统计',
           userId,
           nickname
@@ -608,7 +617,15 @@ class UserCommands {
       }
 
       const userId = userInfo.userId
-      let nickname = userInfo.nickname
+      const currentGroupId = MemberNameResolver.getCurrentGroupId(e)
+      const currentMemberMap = await MemberNameResolver.getCurrentGroupMemberMap(e, currentGroupId)
+      let nickname = MemberNameResolver.resolveDisplayName({
+        e,
+        groupId: currentGroupId,
+        userId,
+        fallback: userInfo.nickname,
+        memberMap: currentMemberMap
+      })
       const mentionedUser = userInfo.isMentioned ? userInfo : null
       const dbService = this.dataService.dbService
 
@@ -686,7 +703,7 @@ class UserCommands {
 
       try {
         const firstStat = userStatsList[0]
-        if (firstStat?.nickname) {
+        if (firstStat?.nickname && !nickname) {
           nickname = firstStat.nickname
         }
       } catch {}

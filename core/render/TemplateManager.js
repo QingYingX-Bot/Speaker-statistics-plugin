@@ -4,6 +4,7 @@ import { PathResolver } from '../utils/PathResolver.js'
 import { globalConfig } from '../ConfigManager.js'
 import { CommonUtils } from '../utils/CommonUtils.js'
 import { TimeUtils } from '../utils/TimeUtils.js'
+import { MemberNameResolver } from '../utils/MemberNameResolver.js'
 
 /**
  * 模板管理器
@@ -253,27 +254,11 @@ class TemplateManager {
      * 获取用户显示名称
      */
     getUserDisplayName(userId, groupId, nickname) {
-        let displayName = nickname || userId
-
-        try {
-            if (typeof Bot !== 'undefined' && Bot.gml) {
-                const userList = Bot.gml.get(groupId)
-                if (userList) {
-                    const userInfo = userList.get(userId)
-                    if (userInfo) {
-                        displayName = userInfo.card || userInfo.nickname || nickname || userId
-                        displayName = displayName.replace(/[^\p{L}\p{N}\p{P}\p{S}\p{Z}]/gu, '').trim()
-                        if (!displayName) {
-                            displayName = nickname || userId
-                        }
-                    }
-                }
-            }
-        } catch (err) {
-            displayName = nickname || userId
-        }
-
-        return displayName || userId
+        return MemberNameResolver.resolveDisplayName({
+            groupId,
+            userId,
+            fallback: nickname || userId
+        }) || userId
     }
 
     /**

@@ -2,6 +2,7 @@ import { DataService } from '../../core/DataService.js'
 import { globalConfig } from '../../core/ConfigManager.js'
 import { CommonUtils } from '../../core/utils/CommonUtils.js'
 import { CommandWrapper } from '../../core/utils/CommandWrapper.js'
+import { MemberNameResolver } from '../../core/utils/MemberNameResolver.js'
 import { ImageGenerator } from '../../core/render/ImageGenerator.js'
 import { TextFormatter } from '../../core/render/TextFormatter.js'
 import { TimeUtils } from '../../core/utils/TimeUtils.js'
@@ -28,12 +29,13 @@ class RankCommands {
         return segment.image(`base64://${base64}`)
     }
 
-    async getUserRankInfo(userId, groupId, period, rankings) {
+    async getUserRankInfo(userId, groupId, period, rankings, nicknameContext = {}) {
         let userRankData = null
         let userInfo = null
         if (userId && !rankings.some(u => String(u.user_id) === userId)) {
             userRankData = await this.dataService.getUserRankData(userId, groupId, period, {})
             if (userRankData?.rank) {
+                userRankData = this.applyCurrentGroupNickname(userRankData, nicknameContext)
                 userInfo = {
                     data: {
                         user_id: userRankData.user_id,
@@ -51,16 +53,37 @@ class RankCommands {
         return { userInfo, userRankData }
     }
 
+    async getNicknameContext(e, groupId = '') {
+        const currentGroupId = MemberNameResolver.getCurrentGroupId(e, groupId)
+        return {
+            e,
+            groupId: currentGroupId,
+            memberMap: await MemberNameResolver.getCurrentGroupMemberMap(e, currentGroupId)
+        }
+    }
+
+    applyCurrentGroupNickname(user, context) {
+        return MemberNameResolver.applyToUser(user, context)
+    }
+
+    applyCurrentGroupNicknames(rankings, context) {
+        return (rankings || []).map(user => this.applyCurrentGroupNickname(user, context))
+    }
+
     async renderRanking(e, period, periodName, emptyMsg, groupId = null, groupName = null, extraOptions = {}) {
         const userId = String(e.user_id || e.sender?.user_id || '')
         const limit = globalConfig.getConfig('display.displayCount') || 20
-        const rankings = await this.dataService.getRankingData(groupId, period, { limit })
+        const nicknameContext = await this.getNicknameContext(e, groupId)
+        const rankings = this.applyCurrentGroupNicknames(
+            await this.dataService.getRankingData(groupId, period, { limit }),
+            nicknameContext
+        )
         
         if (rankings.length === 0) {
             return e.reply(emptyMsg)
         }
 
-        const { userInfo, userRankData } = await this.getUserRankInfo(userId, groupId, period, rankings)
+        const { userInfo, userRankData } = await this.getUserRankInfo(userId, groupId, period, rankings, nicknameContext)
         let finalGroupName = groupName
         if (!finalGroupName && groupId) {
             finalGroupName = await this.dataService.getPreferredGroupName(groupId, e)
@@ -143,14 +166,18 @@ class RankCommands {
             this.dataService.globalStatsCache.delete('globalStats:1:1')
             
             const globalStats = await this.dataService.getGlobalStats(1, 1)
-            const rankings = await this.dataService.getRankingData(null, 'total', { limit })
+            const nicknameContext = await this.getNicknameContext(e)
+            const rankings = this.applyCurrentGroupNicknames(
+                await this.dataService.getRankingData(null, 'total', { limit }),
+                nicknameContext
+            )
             
             if (rankings.length === 0) {
                 return e.reply('暂无排行榜数据')
             }
 
             const userId = String(e.user_id || e.sender?.user_id || '')
-            const { userInfo, userRankData } = await this.getUserRankInfo(userId, null, 'total', rankings)
+            const { userInfo, userRankData } = await this.getUserRankInfo(userId, null, 'total', rankings, nicknameContext)
 
             try {
                 const imagePath = await this.imageGenerator.generateRankingImage(
