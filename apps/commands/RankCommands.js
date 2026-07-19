@@ -6,6 +6,7 @@ import { MemberNameResolver } from '../../core/utils/MemberNameResolver.js'
 import { ImageGenerator } from '../../core/render/ImageGenerator.js'
 import { TextFormatter } from '../../core/render/TextFormatter.js'
 import { TimeUtils } from '../../core/utils/TimeUtils.js'
+import { showPreviousMonthlyRank } from './rank/PreviousMonthRank.js'
 import common from '../../../../lib/common/common.js'
 import { segment } from 'oicq'
 
@@ -29,11 +30,15 @@ class RankCommands {
         return segment.image(`base64://${base64}`)
     }
 
-    async getUserRankInfo(userId, groupId, period, rankings, nicknameContext = {}) {
+    async getUserRankInfo(userId, groupId, period, rankings, nicknameContext = {}, options = {}) {
         let userRankData = null
         let userInfo = null
-        if (userId && !rankings.some(u => String(u.user_id) === userId)) {
-            userRankData = await this.dataService.getUserRankData(userId, groupId, period, {})
+        const inRankings = userId && rankings.some(u => {
+            if (String(u.user_id) === userId) return true
+            return (u.merged_user_ids || []).some(id => String(id) === userId)
+        })
+        if (userId && !inRankings) {
+            userRankData = await this.dataService.getUserRankData(userId, groupId, period, options)
             if (userRankData?.rank) {
                 userRankData = this.applyCurrentGroupNickname(userRankData, nicknameContext)
                 userInfo = {
@@ -44,7 +49,9 @@ class RankCommands {
                         period_words: userRankData.period_words,
                         active_days: userRankData.active_days,
                         continuous_days: userRankData.continuous_days,
-                        last_speaking_time: userRankData.last_speaking_time
+                        last_speaking_time: userRankData.last_speaking_time,
+                        merged_user_ids: userRankData.merged_user_ids,
+                        background_user_ids: userRankData.background_user_ids
                     },
                     rank: userRankData.rank
                 }
@@ -75,7 +82,7 @@ class RankCommands {
         const limit = globalConfig.getConfig('display.displayCount') || 20
         const nicknameContext = await this.getNicknameContext(e, groupId)
         const rankings = this.applyCurrentGroupNicknames(
-            await this.dataService.getRankingData(groupId, period, { limit }),
+            await this.dataService.getRankingData(groupId, period, { limit, ...extraOptions }),
             nicknameContext
         )
         
@@ -83,7 +90,7 @@ class RankCommands {
             return e.reply(emptyMsg)
         }
 
-        const { userInfo, userRankData } = await this.getUserRankInfo(userId, groupId, period, rankings, nicknameContext)
+        const { userInfo, userRankData } = await this.getUserRankInfo(userId, groupId, period, rankings, nicknameContext, extraOptions)
         let finalGroupName = groupName
         if (!finalGroupName && groupId) {
             finalGroupName = await this.dataService.getPreferredGroupName(groupId, e)
@@ -129,6 +136,10 @@ class RankCommands {
             {
                 reg: '^#水群(月)?榜$',
                 fnc: 'showMonthlyRank'
+            },
+            {
+                reg: '^#上月水群榜$',
+                fnc: 'showPreviousMonthlyRank'
             },
             {
                 reg: '^#水群年榜$',
@@ -235,6 +246,10 @@ class RankCommands {
         }, '获取月榜失败', async () => {
             return e.reply('获取月榜失败，请稍后重试')
         })
+    }
+
+    async showPreviousMonthlyRank(e) {
+        return await showPreviousMonthlyRank(this, e)
     }
 
     async showYearlyRank(e) {

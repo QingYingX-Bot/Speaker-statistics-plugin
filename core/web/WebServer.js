@@ -30,6 +30,7 @@ import { getClientIp, getSafeRequestPath, logWebAccess } from './WebAccessLogger
 import { sendAccessDeniedPage } from './WebErrorPages.js'
 import { backgroundAdminController } from './BackgroundAdminController.js'
 import { getBackgroundPreviewData } from './BackgroundPreviewData.js'
+import { webIpBlocker } from './WebIpBlocker.js'
 
 class SpeakerWebServer {
   constructor() {
@@ -42,6 +43,7 @@ class SpeakerWebServer {
     this.dbService = getDatabaseService()
     this.backgroundService = backgroundService
     this.backgroundTokenService = backgroundTokenService
+    this.ipBlocker = webIpBlocker
   }
 
   getVersion() {
@@ -67,6 +69,13 @@ class SpeakerWebServer {
       allowExternalManageAccess: cfg.allowExternalManageAccess === true,
       accessLog: cfg.accessLog !== false,
       queryLog: cfg.queryLog === true,
+      ipBlock: {
+        enabled: cfg.ipBlock?.enabled !== false,
+        windowSeconds: parsePositiveInt(cfg.ipBlock?.windowSeconds, 60, 5, 3600),
+        maxDeniedRequests: parsePositiveInt(cfg.ipBlock?.maxDeniedRequests, 30, 1, 10000),
+        blockMinutes: parsePositiveInt(cfg.ipBlock?.blockMinutes, 60, 1, 10080),
+        maxTrackedIps: parsePositiveInt(cfg.ipBlock?.maxTrackedIps, 1000, 100, 100000)
+      },
       backgroundEditor: {
         enabled: cfg.backgroundEditor?.enabled !== false,
         tokenTtlMinutes: parsePositiveInt(cfg.backgroundEditor?.tokenTtlMinutes, 30, 1, 1440),
@@ -112,12 +121,30 @@ class SpeakerWebServer {
     return { ok: true }
   }
 
+  rejectBlockedIp(req, res, cfg = this.getConfig()) {
+    const ip = getClientIp(req)
+    const block = this.ipBlocker.isBlocked(cfg, ip)
+    if (!block.blocked) return false
+
+    res.statusCode = 403
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-store')
+    res.end('Forbidden')
+    return true
+  }
+
   requireAccess(req, res, cfg = this.getConfig(), scope = 'management', responseType = 'json') {
     const access = scope === 'background'
       ? this.canAccessBackgroundEditor(req, cfg)
       : this.canAccessManagement(req, cfg)
     if (access.ok) return true
-    logWebAccess(cfg, `访问被拒: scope=${scope}, ip=${getClientIp(req)}, path=${getSafeRequestPath(req)}, reason=${access.message}`)
+    const ip = getClientIp(req)
+    logWebAccess(cfg, `访问被拒: scope=${scope}, ip=${ip}, path=${getSafeRequestPath(req)}, reason=${access.message}`)
+    const block = this.ipBlocker.recordDeniedRequest(cfg, ip)
+    if (block.justBlocked) {
+      const until = new Date(block.blockedUntil).toISOString()
+      logWebAccess(cfg, `IP 已封禁: ip=${ip}, denied=${block.deniedCount}/${block.windowSeconds}s, block=${block.blockMinutes}min, until=${until}`)
+    }
     if (responseType === 'html') {
       sendAccessDeniedPage(res, access.message)
       return false
@@ -187,6 +214,7 @@ class SpeakerWebServer {
         allowExternalManageAccess: webCfg.allowExternalManageAccess,
         accessLog: webCfg.accessLog,
         queryLog: webCfg.queryLog,
+        ipBlock: webCfg.ipBlock,
         backgroundEditor: webCfg.backgroundEditor
       },
       switches: {
@@ -527,7 +555,11 @@ class SpeakerWebServer {
     this.registerFontStatic(app)
     this.registerStatic(app, this.basePath)
 
-    this.server = http.createServer((req, res) => app.handle(req, res))
+    this.server = http.createServer((req, res) => {
+      const currentCfg = this.getConfig()
+      if (this.rejectBlockedIp(req, res, currentCfg)) return
+      app.handle(req, res)
+    })
 
     await new Promise((resolve, reject) => {
       const onError = (err) => {

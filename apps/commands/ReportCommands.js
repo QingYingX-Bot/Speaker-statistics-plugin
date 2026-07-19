@@ -17,6 +17,7 @@ import {
 } from '../../core/services/index.js'
 import { PathResolver } from '../../core/utils/PathResolver.js'
 import { UserParser } from '../../core/utils/UserParser.js'
+import { CommonUtils } from '../../core/utils/CommonUtils.js'
 import { logger } from '#lib'
 
 class ReportCommands {
@@ -625,6 +626,7 @@ export class ReportPlugin {
 
       // 渲染报告
       const img = await this.renderReport(report, {
+        groupId,
         groupName,
         model: aiService?.model || '',
         tokenUsage: report.tokenUsage,
@@ -813,6 +815,7 @@ export class ReportPlugin {
         logger.info(`[报告] 用户 ${e.user_id} 查询群 ${targetGroupId} 的${dateLabel}报告（冷却中，${elapsedMinutes}分钟前已生成）`)
 
         const img = await this.renderReport(report, {
+          groupId: targetGroupId,
           groupName,
           model: aiService?.model || '',
           tokenUsage: report.tokenUsage,
@@ -840,6 +843,7 @@ export class ReportPlugin {
         )
 
         const img = await this.renderReport(report, {
+          groupId: targetGroupId,
           groupName,
           model: aiService?.model || '',
           tokenUsage: report.tokenUsage,
@@ -890,6 +894,7 @@ export class ReportPlugin {
 
         const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, queryDate)
         const img = await this.renderReport(savedReport || analysisResults, {
+          groupId: targetGroupId,
           groupName,
           model: aiService?.model || '',
           tokenUsage: (savedReport || analysisResults).tokenUsage,
@@ -1001,6 +1006,7 @@ export class ReportPlugin {
         }
 
         const img = await this.renderReport(analysisResults, {
+          groupId: targetGroupId,
           groupName: `${groupName} · 水友分析`,
           focusName: targetNickname,
           model: aiService?.model || '',
@@ -1125,6 +1131,7 @@ export class ReportPlugin {
         // 渲染并发送报告
         const savedReport = await messageCollector.redisHelper.getReport(targetGroupId, targetDate)
         const img = await this.renderReport(savedReport || analysisResults, {
+          groupId: targetGroupId,
           groupName,
           model: aiService?.model || '',
           tokenUsage: (savedReport || analysisResults).tokenUsage,
@@ -1173,6 +1180,7 @@ export class ReportPlugin {
 
       // 1. 基础统计分析
       const stats = statisticsService.analyze(messages)
+      stats.groupId = groupId
       logger.info(`[报告] 基础统计完成 - 参与用户: ${stats.basic.totalUsers}`)
 
       // 检查是否满足最小消息数阈值
@@ -1423,6 +1431,8 @@ export class ReportPlugin {
 
       // 5. 整合结果
       const analysisResults = {
+        groupId,
+        date,
         stats,
         topics,
         goldenQuotes,
@@ -1458,11 +1468,12 @@ export class ReportPlugin {
   /**
    * 渲染报告
    */
-  async renderReport(analysisResults, options) {
+  async renderReport(analysisResults, options = {}) {
     try {
       const config = Config.get()
       const activityVisualizer = await getActivityVisualizer()
       const { stats, topics, goldenQuotes, userTitles } = analysisResults
+      const groupId = options.groupId || analysisResults.groupId || this.group_id || ''
 
       // 准备活跃度图表数据
       const activityChartData = config?.analysis?.activity?.enabled !== false && activityVisualizer
@@ -1490,6 +1501,11 @@ export class ReportPlugin {
         completion: options.tokenUsage.completion_tokens || 0,
         total: options.tokenUsage.total_tokens || 0
       } : null
+
+      const userTitlesWithAvatar = (userTitles || []).map(title => ({
+        ...title,
+        avatarUrl: title.avatarUrl || (title.user_id ? CommonUtils.getQQUserAvatarUrl(title.user_id, groupId) : '')
+      }))
 
       const templateData = {
         version: this.version,
@@ -1525,7 +1541,7 @@ export class ReportPlugin {
         // AI 分析结果
         topics,
         goldenQuotes,
-        userTitles,
+        userTitles: userTitlesWithAvatar,
 
         // 元数据 - 使用报告数据中的 savedAt 时间戳
         createTime: analysisResults.savedAt ? moment(analysisResults.savedAt).format('YYYY-MM-DD HH:mm:ss') : moment().format('YYYY-MM-DD HH:mm:ss'),
@@ -1608,7 +1624,7 @@ export class ReportPlugin {
             userMap.set(msg.nickname, { user_id: msg.user_id, nickname: msg.nickname })
           }
         }
-        const stats = { users: Array.from(userMap.values()) }
+        const stats = { groupId, users: Array.from(userMap.values()) }
 
         // 并行分析话题和金句
         const [topicResult, quoteResult] = await Promise.all([

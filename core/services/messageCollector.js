@@ -92,6 +92,8 @@ export default class MessageCollector {
    * @param {object} e - 事件对象
    */
   async handleMessage(e) {
+    e.time = Number(e.time) || Math.floor(Date.now() / 1000)
+
     // 过滤 QQ 官方 Bot 的消息
     if (e.bot?.adapter?.id === 'QQBot') {
       logger.debug(`已过滤QQ官方Bot消息 (adapter: QQBot)`)
@@ -463,7 +465,7 @@ export default class MessageCollector {
       const recordId = await this.redisHelper.saveAtRecord(e.group_id, userId.toString(), atData)
 
       // 如果是纯@，保存到 pending 列表等待收集下一条消息
-      if (isPureAt && this.contextMessageCount > 0) {
+      if (isPureAt && this.contextMessageCount > 0 && recordId) {
         const nextMessageTimeout = this.config.nextMessageTimeout || 300
         const expireTime = e.time + nextMessageTimeout
         await this.redisHelper.savePendingAt(e.group_id, e.user_id.toString(), recordId, expireTime)
@@ -541,7 +543,7 @@ export default class MessageCollector {
   async getRecentUserMessages(groupId, userId, count = 1, beforeTime = null, days = null) {
     try {
       const userMessages = []
-      const targetUserId = parseInt(userId)
+      const targetUserId = String(userId)
 
       // 如果指定了 days，则获取该天数内的所有消息，忽略 count 限制
       const queryDays = days || this.redisHelper.retentionDays
@@ -570,7 +572,7 @@ export default class MessageCollector {
             const msg = JSON.parse(dayMessages[j])
 
             // 检查是否是目标用户的消息
-            if (msg.user_id === targetUserId) {
+            if (String(msg.user_id) === targetUserId) {
               logger.debug(`找到用户消息: time=${msg.time}, beforeTime=${beforeTime}, message=${msg.message}`)
 
               // 如果指定了时间限制,只获取该时间之前的消息
@@ -782,6 +784,7 @@ export default class MessageCollector {
         }
       }
       const stats = {
+        groupId,
         users: Array.from(userMap.values())
       }
 

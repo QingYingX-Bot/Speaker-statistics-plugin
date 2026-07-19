@@ -3,6 +3,39 @@
  * 提供标准化的验证、处理和格式化功能
  */
 class CommonUtils {
+    static getBotAppId(selfId) {
+        const bot = globalThis.Bot?.[String(selfId || '').trim()]
+        return String(bot?.info?.appid || bot?.info?.appId || '').trim()
+    }
+
+    static parseQQBotUserId(userId, groupId = '') {
+        const rawUserId = String(userId || '').trim()
+        const rawGroupId = String(groupId || '').trim()
+        if (!rawUserId) return null
+
+        const splitPrefixedId = (id) => {
+            const idx = id.indexOf(':')
+            if (idx <= 0) return null
+            return { selfId: id.slice(0, idx), openid: id.slice(idx + 1) }
+        }
+
+        const userParts = splitPrefixedId(rawUserId)
+        const groupParts = splitPrefixedId(rawGroupId)
+        const openid = userParts?.openid || rawUserId
+        const appid = this.getBotAppId(userParts?.selfId || groupParts?.selfId)
+
+        if (!appid || !/^[A-Za-z0-9_-]{16,}$/.test(openid) || /^\d+$/.test(openid)) return null
+        return { appid, openid }
+    }
+
+    static getQQUserAvatarUrl(userId, groupId = '') {
+        const qqBotUser = this.parseQQBotUserId(userId, groupId)
+        if (qqBotUser) {
+            return `https://thirdqq.qlogo.cn/qqapp/${encodeURIComponent(qqBotUser.appid)}/${encodeURIComponent(qqBotUser.openid)}/640`
+        }
+        return `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(String(userId || '').trim())}&s=100`
+    }
+
     /**
      * 验证群聊消息事件
      * @param {Object} e 消息事件对象

@@ -83,6 +83,49 @@ export function getWebSchemas() {
       component: 'Switch'
     },
     {
+      label: 'IP 封禁',
+      component: 'SOFT_GROUP_BEGIN'
+    },
+    {
+      field: 'web.ipBlock.enabled',
+      label: '启用 IP 封禁',
+      bottomHelpMessage: '开启后，同一 IP 在统计窗口内多次被拒绝访问会被临时封禁',
+      component: 'Switch'
+    },
+    {
+      field: 'web.ipBlock.windowSeconds',
+      label: '统计窗口',
+      bottomHelpMessage: '单位：秒。默认 60 秒',
+      component: 'InputNumber',
+      componentProps: {
+        min: 5,
+        max: 3600,
+        placeholder: '60'
+      }
+    },
+    {
+      field: 'web.ipBlock.maxDeniedRequests',
+      label: '拒绝次数阈值',
+      bottomHelpMessage: '同一 IP 在统计窗口内达到该拒绝次数后封禁',
+      component: 'InputNumber',
+      componentProps: {
+        min: 1,
+        max: 10000,
+        placeholder: '30'
+      }
+    },
+    {
+      field: 'web.ipBlock.blockMinutes',
+      label: '封禁时长',
+      bottomHelpMessage: '单位：分钟。默认 60 分钟',
+      component: 'InputNumber',
+      componentProps: {
+        min: 1,
+        max: 10080,
+        placeholder: '60'
+      }
+    },
+    {
       label: '背景编辑器',
       component: 'SOFT_GROUP_BEGIN'
     },

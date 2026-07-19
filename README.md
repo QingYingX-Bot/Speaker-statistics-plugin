@@ -12,12 +12,12 @@
 
 发言统计插件是 Yunzai-Bot 的群聊统计解决方案，用于统计并展示群成员的发言次数、字数、活跃情况，并提供群聊分析、词云、归档清理和锅巴配置能力。
 
-- 文档版本：`5.1.1`
-- 发布日期：`2026-06-07`
+- 文档版本：`5.1.2`
+- 发布日期：`2026-07-19`
 
 ### 核心特性
 
-- 📊 **多维度统计**：总榜、日榜、周榜、月榜、年榜、趋势全覆盖
+- 📊 **多维度统计**：总榜、日榜、周榜、月榜、上月榜、年榜、趋势全覆盖
 - 👤 **个人查询**：支持个人统计、跨群列表、@ 查询他人
 - 🪪 **当前群昵称展示**：个人查询和排行榜优先显示用户在当前群的群名片 / 群昵称
 - 🎨 **排行榜个人背景**：支持私聊生成短期链接，通过 Web 页面设置自己的排行榜行背景
@@ -125,6 +125,7 @@ pnpm install --filter=Speaker-statistics-plugin
 | 日榜 | `#水群日榜` | 查看今日发言排行 |
 | 周榜 | `#水群周榜` | 查看本周发言排行 |
 | 月榜 | `#水群月榜` / `#水群榜` | 查看本月发言排行 |
+| 上月榜 | `#上月水群榜` | 查看上月发言排行 |
 | 年榜 | `#水群年榜` | 查看今年发言排行 |
 | 群统计 | `#水群统计` | 查看当前群聊统计信息 |
 | 群信息 | `#水群信息` | 查看当前群聊详细信息 |
@@ -188,6 +189,9 @@ pnpm install --filter=Speaker-statistics-plugin
 | `web.allowExternalManageAccess` | `web.localOnly` 关闭时，是否允许公网访问普通管理端页面和统计 API |
 | `web.accessLog` | 是否记录页面访问、背景设置、上传、删除和访问拒绝日志 |
 | `web.queryLog` | 网页查询概览和群组列表时是否输出全局统计计算日志 |
+| `web.ipBlock.enabled` | 是否启用重复拒绝访问 IP 临时封禁 |
+| `web.ipBlock.windowSeconds` / `web.ipBlock.maxDeniedRequests` | 封禁统计窗口和拒绝次数阈值，默认 60 秒内 30 次 |
+| `web.ipBlock.blockMinutes` | 临时封禁时长，默认 60 分钟 |
 | `web.backgroundEditor.enabled` | 是否启用排行榜背景编辑器 |
 | `web.backgroundEditor.tokenTtlMinutes` | 背景设置链接有效期，单位分钟 |
 | `web.backgroundEditor.maxImageMB` | 背景图片大小限制，单位 MB |
@@ -196,6 +200,7 @@ pnpm install --filter=Speaker-statistics-plugin
 > - Web 管理端提供统计概览、群组列表和排行查询。
 > - 默认仅本机访问，公网访问建议放在反向代理、HTTPS 和访问控制之后。
 > - 若 `web.localOnly=false` 且 `web.allowExternalManageAccess=false`，公网只能访问带 `backgroundToken` 的背景设置页面，局域网 IP 访问管理端保持可用。
+> - 同一 IP 在封禁统计窗口内触发多次访问拒绝后，会被应用层临时封禁，后续请求直接返回 `403 Forbidden`。
 > - 日榜、周榜、月榜、年榜在未填写群号时按全部当前群聚合统计。
 > - 管理端“背景”页支持查看、搜索、上传替换和删除所有用户的排行榜个人背景。
 > - 排行榜背景设置链接由私聊命令生成，图片保存在 `data/backgrounds/ranking/`。
@@ -310,6 +315,7 @@ data/
 
 - 控制 Web 管理端监听地址、端口、访问路径和本机访问限制
 - 控制网页查询是否输出全局统计计算日志
+- 控制重复拒绝访问 IP 的临时封禁策略
 
 ---
 

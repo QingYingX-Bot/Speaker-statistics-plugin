@@ -111,14 +111,21 @@ export default class RedisHelper {
    * @returns {string|null} recordId - 记录ID，保存失败返回 null
    */
   async saveAtRecord(groupId, userId, atData) {
+    const messageTime = Number(atData.time)
+    if (!Number.isFinite(messageTime)) {
+      logger.debug(`艾特记录时间无效，跳过保存: ${groupId}_${userId}`)
+      return null
+    }
+
     // 生成唯一记录ID
-    const recordId = this.generateAtRecordId(groupId, userId, atData.time)
+    const recordId = this.generateAtRecordId(groupId, userId, messageTime)
     const indexKey = this.getAtIndexKey(groupId, userId)
     const dataKey = this.getAtDataKey(recordId)
 
     // 计算过期时间
-    const expireTime = moment.unix(atData.time).add(this.atRetentionHours, 'hours').format('YYYY-MM-DD HH:mm:ss')
-    const expireSeconds = Math.floor((moment(expireTime).valueOf() - Date.now()) / 1000)
+    const expireAt = moment.unix(messageTime).add(this.atRetentionHours, 'hours')
+    const expireTime = expireAt.format('YYYY-MM-DD HH:mm:ss')
+    const expireSeconds = Math.floor((expireAt.valueOf() - Date.now()) / 1000)
 
     // 如果已经过期，不保存
     if (expireSeconds <= 0) {
@@ -129,7 +136,7 @@ export default class RedisHelper {
     try {
       // 1. 将记录ID添加到索引 (Sorted Set)
       // Score: 消息时间戳(秒)，Member: 记录ID
-      await redis.zAdd(indexKey, { score: atData.time, value: recordId })
+      await redis.zAdd(indexKey, { score: messageTime, value: recordId })
 
       // 2. 保存记录详情到 Hash
       const hashData = {
@@ -138,7 +145,7 @@ export default class RedisHelper {
         message: atData.message,
         images: JSON.stringify(atData.images || []),
         faces: JSON.stringify(atData.faces || {}),
-        time: String(atData.time),
+        time: String(messageTime),
         messageId: atData.messageId || '',
         contextMessages: JSON.stringify(atData.contextMessages || []),  // 新增: 上下文消息
         endTime: expireTime

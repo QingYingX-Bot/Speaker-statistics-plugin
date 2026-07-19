@@ -12,6 +12,13 @@ export const webTemplate = {
   allowExternalManageAccess: false,
   accessLog: true,
   queryLog: false,
+  ipBlock: {
+    enabled: true,
+    windowSeconds: 60,
+    maxDeniedRequests: 30,
+    blockMinutes: 60,
+    maxTrackedIps: 1000
+  },
   backgroundEditor: {
     enabled: true,
     tokenTtlMinutes: 30,

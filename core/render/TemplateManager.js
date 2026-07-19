@@ -121,7 +121,7 @@ class TemplateManager {
         if (platform === 'discord') {
             return 'https://cdn.discordapp.com/embed/avatars/0.png'
         }
-        return `https://q1.qlogo.cn/g?b=qq&s=100&nk=${normalizedUserId}`
+        return CommonUtils.getQQUserAvatarUrl(normalizedUserId, resolvedGroupId)
     }
 
     /**
@@ -244,6 +244,15 @@ class TemplateManager {
         return this.backgroundService.getRankingBackgroundStyle(userId)
     }
 
+    getRankingItemBackgroundStyleByIds(userIds) {
+        const ids = Array.isArray(userIds) ? userIds : [userIds]
+        for (const id of ids) {
+            const backgroundInfo = this.getRankingItemBackgroundStyle(id)
+            if (backgroundInfo.hasBackground) return backgroundInfo
+        }
+        return { style: '', hasBackground: false }
+    }
+
     /**
      * 生成排名显示
      */
@@ -336,7 +345,10 @@ class TemplateManager {
         if (userInfo && userInfo.data) {
             const userCount = userInfo.data.count || 0
             // 检查用户是否已经在显示范围内（通过检查是否有相同的user_id）
-            const userInRankings = data.some(item => String(item.user_id) === String(userInfo.data.user_id))
+            const userInRankings = data.some(item => {
+                if (String(item.user_id) === String(userInfo.data.user_id)) return true
+                return (item.merged_user_ids || []).some(id => String(id) === String(userInfo.data.user_id))
+            })
             // 如果用户不在显示范围内，将其消息数加入总计数
             if (!userInRankings) {
                 totalCount = totalCount + userCount
@@ -375,7 +387,7 @@ class TemplateManager {
             const rankDisplay = this.generateRankDisplay(index)
             const displayName = await this.getPreferredUserDisplayName(item.user_id, groupId, item.nickname)
             const avatarUrl = await this.getUserAvatarUrl(item.user_id, groupId)
-            const backgroundInfo = this.getRankingItemBackgroundStyle(item.user_id)
+            const backgroundInfo = this.getRankingItemBackgroundStyleByIds(item.background_user_ids || item.merged_user_ids || item.user_id)
 
             const itemHtml = `
         <div class="rank-item ${backgroundInfo.hasBackground ? 'has-background' : ''}" style="${backgroundInfo.style || ''}">
@@ -410,7 +422,7 @@ class TemplateManager {
     async generateUserCard(userInfo, totalCount = 0, showExtraStats = false, groupId = null) {
         const displayName = await this.getPreferredUserDisplayName(userInfo.data.user_id, groupId, userInfo.data.nickname)
         const avatarUrl = await this.getUserAvatarUrl(userInfo.data.user_id, groupId)
-        const backgroundInfo = this.getRankingItemBackgroundStyle(userInfo.data.user_id)
+        const backgroundInfo = this.getRankingItemBackgroundStyleByIds(userInfo.data.background_user_ids || userInfo.data.merged_user_ids || userInfo.data.user_id)
         
         // 计算百分比（与主排行榜条目保持一致）
         const count = userInfo.data.count || 0

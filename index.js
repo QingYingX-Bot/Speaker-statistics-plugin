@@ -31,7 +31,7 @@ try {
   packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 } catch (err) {
   global.logger.error('[发言统计] 读取 package.json 失败:', err)
-  packageJson = { version: '5.0.0' }
+  packageJson = { version: '5.1.2' }
 }
 
 const version = packageJson.version

@@ -7,6 +7,7 @@ import path from 'path'
 import fetch from 'node-fetch'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { getFrameworkProxyUrl } from './utils/ProxyUtils.js'
+import { CommonUtils } from './utils/CommonUtils.js'
 
 /**
  * LRU 缓存类
@@ -108,6 +109,7 @@ class DataService {
         this.currentGroupIdsCacheTTL = 10 * 60 * 1000 // 10 分钟
         this.discordTokenCache = { value: '', loadedAt: 0 } // Discord token 缓存，避免频繁读文件
         this.httpProxyAgentCache = new Map() // 代理 agent 缓存（按 proxy URL）
+        this.qqBotBindCache = null // QQBot OpenID -> QQ 绑定缓存
         this.discordPersistentCacheTTL = 24 * 60 * 60 * 1000 // 持久化缓存TTL：24小时
         this.discordPersistentCacheLimits = {
             users: 5000,
@@ -177,6 +179,141 @@ class DataService {
     normalizeGroupId(groupId) {
         if (groupId === null || groupId === undefined) return ''
         return String(groupId).trim()
+    }
+
+    getQQBotBindData() {
+        const dataFile = path.join(process.cwd(), 'data', 'binduid', 'users.json')
+        let mtimeMs = 0
+        try {
+            mtimeMs = fs.existsSync(dataFile) ? fs.statSync(dataFile).mtimeMs : 0
+            if (this.qqBotBindCache?.mtimeMs === mtimeMs) {
+                return this.qqBotBindCache
+            }
+        } catch {
+            return this.qqBotBindCache || { mtimeMs: 0, map: new Map(), aliasesByUin: new Map() }
+        }
+
+        const bindData = { mtimeMs, map: new Map(), aliasesByUin: new Map() }
+        const addAlias = (rawId, rawUin) => {
+            const id = this.normalizeGroupId(rawId)
+            const uin = this.normalizeGroupId(rawUin)
+            if (!id || !uin) return
+            bindData.map.set(id, uin)
+            const aliases = bindData.aliasesByUin.get(uin) || []
+            if (!aliases.includes(id)) aliases.push(id)
+            bindData.aliasesByUin.set(uin, aliases)
+        }
+
+        try {
+            if (!mtimeMs) {
+                this.qqBotBindCache = bindData
+                return bindData
+            }
+
+            const records = JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+            for (const [key, record] of Object.entries(records || {})) {
+                const uin = this.normalizeGroupId(record?.uin)
+                if (!uin) continue
+
+                const keyId = this.normalizeGroupId(key)
+                const selfId = this.normalizeGroupId(record?.self_id || keyId.split(':')[0])
+                const openid = this.normalizeGroupId(record?.user_id || keyId.split(':').pop())
+
+                addAlias(uin, uin)
+                addAlias(keyId, uin)
+                addAlias(openid, uin)
+                if (selfId && openid) addAlias(`${selfId}:${openid}`, uin)
+            }
+        } catch (err) {
+            this.debug('读取 QQBot 绑定数据失败:', err?.message || err)
+        }
+
+        this.qqBotBindCache = bindData
+        return bindData
+    }
+
+    resolveQQBotBoundUserId(userId, bindData = null) {
+        const id = this.normalizeGroupId(userId)
+        if (!id) return ''
+
+        const data = bindData || this.getQQBotBindData()
+        const shortId = id.includes(':') ? id.slice(id.indexOf(':') + 1) : id
+        return data.map.get(id) || data.map.get(shortId) || id
+    }
+
+    isSameQQBotBoundUserId(left, right, bindData = null) {
+        const data = bindData || this.getQQBotBindData()
+        return this.resolveQQBotBoundUserId(left, data) === this.resolveQQBotBoundUserId(right, data)
+    }
+
+    pickRankingNickname(current, candidate, currentId, candidateId, canonicalId) {
+        const name = this.normalizeGroupName(candidate)
+        if (!name || name === candidateId || name === canonicalId) return current
+
+        const oldName = this.normalizeGroupName(current)
+        if (!oldName || oldName === currentId || oldName === canonicalId || oldName === candidateId) return name
+        if (candidateId === canonicalId) return name
+        return oldName
+    }
+
+    mergeQQBotBoundRankingData(rows = [], limit = 20) {
+        const bindData = this.getQQBotBindData()
+        if (!bindData.map.size) return rows.slice(0, limit)
+
+        const appendId = (list, rawId) => {
+            const id = this.normalizeGroupId(rawId)
+            if (id && !list.includes(id)) list.push(id)
+        }
+        const toTime = value => {
+            const time = Date.parse(String(value || '').replace(' ', 'T'))
+            return Number.isFinite(time) ? time : 0
+        }
+
+        const merged = new Map()
+        for (const row of rows) {
+            const rowId = this.normalizeGroupId(row.user_id)
+            if (!rowId) continue
+
+            const canonicalId = this.resolveQQBotBoundUserId(rowId, bindData)
+            const item = merged.get(canonicalId) || {
+                ...row,
+                user_id: canonicalId,
+                nickname: '',
+                count: 0,
+                period_words: 0,
+                active_days: 0,
+                continuous_days: 0,
+                last_speaking_time: null,
+                merged_user_ids: [],
+                background_user_ids: []
+            }
+
+            item.count += parseInt(row.count || 0, 10)
+            item.period_words += parseInt(row.period_words || 0, 10)
+            item.active_days = Math.max(parseInt(item.active_days || 0, 10), parseInt(row.active_days || 0, 10))
+            item.continuous_days = Math.max(parseInt(item.continuous_days || 0, 10), parseInt(row.continuous_days || 0, 10))
+            if (toTime(row.last_speaking_time) >= toTime(item.last_speaking_time)) {
+                item.last_speaking_time = row.last_speaking_time || item.last_speaking_time
+            }
+            item.nickname = this.pickRankingNickname(item.nickname, row.nickname, item.user_id, rowId, canonicalId)
+
+            appendId(item.merged_user_ids, canonicalId)
+            appendId(item.merged_user_ids, rowId)
+            for (const alias of bindData.aliasesByUin.get(canonicalId) || []) appendId(item.merged_user_ids, alias)
+            item.background_user_ids = item.merged_user_ids
+            merged.set(canonicalId, item)
+        }
+
+        return [...merged.values()]
+            .map(item => ({ ...item, nickname: item.nickname || item.user_id }))
+            .sort((left, right) => {
+                const countDiff = parseInt(right.count || 0, 10) - parseInt(left.count || 0, 10)
+                if (countDiff) return countDiff
+                const wordDiff = parseInt(right.period_words || 0, 10) - parseInt(left.period_words || 0, 10)
+                if (wordDiff) return wordDiff
+                return toTime(right.last_speaking_time) - toTime(left.last_speaking_time)
+            })
+            .slice(0, limit)
     }
 
     /**
@@ -1229,7 +1366,7 @@ class DataService {
             return `https://cdn.discordapp.com/embed/avatars/0.png`
         }
 
-        return `https://q1.qlogo.cn/g?b=qq&s=100&nk=${normalizedUserId}`
+        return CommonUtils.getQQUserAvatarUrl(normalizedUserId, groupId)
     }
 
     /**
@@ -1866,15 +2003,19 @@ class DataService {
     async getRankingData(groupId, type = 'total', options = {}) {
         const timeInfo = TimeUtils.getCurrentDateTime()
         const limit = options.limit || 20
+        const bindData = this.getQQBotBindData()
+        const queryLimit = bindData.map.size ? 999999 : limit
+        const bindCacheKey = bindData.map.size ? `:${bindData.mtimeMs}` : ''
 
         try {
             switch (type) {
                 case 'total':
                     const queryAllGroups = !groupId || groupId === 'all'
                     const currentGroupIdsForRank = queryAllGroups ? this.getCurrentGroupIdsForFilter() : null
+                    const useAllGroupsCache = queryAllGroups && limit < 999999
 
-                    if (queryAllGroups) {
-                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}`
+                    if (useAllGroupsCache) {
+                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}${bindCacheKey}`
                         const cached = this.rankingCache.get(cacheKey)
                         if (cached) {
                             return cached
@@ -1883,16 +2024,16 @@ class DataService {
 
                     let topUsers
                     if (queryAllGroups) {
-                        topUsers = await this.dbService.getTopUsersAllGroups(limit, 'total_count', currentGroupIdsForRank)
+                        topUsers = await this.dbService.getTopUsersAllGroups(queryLimit, 'total_count', currentGroupIdsForRank)
                     } else {
                         const isArchived = await this.dbService.isGroupArchived(groupId)
                         if (isArchived) {
                             return []
                         }
-                        topUsers = await this.dbService.getTopUsers(groupId, limit, 'total_count')
+                        topUsers = await this.dbService.getTopUsers(groupId, queryLimit, 'total_count')
                     }
                     
-                    const result = topUsers.map(user => ({
+                    const result = this.mergeQQBotBoundRankingData(topUsers.map(user => ({
                         user_id: user.user_id,
                         nickname: user.nickname,
                         count: parseInt(user.total_count || 0, 10),
@@ -1900,10 +2041,10 @@ class DataService {
                         active_days: parseInt(user.active_days || 0, 10),
                         continuous_days: parseInt(user.continuous_days || 0, 10),
                         last_speaking_time: user.last_speaking_time || null
-                    }))
+                    })), limit)
                     
-                    if (queryAllGroups) {
-                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}`
+                    if (useAllGroupsCache) {
+                        const cacheKey = `ranking:total:all:${limit}:${currentGroupIdsForRank?.length ?? 'all'}${bindCacheKey}`
                         this.rankingCache.set(cacheKey, result)
                     }
                     
@@ -1913,25 +2054,25 @@ class DataService {
                     const todayDate = timeInfo.formattedDate
                     const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate)
                     
-                    return dailyStats.slice(0, limit).map(stat => ({
+                    return this.mergeQQBotBoundRankingData(dailyStats.map(stat => ({
                         user_id: stat.user_id,
                         nickname: stat.nickname || stat.user_id,
                         count: parseInt(stat.message_count || 0, 10),
                         period_words: parseInt(stat.word_count || 0, 10),
                         last_speaking_time: stat.last_speaking_time || null
-                    }))
+                    })), limit)
 
                 case 'weekly':
                     const weekKey = timeInfo.weekKey
                     const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey)
                     
-                    return weeklyStats.slice(0, limit).map(stat => ({
+                    return this.mergeQQBotBoundRankingData(weeklyStats.map(stat => ({
                         user_id: stat.user_id,
                         nickname: stat.nickname || stat.user_id,
                         count: parseInt(stat.message_count || 0, 10),
                         period_words: parseInt(stat.word_count || 0, 10),
                         last_speaking_time: stat.last_speaking_time || null
-                    }))
+                    })), limit)
 
                 case 'monthly':
                     if (!groupId) {
@@ -1942,25 +2083,25 @@ class DataService {
                     const validMonthKey = monthKey.match(/^\d{4}-\d{2}$/) ? monthKey : timeInfo.monthKey
                     const monthlyStats = await this.dbService.getMonthlyStatsByGroupAndMonth(groupId, validMonthKey)
                     
-                    return monthlyStats.slice(0, limit).map(stat => ({
+                    return this.mergeQQBotBoundRankingData(monthlyStats.map(stat => ({
                         user_id: stat.user_id,
                         nickname: stat.nickname || stat.user_id,
                         count: parseInt(stat.message_count || 0, 10),
                         period_words: parseInt(stat.word_count || 0, 10),
                         last_speaking_time: stat.last_speaking_time || null
-                    }))
+                    })), limit)
 
                 case 'yearly':
                     const yearKey = timeInfo.yearKey
                     const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey)
                     
-                    return yearlyStats.slice(0, limit).map(stat => ({
+                    return this.mergeQQBotBoundRankingData(yearlyStats.map(stat => ({
                         user_id: stat.user_id,
                         nickname: stat.nickname || stat.user_id,
                         count: parseInt(stat.message_count || 0, 10),
                         period_words: parseInt(stat.word_count || 0, 10),
                         last_speaking_time: stat.last_speaking_time || null
-                    }))
+                    })), limit)
 
                 default:
                     return []
@@ -1980,155 +2121,23 @@ class DataService {
      * @returns {Promise<Object|null>} 用户排名数据 { user_id, nickname, count, period_words, active_days, continuous_days, last_speaking_time, rank }
      */
     async getUserRankData(userId, groupId, type = 'total', options = {}) {
-        const timeInfo = TimeUtils.getCurrentDateTime()
-        
         try {
-            switch (type) {
-                case 'total':
-                    const queryAllGroups = !groupId || groupId === 'all'
-                    if (queryAllGroups) {
-                        const currentGroupIdsForUserRank = this.getCurrentGroupIdsForFilter()
-                        const allUsers = await this.dbService.getTopUsersAllGroups(999999, 'total_count', currentGroupIdsForUserRank)
-                        
-                        const userIndex = allUsers.findIndex(u => String(u.user_id) === String(userId))
-                        if (userIndex === -1) return null
-                        
-                        const user = allUsers[userIndex]
-                        return {
-                            user_id: user.user_id,
-                            nickname: user.nickname,
-                            count: parseInt(user.total_count || 0, 10),
-                            period_words: parseInt(user.total_words || 0, 10),
-                            active_days: parseInt(user.active_days || 0, 10),
-                            continuous_days: parseInt(user.continuous_days || 0, 10),
-                            last_speaking_time: user.last_speaking_time || null,
-                            rank: userIndex + 1
-                        }
-                    } else {
-                        const isArchived = await this.dbService.isGroupArchived(groupId)
-                        if (isArchived) {
-                            return null
-                        }
-                        
-                        const userStats = await this.dbService.getUserStats(groupId, userId)
-                        if (!userStats || !userStats.total_count || userStats.total_count === 0) {
-                            return null
-                        }
-                        
-                        const allUsers = await this.dbService.getTopUsers(groupId, 999999, 'total_count')
-                        const userIndex = allUsers.findIndex(u => String(u.user_id) === String(userId))
-                        
-                        return {
-                            user_id: userStats.user_id,
-                            nickname: userStats.nickname,
-                            count: parseInt(userStats.total_count || 0, 10),
-                            period_words: parseInt(userStats.total_words || 0, 10),
-                            active_days: parseInt(userStats.active_days || 0, 10),
-                            continuous_days: parseInt(userStats.continuous_days || 0, 10),
-                            last_speaking_time: userStats.last_speaking_time || null,
-                            rank: userIndex !== -1 ? userIndex + 1 : null
-                        }
-                    }
+            const targetId = this.normalizeGroupId(userId)
+            if (!targetId) return null
 
-                case 'daily':
-                    if (!groupId) return null
-                    const todayDate = timeInfo.formattedDate
-                    const dailyStats = await this.dbService.getDailyStatsByGroupAndDate(groupId, todayDate)
-                    
-                    const userDailyStat = dailyStats.find(s => String(s.user_id) === String(userId))
-                    if (!userDailyStat) {
-                        return null
-                    }
-                    
-                    const dailyUserIndex = dailyStats.findIndex(s => String(s.user_id) === String(userId))
-                    
-                    const userStats = await this.dbService.getUserStats(groupId, userId)
-                    return {
-                        user_id: userId,
-                        nickname: userDailyStat.nickname || userStats?.nickname || '未知',
-                        count: parseInt(userDailyStat.message_count || 0, 10),
-                        period_words: parseInt(userDailyStat.word_count || 0, 10),
-                        active_days: userStats?.active_days || 0,
-                        continuous_days: userStats?.continuous_days || 0,
-                        last_speaking_time: userDailyStat.last_speaking_time || userStats?.last_speaking_time || null,
-                        rank: dailyUserIndex !== -1 ? dailyUserIndex + 1 : null
-                    }
+            const bindData = this.getQQBotBindData()
+            const normalizedTargetId = this.resolveQQBotBoundUserId(targetId, bindData)
+            const rankings = await this.getRankingData(groupId, type, { ...options, limit: 999999 })
+            const userIndex = rankings.findIndex(item => {
+                if (this.isSameQQBotBoundUserId(item.user_id, normalizedTargetId, bindData)) return true
+                return (item.merged_user_ids || []).some(id => this.isSameQQBotBoundUserId(id, targetId, bindData))
+            })
 
-                case 'weekly':
-                    if (!groupId) return null
-                    const weekKey = timeInfo.weekKey
-                    const weeklyStats = await this.dbService.getWeeklyStatsByGroupAndWeek(groupId, weekKey)
-                    
-                    const userWeeklyStat = weeklyStats.find(s => String(s.user_id) === String(userId))
-                    if (!userWeeklyStat) {
-                        return null
-                    }
-                    
-                    const weeklyUserIndex = weeklyStats.findIndex(s => String(s.user_id) === String(userId))
-                    
-                    const weeklyUserStats = await this.dbService.getUserStats(groupId, userId)
-                    return {
-                        user_id: userId,
-                        nickname: userWeeklyStat.nickname || weeklyUserStats?.nickname || '未知',
-                        count: parseInt(userWeeklyStat.message_count || 0, 10),
-                        period_words: parseInt(userWeeklyStat.word_count || 0, 10),
-                        active_days: weeklyUserStats?.active_days || 0,
-                        continuous_days: weeklyUserStats?.continuous_days || 0,
-                        last_speaking_time: userWeeklyStat.last_speaking_time || weeklyUserStats?.last_speaking_time || null,
-                        rank: weeklyUserIndex !== -1 ? weeklyUserIndex + 1 : null
-                    }
+            if (userIndex === -1) return null
 
-                case 'monthly':
-                    if (!groupId) return null
-                    const monthKey = options.monthKey || timeInfo.monthKey
-                    const validMonthKey = monthKey.match(/^\d{4}-\d{2}$/) ? monthKey : timeInfo.monthKey
-                    const monthlyStats = await this.dbService.getMonthlyStatsByGroupAndMonth(groupId, validMonthKey)
-                    
-                    const userMonthlyStat = monthlyStats.find(s => String(s.user_id) === String(userId))
-                    if (!userMonthlyStat) {
-                        return null
-                    }
-                    
-                    const monthlyUserIndex = monthlyStats.findIndex(s => String(s.user_id) === String(userId))
-                    
-                    const monthlyUserStats = await this.dbService.getUserStats(groupId, userId)
-                    return {
-                        user_id: userId,
-                        nickname: userMonthlyStat.nickname || monthlyUserStats?.nickname || '未知',
-                        count: parseInt(userMonthlyStat.message_count || 0, 10),
-                        period_words: parseInt(userMonthlyStat.word_count || 0, 10),
-                        active_days: monthlyUserStats?.active_days || 0,
-                        continuous_days: monthlyUserStats?.continuous_days || 0,
-                        last_speaking_time: userMonthlyStat.last_speaking_time || monthlyUserStats?.last_speaking_time || null,
-                        rank: monthlyUserIndex !== -1 ? monthlyUserIndex + 1 : null
-                    }
-
-                case 'yearly':
-                    if (!groupId) return null
-                    const yearKey = timeInfo.yearKey
-                    const yearlyStats = await this.dbService.getYearlyStatsByGroupAndYear(groupId, yearKey)
-                    
-                    const userYearlyStat = yearlyStats.find(s => String(s.user_id) === String(userId))
-                    if (!userYearlyStat) {
-                        return null
-                    }
-                    
-                    const yearlyUserIndex = yearlyStats.findIndex(s => String(s.user_id) === String(userId))
-                    
-                    const yearlyUserStats = await this.dbService.getUserStats(groupId, userId)
-                    return {
-                        user_id: userId,
-                        nickname: userYearlyStat.nickname || yearlyUserStats?.nickname || '未知',
-                        count: parseInt(userYearlyStat.message_count || 0, 10),
-                        period_words: parseInt(userYearlyStat.word_count || 0, 10),
-                        active_days: yearlyUserStats?.active_days || 0,
-                        continuous_days: yearlyUserStats?.continuous_days || 0,
-                        last_speaking_time: userYearlyStat.last_speaking_time || yearlyUserStats?.last_speaking_time || null,
-                        rank: yearlyUserIndex !== -1 ? yearlyUserIndex + 1 : null
-                    }
-
-                default:
-                    return null
+            return {
+                ...rankings[userIndex],
+                rank: userIndex + 1
             }
         } catch (err) {
             this.error(`获取用户排名数据失败 (${type}):`, err)

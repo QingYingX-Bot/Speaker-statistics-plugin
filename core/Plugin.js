@@ -131,6 +131,10 @@ class Plugin extends plugin {
         return await this.rankCommands.showMonthlyRank(e)
     }
 
+    async showPreviousMonthlyRank(e) {
+        return await this.rankCommands.showPreviousMonthlyRank(e)
+    }
+
     async showYearlyRank(e) {
         return await this.rankCommands.showYearlyRank(e)
     }

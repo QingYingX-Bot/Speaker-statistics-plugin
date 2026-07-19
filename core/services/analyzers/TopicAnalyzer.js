@@ -4,6 +4,7 @@
  */
 
 import BaseAnalyzer from './BaseAnalyzer.js'
+import { CommonUtils } from '../../utils/CommonUtils.js'
 import { logger } from '#lib'
 
 export default class TopicAnalyzer extends BaseAnalyzer {
@@ -64,7 +65,7 @@ export default class TopicAnalyzer extends BaseAnalyzer {
             })
           : [],
         // 处理 detail 中的 [user_id] 引用，替换为带头像的 HTML
-        detail: this.processDetailUserReferences(topic.detail.trim(), userMap)
+        detail: this.processDetailUserReferences(topic.detail.trim(), userMap, stats?.groupId)
       }))
 
     logger.info(`[TopicAnalyzer] 提取到 ${validTopics.length} 个话题`)
@@ -76,15 +77,15 @@ export default class TopicAnalyzer extends BaseAnalyzer {
    * 处理 detail 中的用户引用，将 [user_id] 替换为带头像的 HTML
    * @param {string} detail - 原始描述文本
    * @param {Map} userMap - user_id → nickname 映射
+   * @param {string} groupId - 群 ID
    * @returns {string} 处理后的描述文本
    */
-  processDetailUserReferences(detail, userMap) {
-    // 匹配 [数字] 格式的用户ID引用
-    return detail.replace(/\[(\d+)\]/g, (match, userId) => {
+  processDetailUserReferences(detail, userMap, groupId = '') {
+    return detail.replace(/\[([^\]]+)\]/g, (match, userId) => {
       const nickname = userMap.get(userId)
       if (nickname) {
         // 返回带头像的 HTML 胶囊组件
-        const capsule = `<span class="user-capsule"><img class="user-capsule-avatar" src="https://q1.qlogo.cn/g?b=qq&nk=${userId}&s=100" alt="${nickname}" onerror="this.style.display='none'"><span class="user-capsule-name">${nickname}</span></span>`
+        const capsule = `<span class="user-capsule"><img class="user-capsule-avatar" src="${CommonUtils.getQQUserAvatarUrl(userId, groupId)}" alt="${nickname}" onerror="this.style.display='none'"><span class="user-capsule-name">${nickname}</span></span>`
         // 在胶囊前后补薄空格，避免紧贴中文语句导致“黏在一起”的视觉问题
         return `\u2009${capsule}\u2009`
       }
